@@ -10,7 +10,7 @@ dev:
 	uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 docker-up:
-	docker compose up --build -d
+	docker compose up --build -d db
 
 docker-down:
 	docker compose down
