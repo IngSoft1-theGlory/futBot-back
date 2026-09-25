@@ -18,6 +18,7 @@ canales WebSocket definidos en el contrato de API del proyecto.
 
 * Python 3.12+
 * Docker y Docker Compose (para levantar Postgres localmente)
+* Venv 
 
 ## 2. Clonar y configurar el entorno
 
