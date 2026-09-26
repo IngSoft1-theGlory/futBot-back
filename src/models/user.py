@@ -1,23 +1,14 @@
 """
-Modelo User — alcance principal de este ticket.
-
-Contempla:
-  * user_id       -> Primary Key
-  * team_id       -> relación 1 a 1 con Team (FK única, obligatoria)
-  * username      -> no puede estar vacío (validado en la capa de servicio,
-                     ver app/services/user_service.py)
-  * email         -> único en toda la plataforma (constraint a nivel DB)
-  * password_hash -> nunca se guarda la contraseña en texto plano
+Se define la clase User como modelo de SQLAlchemy — la tabla  en la base de datos
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from database.base import Base
 
-from src.database.database import Base
 
 if TYPE_CHECKING:
     from src.models.team import Team
@@ -40,10 +31,8 @@ class User(Base):
 
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # cascade="all, delete-orphan" + single_parent=True: al eliminar un User
-    # (session.delete(user)), SQLAlchemy elimina también su Team asociado.
-    # single_parent=True es requerido para poder usar delete-orphan en una
-    # relación "uno a uno" / many-to-one.
+    # cascada : en cascade="all, delete-orphan", si se borra el usurio 
+    # se elimina tambien el team asociado
     team: Mapped["Team"] = relationship(
         "Team",
         back_populates="user",
@@ -52,18 +41,15 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    # Metodo especial para mostar el objeto con campos, como en el debugger,
+    # no se incluye el password_hash. 
     def __repr__(self) -> str:
-        # A propósito NO incluye `password_hash`: nunca queda expuesta en logs.
         return (
             f"User(user_id={self.user_id!r}, username={self.username!r}, "
             f"email={self.email!r}, team_id={self.team_id!r})"
         )
 
     def to_public_dict(self) -> dict:
-        """
-        Representación de este usuario sin exponer la contraseña
-        (criterio de aceptación #5). No es serialización HTTP.
-        """
         return {
             "user_id": self.user_id,
             "team_id": self.team_id,

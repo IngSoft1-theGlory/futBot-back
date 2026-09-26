@@ -1,29 +1,23 @@
 """
-Lógica de persistencia de User, incluyendo la operación transaccional
-User + Team.
+Lógica de persistencia de User, incluyendo 
 
-El desarrollador de POST /api/v1/auth/register sólo necesita llamar a
-create_user_with_team(...) y traducir estas excepciones a los códigos que
-definió el contrato (DUPLICATE_EMAIL, VOID_USERNAME, etc.).
+operación transaccional User + Team.
 """
 
 from __future__ import annotations
 
 from typing import Any
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
 from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
 
-_EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
+_EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
 class EmptyUsernameError(ValueError):
     """El username es vacío (o sólo espacios)."""
-
 
 class DuplicateEmailError(ValueError):
     """El email ya pertenece a otro usuario."""
@@ -39,13 +33,9 @@ def create_user_with_team(
 ) -> User:
     """
     Crea un User y su Team asociado en una única transacción atómica.
-
-      1. Valida username no vacío.
-      2. Hashea la contraseña.
-      3. Crea el Team.
-      4. Crea el User asociado a ese Team.
-      5. Confirma todo junto; si algo falla, ROLLBACK completo.
+    y si algo falla, ROLLBACK completo.
     """
+
     if username is None or username.strip() == "":
         raise EmptyUsernameError("El nombre de usuario no puede estar vacío.")
 
@@ -66,8 +56,7 @@ def create_user_with_team(
             )
             session.add(user)
             session.flush()
-        # Sale del `with` sin excepción -> COMMIT. Con excepción,
-        # session.begin() ya hizo ROLLBACK y la vuelve a lanzar.
+
     except IntegrityError as exc:
         original_message = str(getattr(exc, "orig", exc))
         if _EMAIL_UNIQUE_CONSTRAINT in original_message or "email" in original_message.lower():

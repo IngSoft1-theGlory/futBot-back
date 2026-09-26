@@ -19,6 +19,10 @@ from collections.abc import Iterator
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+# Convención de nombres para constraints/índices. Fija nombres predecibles
+# (ej: "uq_users_email") en vez de los que autogeneraría cada motor de DB,
+# lo cual hace que Alembic pueda autogenerar migraciones de forma consistente
+# y que el código de manejo de errores pueda reconocer qué constraint falló.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -36,8 +40,13 @@ class Base(DeclarativeBase):
     metadata = metadata_obj
 
 
+# URL de conexión configurable por variable de entorno. Por defecto usa un
+# archivo SQLite local para poder levantar el proyecto sin infraestructura
+# adicional; en producción se espera que DATABASE_URL apunte a Postgres.
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./futbot.db")
 
+# `connect_args` sólo es necesario para SQLite (permite usarlo en tests con
+# distintos threads); en otros motores se ignora porque no se pasa.
 _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, echo=False, future=True, connect_args=_connect_args)
@@ -45,11 +54,13 @@ engine = create_engine(DATABASE_URL, echo=False, future=True, connect_args=_conn
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
-def get_session() -> Iterator[Session]:
+def get_db() -> Iterator[Session]:
     """
     Generador de sesiones para inyección de dependencias (ej. en FastAPI).
-    No se usa desde este ticket, pero el desarrollador de `/auth/register`
-    lo va a necesitar como `Depends(get_session)`.
+
+    No se usa desde este ticket (no se implementa ningún endpoint), pero se
+    deja preparado porque el desarrollador de `/auth/register` lo va a
+    necesitar como `Depends(get_session)`.
     """
     session = SessionLocal()
     try:

@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.database.database import Base
+from database.base import Base
 from src.models import Team, User  # noqa: F401
 
 
