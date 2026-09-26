@@ -1,22 +1,25 @@
 """
 Utilidad de hashing de contraseñas.
 
-No existía en el repositorio ningún mecanismo de hashing reutilizable, así
-que este módulo implementa ÚNICAMENTE lo necesario para hashear una
-contraseña de forma segura antes de persistirla.
+Implementa ÚNICAMENTE lo necesario para hashear una contraseña de forma
+segura antes de persistirla. A propósito NO incluye `verify_password` ni
+ninguna lógica de comparación de credenciales: eso es autenticación
+(login), y pertenece al ticket "[BACK] Implementar endpoint de login".
+Ese ticket debería agregar esa función acá mismo (con `bcrypt.checkpw`),
+en vez de duplicar el mecanismo de hashing.
 
-A propósito NO incluye una función `verify_password` ni ninguna lógica de
-comparación de credenciales: eso es autenticación (login), y pertenece al
-ticket "[BACK] Implementar endpoint de login". Cuando ese ticket se
-implemente, va a necesitar agregar esa función usando el mismo
-`pwd_context` definido acá, para no duplicar el mecanismo de hashing.
+Usa `bcrypt` directamente (sin passlib): passlib está sin mantenimiento
+desde 2020 y es incompatible con bcrypt>=4.1 (perdió el atributo
+`__about__` que passlib usaba para detectar la versión del backend),
+lo que provocaba el error "password cannot be longer than 72 bytes"
+incluso con contraseñas cortas.
 """
 
 from __future__ import annotations
 
-from passlib.context import CryptContext
+import bcrypt
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_MAX_PASSWORD_BYTES = 72  # límite duro del algoritmo bcrypt
 
 
 def hash_password(plain_password: str) -> str:
@@ -27,4 +30,10 @@ def hash_password(plain_password: str) -> str:
     """
     if plain_password is None or plain_password == "":
         raise ValueError("La contraseña no puede estar vacía.")
-    return pwd_context.hash(plain_password)
+
+    password_bytes = plain_password.encode("utf-8")
+    if len(password_bytes) > _MAX_PASSWORD_BYTES:
+        raise ValueError(f"La contraseña no puede superar los {_MAX_PASSWORD_BYTES} bytes.")
+
+    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    return hashed.decode("utf-8")

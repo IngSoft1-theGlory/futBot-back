@@ -5,9 +5,10 @@ aislados, sin depender de la DATABASE_URL real.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 from sqlalchemy import create_engine
-from collections.abc import Generator
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -15,14 +16,8 @@ from src.database.database import Base
 from src.models import Team, User  # noqa: F401
 
 
-
-@pytest.fixture()
 @pytest.fixture()
 def session() -> Generator[Session, None, None]:
-    ...
-    yield db_session
-    ...
-    
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},

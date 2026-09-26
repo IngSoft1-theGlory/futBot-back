@@ -56,7 +56,7 @@ def create_user_with_team(
         with session.begin():
             team = Team(**team_data)
             session.add(team)
-            session.flush()  # asigna team.team_id dentro de la misma transacción
+            session.flush()
 
             user = User(
                 username=username,
@@ -66,13 +66,12 @@ def create_user_with_team(
             )
             session.add(user)
             session.flush()
-        # Sale del `with` sin excepción -> COMMIT. Con excepción -> ROLLBACK
-        # (lo hace session.begin() automáticamente) y la vuelve a lanzar.
+        # Sale del `with` sin excepción -> COMMIT. Con excepción,
+        # session.begin() ya hizo ROLLBACK y la vuelve a lanzar.
     except IntegrityError as exc:
         original_message = str(getattr(exc, "orig", exc))
         if _EMAIL_UNIQUE_CONSTRAINT in original_message or "email" in original_message.lower():
             raise DuplicateEmailError(f"El email '{email}' ya está en uso.") from exc
         raise
 
-    session.refresh(user)
     return user

@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.user import User
+from src.models.user import User
 
 
 def get_user_by_id(session: Session, user_id: int) -> User | None:

@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from src.core.security import hash_password, pwd_context
+import bcrypt 
+from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
 from src.repositories.user_repository import get_user_by_email, get_user_by_id
@@ -55,11 +56,15 @@ def test_empty_username_fails_and_persists_nothing(session):
 def test_password_is_stored_hashed_not_plaintext(session):
     plain_password = "Password123!"
     user = create_user_with_team(
-        session, username="Pepe", email="pepe@famaf.unc.edu.ar",
-        password=plain_password, team_data={"name": "PepeFC"},
+        session,
+        username="Pepe",
+        email="pepe@famaf.unc.edu.ar",
+        password=plain_password,
+        team_data={"name": "PepeFC"},
     )
+
     assert user.password_hash != plain_password
-    assert pwd_context.verify(plain_password, user.password_hash)
+    assert bcrypt.checkpw(plain_password.encode("utf-8"), user.password_hash.encode("utf-8"))
 
 
 def test_password_never_exposed_when_reading_user(session):

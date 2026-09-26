@@ -26,10 +26,10 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from src.database.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from src.models.user import User
 
 
 class Team(Base):

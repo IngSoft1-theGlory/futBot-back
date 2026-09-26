@@ -1,3 +1,3 @@
-from src.services.user_service import User_service  # noqa: F401
+from src.services.user_service import create_user_with_team  
 
-__all__ = ["User_service"]
+__all__ = ["create_user_with_team"]

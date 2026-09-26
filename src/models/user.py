@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from src.database.database import Base
 
 if TYPE_CHECKING:
-    from app.models.team import Team
+    from src.models.team import Team
 
 
 class User(Base):
