@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from src.config.settings import settings
-from src.database.session import get_db
+from database.base import get_db
 
 app = FastAPI(title=settings.PROJECT_NAME)
 

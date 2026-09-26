@@ -17,3 +17,6 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f backend
+
+test:
+	PYTHONPATH=. pytest tests/ -v
