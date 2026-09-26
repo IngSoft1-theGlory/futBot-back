@@ -17,9 +17,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.database.base import Base
-from src.models.behavior import Behavior  # noqa: F401
-from src.models.team import Team  # noqa: F401
-from src.models.user import User  # noqa: F401
+from src.models.behavior import Behavior
+from src.models.team import Team  
+from src.models.user import User 
 
 
 @pytest.fixture()

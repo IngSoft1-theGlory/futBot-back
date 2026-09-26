@@ -21,7 +21,7 @@ def test_behavior_tiene_los_atributos_requeridos():
     behavior = Behavior(
         name="Patear pelota",
         description="El jugador patea la pelota",
-        code="def act(ctx): ...",
+        code="def on_tick(PlayerAPI): ...",
         user_id=1,
         is_default=False,
     )
@@ -29,7 +29,7 @@ def test_behavior_tiene_los_atributos_requeridos():
     assert hasattr(behavior, "behavior_id")
     assert behavior.name == "Patear pelota"
     assert behavior.description == "El jugador patea la pelota"
-    assert behavior.code == "def act(ctx): ..."
+    assert behavior.code == "def on_tick(PlayerAPI): ..."
     assert behavior.user_id == 1
     assert behavior.is_default is False
 
@@ -40,7 +40,7 @@ def test_behavior_se_persiste_en_la_base_de_datos(db_session, usuario_con_equipo
     nuevo = Behavior(
         name="Correr al arco",
         description="El jugador corre hacia el arco rival",
-        code="def act(ctx): ctx.move_to(goal)",
+        code="def on_tick(PlayerAPI): ...",
         user_id=usuario_con_equipo.user_id,
         is_default=False,
     )
@@ -54,7 +54,7 @@ def test_behavior_se_persiste_en_la_base_de_datos(db_session, usuario_con_equipo
     assert guardado is not None
     assert guardado.name == "Correr al arco"
     assert guardado.description == "El jugador corre hacia el arco rival"
-    assert guardado.code == "def act(ctx): ctx.move_to(goal)"
+    assert guardado.code == "def on_tick(PlayerAPI): ..."
     assert guardado.user_id == usuario_con_equipo.user_id
     assert guardado.is_default is False
 
