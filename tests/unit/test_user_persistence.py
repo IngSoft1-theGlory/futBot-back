@@ -18,7 +18,7 @@ from src.services.user_service import (
 def test_create_user_persists_user_and_team(session):
     user = create_user_with_team(
         session, username="Maradona10", email="diego@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "alfajoresFC"},
+        password="Password123!", team_data={"name": "alfajoresFC", "logo": "http://imagen_logo.png"},
     )
     assert user.user_id is not None
     assert user.team_id is not None
@@ -32,12 +32,12 @@ def test_create_user_persists_user_and_team(session):
 def test_duplicate_email_fails_and_rolls_back_completely(session):
     create_user_with_team(
         session, username="Primero", email="repetido@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "EquipoUno"},
+        password="Password123!", team_data={"name": "EquipoUno","logo": "http://imagen_logo.png"},
     )
     with pytest.raises(DuplicateEmailError):
         create_user_with_team(
             session, username="Segundo", email="repetido@famaf.unc.edu.ar",
-            password="OtraPassword456!", team_data={"name": "EquipoDos"},
+            password="OtraPassword456!", team_data={"name": "EquipoDos","logo": "http://imagen_logo.png"},
         )
     assert len(session.scalars(select(User)).all()) == 1
     assert len(session.scalars(select(Team)).all()) == 1  # no quedó EquipoDos
@@ -47,7 +47,7 @@ def test_empty_username_fails_and_persists_nothing(session):
     with pytest.raises(EmptyUsernameError):
         create_user_with_team(
             session, username="   ", email="nadie@famaf.unc.edu.ar",
-            password="Password123!", team_data={"name": "EquipoFantasma"},
+            password="Password123!", team_data={"name": "EquipoFantasma", "logo": "http://imagen_logo.png"},
         )
     assert session.scalars(select(User)).all() == []
     assert session.scalars(select(Team)).all() == []
@@ -60,7 +60,7 @@ def test_password_is_stored_hashed_not_plaintext(session):
         username="Pepe",
         email="pepe@famaf.unc.edu.ar",
         password=plain_password,
-        team_data={"name": "PepeFC"},
+        team_data={"name": "PepeFC", "logo": "http://imagen_logo.png"},
     )
 
     assert user.password_hash != plain_password
@@ -70,7 +70,7 @@ def test_password_is_stored_hashed_not_plaintext(session):
 def test_password_never_exposed_when_reading_user(session):
     user = create_user_with_team(
         session, username="Sin Password Expuesta", email="segura@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "SeguraFC"},
+        password="Password123!", team_data={"name": "SeguraFC", "logo": "http://imagen_logo.png"},
     )
     fetched = get_user_by_id(session, user.user_id)
     public_data = fetched.to_public_dict()
@@ -82,7 +82,7 @@ def test_password_never_exposed_when_reading_user(session):
 def test_user_team_relationship_is_one_to_one(session):
     user = create_user_with_team(
         session, username="Relacion", email="relacion@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "RelacionFC"},
+        password="Password123!", team_data={"name": "RelacionFC", "logo": "http://imagen_logo.png"},
     )
     assert user.team is not None
     assert user.team.team_id == user.team_id
@@ -92,7 +92,7 @@ def test_user_team_relationship_is_one_to_one(session):
 def test_get_user_by_email_helper(session):
     create_user_with_team(
         session, username="Buscable", email="buscable@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "BuscableFC"},
+        password="Password123!", team_data={"name": "BuscableFC", "logo": "http://imagen_logo.png"},
     )
     assert get_user_by_email(session, "buscable@famaf.unc.edu.ar") is not None
     assert get_user_by_email(session, "no-existe@famaf.unc.edu.ar") is None
@@ -126,7 +126,7 @@ def test_atomicity_user_failure_rolls_back_already_flushed_team(session, monkeyp
     with pytest.raises(RuntimeError):
         create_user_with_team(
             session, username="RollbackProfundo", email="rollback-profundo@famaf.unc.edu.ar",
-            password="Password123!", team_data={"name": "EquipoQueNoDeberiaQuedar"},
+            password="Password123!", team_data={"name": "EquipoQueNoDeberiaQuedar", "logo": "http://imagen_logo.png"},
         )
     assert session.scalars(select(Team)).all() == []
     assert get_user_by_email(session, "rollback-profundo@famaf.unc.edu.ar") is None
@@ -135,7 +135,7 @@ def test_atomicity_user_failure_rolls_back_already_flushed_team(session, monkeyp
 def test_delete_user_cascades_to_team(session):
     user = create_user_with_team(
         session, username="ParaEliminar", email="eliminar@famaf.unc.edu.ar",
-        password="Password123!", team_data={"name": "EquipoAEliminar"},
+        password="Password123!", team_data={"name": "EquipoAEliminar", "logo": "http://imagen_logo.png"},
     )
     user_id, team_id = user.user_id, user.team_id
     session.delete(user)

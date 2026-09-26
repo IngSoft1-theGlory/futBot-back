@@ -37,7 +37,13 @@ class Team(Base):
 
     team_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # Tener en cuenta que por estandar el logo suele ser una URL y el largo puede variar
+    # nulleable=False permite que si alguien llama a Team desde una migración u otro lado
+    # que no sea create_user_with_team, la constraint de la tabla impida que hayan datos inconsistentes
+    # incluso si se saltean la validación de negocio con la base de datos, son fines robustos.
+    logo: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # NOTA para el ticket de estadísticas/Team: cuando exista un modelo de
     # estadísticas de equipo, debe colgar de Team (no de User) con su propio
