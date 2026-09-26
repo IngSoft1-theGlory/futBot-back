@@ -5,10 +5,15 @@ Representa un comportamiento predeterminado del sistema
 - Contrato de API: GET/POST/DELETE /api/v1/behaviors
 """
 
-from sqlalchemy import Boolean, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import TYPE_CHECKING
+
+from sqlalchemy import ForeignKey, Boolean, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base
+
+if TYPE_CHECKING:
+    from src.models.user import User
 
 
 class Behavior(Base):
@@ -28,12 +33,14 @@ class Behavior(Base):
     # Codigo fuente en Python asociado al comportamiento (puede ser extenso).
     code: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Dueño del comportamiento. Por ahora es un Integer simple porque el
-    # modelo User todavia no existe en el proyecto (es de otro ticket).
-    # Cuando exista, reemplazar por:
-    #   user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=True)
-    #   user: Mapped["User"] = relationship(back_populates="behaviors")
-    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Dueño del comportamiento (nullable porque los comportamientos
+    # is_default=True son del sistema y no pertenecen a ningún usuario).
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), nullable=True
+    )
+
+    # Relación con respecto al modelo users.
+    user: Mapped["User"] = relationship(back_populates="behaviors")
 
     # True si es un comportamiento predeterminado del sistema (no editable/
     # eliminable por el usuario), False si es personalizado.
