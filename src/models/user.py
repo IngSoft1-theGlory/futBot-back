@@ -21,6 +21,7 @@ from src.database.base import Base
 
 if TYPE_CHECKING:
     from src.models.team import Team
+    from src.models.behavior import Behavior
 
 
 class User(Base):
@@ -56,6 +57,16 @@ class User(Base):
         back_populates="user",
         uselist=False,
         single_parent=True,
+        cascade="all, delete-orphan",
+    )
+
+    # Lado inverso de Behavior.user (necesario porque Behavior declara
+    # back_populates="behaviors"). Un usuario puede tener muchos
+    # comportamientos personalizados; si se borra el User, sus
+    # comportamientos se borran con él (cascade), no quedan huérfanos.
+    behaviors: Mapped[list["Behavior"]] = relationship(
+        "Behavior",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 
