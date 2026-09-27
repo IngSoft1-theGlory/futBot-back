@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from src.config.settings import settings
-from src.database.base import get_session
+from src.database.base import get_db
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -22,7 +22,7 @@ def root():
     return {"message": "FutBot Backend API is running"}
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK)
-def health_check(db: Session = Depends(get_session)):
+def health_check(db: Session = Depends(get_db)):
     try:
         # Ejecuta una consulta ligera para verificar conectividad real con la DB
         db.execute(text("SELECT 1"))

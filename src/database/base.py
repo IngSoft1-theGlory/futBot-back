@@ -54,7 +54,7 @@ engine = create_engine(DATABASE_URL, echo=False, future=True, connect_args=_conn
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
-def get_session() -> Iterator[Session]:
+def get_db() -> Iterator[Session]:
     """
     Generador de sesiones para inyección de dependencias (ej. en FastAPI).
 

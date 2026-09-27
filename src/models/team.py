@@ -37,21 +37,13 @@ class Team(Base):
 
     team_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # Placeholder temporal: el ticket de Team va a reemplazar esto por
-    # `team_name` (con sus validaciones) y `team_logo`. Se deja nullable para
-    # no imponer ninguna regla de negocio que no corresponda a este ticket.
     name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    # NOTA para el ticket de estadísticas/Team: cuando exista un modelo de
-    # estadísticas de equipo, debe colgar de Team (no de User) con su propio
-    # `relationship(..., cascade="all, delete-orphan")`, de forma que al
-    # eliminarse el Team (lo cual ya ocurre en cascada al eliminar el User,
-    # ver app/models/user.py) se eliminen también sus estadísticas.
     user: Mapped[Optional["User"]] = relationship(
         "User",
         back_populates="team",
         uselist=False,
     )
 
-    def __repr__(self) -> str:  # pragma: no cover - solo utilidad de debug
+    def __repr__(self) -> str:
         return f"Team(team_id={self.team_id!r}, name={self.name!r})"
