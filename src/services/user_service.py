@@ -13,7 +13,9 @@ from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
 
-
+# Nombre del constraint UNIQUE de la columna email (ver NAMING_CONVENTION en
+# database/base.py). Se usa para distinguir "email duplicado" de cualquier
+# otro IntegrityError que pueda tirar la DB.
 _EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
 class EmptyUsernameError(ValueError):
@@ -39,11 +41,20 @@ def create_user_with_team(
     if username is None or username.strip() == "":
         raise EmptyUsernameError("El nombre de usuario no puede estar vacío.")
 
+    # Se guarad trimeado para evitar que, por ejemplo "  messi  ", persista con los espacios.
+    username = username.strip()
+
+    # Normaizando a minuscula para que la unicicdad de email sea case-insensitive
+    email = "" if email is None else email.strip().lower()
+
+    # Se hashea antes de abrir la transacción: si esto falla (password
+    # vacía), no llegamos a tocar la DB
     password_hash = hash_password(password)
     team_data = dict(team_data or {})
 
     try:
         with session.begin():
+            # Si algo falla dentro del `with`, rollback de team + user completo.            
             team = Team(**team_data)
             session.add(team)
             session.flush()
