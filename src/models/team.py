@@ -12,6 +12,7 @@ que apuntar como Foreign Key para poder:
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import ForeignKey, String
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -25,7 +26,15 @@ class Team(Base):
 
     team_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    user_id : Mapped[int] = mapped_column(
+        ForeignKey("User.user_id"),
+        unique=True,
+        nullable=False
+    )
+    
+    team_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+ 
+    team_logo: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     user: Mapped[Optional["User"]] = relationship(
         "User",
@@ -35,3 +44,12 @@ class Team(Base):
 
     def __repr__(self) -> str:
         return f"Team(team_id={self.team_id!r}, name={self.name!r})"
+
+    def to_public_dicc(self) -> dict:
+        """ Diccionario para mostrar datos en publicos """
+        return{
+            "team_id": self.team_id,
+            "user_id": self.user_id,
+            "team_name": self.name.name,
+            "team_logo": self.team.logo,
+        }
