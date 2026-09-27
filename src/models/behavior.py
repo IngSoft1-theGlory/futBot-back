@@ -5,7 +5,7 @@ Representa un comportamiento predeterminado del sistema
 - Contrato de API: GET/POST/DELETE /api/v1/behaviors
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,11 +36,11 @@ class Behavior(Base):
     # Dueño del comportamiento (nullable porque los comportamientos
     # is_default=True son del sistema y no pertenecen a ningún usuario).
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.user_id"), nullable=True
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=True
     )
 
     # Relación con respecto al modelo users.
-    user: Mapped["User"] = relationship(back_populates="behaviors")
+    user: Mapped[Optional["User"]] = relationship(back_populates="behaviors")
 
     # True si es un comportamiento predeterminado del sistema (no editable/
     # eliminable por el usuario), False si es personalizado.
