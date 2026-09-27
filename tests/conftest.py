@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database.base import Base
-from src.models import Team, User  # noqa: F401
+from src.models import Team, User
 
 
 @pytest.fixture()
@@ -25,7 +25,7 @@ def session() -> Generator[Session, None, None]:
     )
     Base.metadata.create_all(engine)
 
-    testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True, expire_on_commit=False)
     db_session = testing_session_local()
     try:
         yield db_session
