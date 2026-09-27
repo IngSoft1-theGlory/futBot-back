@@ -11,9 +11,6 @@ run:
 dev:
 	uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
-test:
-	pytest -v
-
 docker-up:
 	docker compose up --build -d db
 
