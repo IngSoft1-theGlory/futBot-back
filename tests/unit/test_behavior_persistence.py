@@ -1,17 +1,7 @@
 """
-Tests que verifican los Criterios de Aceptacion del ticket
-"Implementar modelo y persistencia de comportamiento":
-
-  1. Debe existir un modelo Behavior con los atributos behavior_id, name,
-     description, code, user_id y is_default.
-  2. Debe existir una estructura persistente para almacenar los comportamientos.
-  3. Cada comportamiento debe tener un identificador unico.
-  4. Los datos almacenados deben corresponder con los atributos definidos
-     en el modelo.
-
-Usan el User y el Team reales del repo (no mocks) porque Behavior.user_id
-es una ForeignKey a la tabla "users".
+Tests que verifican los Criterios de Aceptacion del ticket.
 """
+
 from src.models.behavior import Behavior
 
 
@@ -34,7 +24,7 @@ def test_behavior_tiene_los_atributos_requeridos():
 
 
 def test_behavior_se_persiste_en_la_base_de_datos(session, usuario_con_equipo):
-    """CA2 y CA4: existe una estructura persistente y los datos guardados
+    """Existe una estructura persistente y los datos guardados
     corresponden con los atributos definidos al crear el objeto."""
     nuevo = Behavior(
         name="Correr al arco",

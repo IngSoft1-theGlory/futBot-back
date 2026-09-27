@@ -1,5 +1,5 @@
 """
-Se define la clase User como modelo de SQLAlchemy — la tabla  en la base de datos
+Se define la clase User como modelo de SQLAlchemy.
 """
 
 from __future__ import annotations
