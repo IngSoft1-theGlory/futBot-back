@@ -1,5 +1,5 @@
 """
-Modelo User — alcance principal de este ticket.
+Modelo User
 
 Contempla:
   * user_id       -> Primary Key
