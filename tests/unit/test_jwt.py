@@ -31,7 +31,7 @@ def client(app):
     return TestClient(app)
 
 
-def test_create_token_contains_user_id():
+def test_crear_token_contiene_user_id():
     """El JWT generado debe contener el user_id (como 'sub')."""
     token = create_access_token(user_id=123)
 
@@ -41,7 +41,7 @@ def test_create_token_contains_user_id():
     assert payload["sub"] == "123"
 
 
-def test_create_token_contains_expiration():
+def test_crear_token_contiene_expiracion():
     """El JWT debe contener una fecha de expiración."""
     token = create_access_token(user_id=123)
 
@@ -50,7 +50,7 @@ def test_create_token_contains_expiration():
     assert "exp" in payload
 
 
-def test_create_token_expiration_is_in_the_future():
+def test_crear_token_expiracion_es_futura():
     """
     exp tiene que ser una fecha real y
     posterior a ahora, no cualquier valor.
@@ -65,7 +65,7 @@ def test_create_token_expiration_is_in_the_future():
     assert exp > datetime.now(timezone.utc)
 
 
-def test_valid_token_allows_access(client):
+def test_token_valido_permite_acceso(client):
     """
     token valido -> 200 OK -> y el user_id
     devuelto es el mismo que genero el token (no cualquier usuario).
@@ -78,7 +78,7 @@ def test_valid_token_allows_access(client):
     assert response.json()["user_id"] == 123
 
 
-def test_missing_token_returns_401(client):
+def test_token_ausente_devuelve_401(client):
     """
     Sin header Authorization tiene que dar 401, nunca 403 (default de
     HTTPBearer que esta desactivado a proposito con auto_error=False).
@@ -88,7 +88,7 @@ def test_missing_token_returns_401(client):
     assert response.status_code == 401
 
 
-def test_invalid_token_returns_401(client):
+def test_token_invalido_devuelve_401(client):
     """Un string cualquiera, que ni siquiera tiene forma de JWT, da 401."""
     response = client.get(
         "/protected", headers={"Authorization": "Bearer token-invalido"}
@@ -97,7 +97,7 @@ def test_invalid_token_returns_401(client):
     assert response.status_code == 401
 
 
-def test_tampered_token_returns_401(client):
+def test_token_manipulado_devuelve_401(client):
     """
     Corrompe el payload de un token valido sin volver a firmarlo:
     prueba que la firma protege contra manipulacion, no solo que
@@ -115,7 +115,7 @@ def test_tampered_token_returns_401(client):
     assert response.status_code == 401
 
 
-def test_expired_token_returns_401(client):
+def test_token_expirado_devuelve_401(client):
     """Un token expirado da 401."""
     # se le pasa a create_access_token una duración negativa, asi el test usa el mismo camino real
     # que usaria el login, solo que con el resultado ya vencido.
@@ -126,7 +126,7 @@ def test_expired_token_returns_401(client):
     assert response.status_code == 401
 
 
-def test_token_signed_with_wrong_secret_returns_401(client):
+def test_token_firmado_con_clave_incorrecta_devuelve_401(client):
     """
     Un token bien formado, pero firmado con una clave distinta a nuestra secret_key, debe ser rechazado.
     """
@@ -141,7 +141,7 @@ def test_token_signed_with_wrong_secret_returns_401(client):
     assert response.status_code == 401
 
 
-def test_token_uses_secret_key_from_settings(monkeypatch):
+def test_token_usa_secret_key_de_settings(monkeypatch):
     """
     create_access_token firma con el SECRET_KEY que tenga cargado
     `settings` en ese momento, nunca con un valor hardcodeado en el
@@ -159,7 +159,7 @@ def test_token_uses_secret_key_from_settings(monkeypatch):
     assert payload["sub"] == "123"
 
 
-def test_token_cannot_be_verified_with_another_secret(monkeypatch):
+def test_token_no_se_puede_verificar_con_otra_clave(monkeypatch):
     """
     Reverso del test anterior: un token firmado con la clave de settings
     no se puede verificar con ninguna otra clave.
