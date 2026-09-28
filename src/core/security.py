@@ -1,18 +1,27 @@
 """
-Utilidad de hashing de contraseñas.
+Utilidades de seguridad de la aplicación: hashing de contraseñas y
+manejo de JWT para autenticación sin estado (stateless).
 
-Implementa UNICAMENTE lo necesario para hashear una contraseña de forma
-segura antes de persistirla
-
-NO incluye
-- verificacion de_password 
-- ni lógica de comparación de credenciales
+Hashing:
+  - hash_password(): genera el hash de una contraseña para persistir.
+JWT:
+  - create_access_token(): emite un token firmado que identifica a un
+    usuario ya autenticado, con una expiración configurable.
+  - get_current_user(): dependencia de FastAPI que valida ese token en
+    los endpoints protegidos y devuelve el user_id autenticado.
 """
-
 from __future__ import annotations
-import bcrypt
-_MAX_PASSWORD_BYTES = 72  # límite para algoritmo bcrypt
+from datetime import datetime, timezone, timedelta
+from src.config.settings import settings
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from src.core.exceptions import UnauthorizedError
 
+import jwt
+import bcrypt
+
+_MAX_PASSWORD_BYTES = 72  # límite para algoritmo bcrypt
+ALGORITHM = "HS256"  # fijo a propósito: no es un secreto ni varía por entorno
 
 def hash_password(plain_password: str) -> str:
     """ 
@@ -34,3 +43,57 @@ def hash_password(plain_password: str) -> str:
     # el string resultante incluye automáticamente el salt, el algoritmo y el costo
     hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
     return hashed.decode("utf-8")
+
+def create_access_token(user_id: int, expires_delta: timedelta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),) -> str:
+    """
+    Genera un JWT firmado que identifica a un usuario ya autenticado.
+    No consulta la base de datos ni sabe nada de contraseñas: solo
+    empaqueta un user_id y una expiración, y los firma con SECRET_KEY.
+
+    expires_delta tiene un default (la duración configurada en settings),
+    pero se puede pasar un valor propio, por ejemplo en los tests, para
+    generar a propósito un token ya vencido y probar que se lo rechaza.
+    """
+    # 'sub' (subject) es un claim estándar de JWT: identifica a quién
+    # pertenece el token.
+    encode = {"sub": str(user_id)}
+
+    # 'exp' (expiration) es otro claim estándar: pyjwt lo va a comparar
+    # solo contra la hora actual al momento de decodificar
+    expires = datetime.now(timezone.utc) + expires_delta
+    encode.update({"exp": expires})
+
+    # Firma el payload con la clave secreta
+    return jwt.encode(encode, key=settings.SECRET_KEY, algorithm=ALGORITHM)
+
+# Si falta el header Authorization, cancelo el autoerror de FastAPI (403) para poder decidir en get_current_user que responder
+bearer_scheme = HTTPBearer(auto_error=False)
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> int:
+    """
+    Dependencia de FastAPI para proteger endpoints: valida el JWT que
+    venga en el header "Authorization: Bearer <token>" y devuelve el
+    user_id que contiene. Si el token falta, es inválido o expiró,
+    corta la request acá mismo con 401 (el endpoint protegido ni
+    llega a ejecutarse).
+    """
+    # Caso 1: no vino ningun header Authorization.
+    if credentials is None:
+         raise UnauthorizedError("El token de sesión no es válido o ha expirado")
+
+    token = credentials.credentials  # el JWT, ya sin el prefijo "Bearer"
+
+    try:
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[ALGORITHM])
+
+    except jwt.InvalidTokenError:
+        # Caso 2: cubre tanto token expirado como cualquier otro token invalido: firma inválida, formato corrupto, algoritmo distinto, etc.
+        raise  UnauthorizedError("El token de sesión no es válido o ha expirado")
+
+    # paso user_id de vuelta a int para que el resto del código lo use como user_id
+    user_id_str = payload.get("sub")
+    user_id = int(user_id_str)
+
+    return user_id

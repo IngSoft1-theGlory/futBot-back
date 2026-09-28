@@ -6,20 +6,20 @@ No conoce nada sobre User.
 from __future__ import annotations
 
 from src.utils.validators import is_valid_logo_format
-from src.core.exceptions import AppError
+from src.core.exceptions import BadRequestError
 
 
-class VoidTeamNameError(AppError):
+class VoidTeamNameError(BadRequestError):
     error_code = "VOID_TEAM_NAME"
     """El nombre del equipo no puede estar vacío (VOID_TEAM_NAME)"""
 
 
-class VoidTeamLogoError(AppError):
+class VoidTeamLogoError(BadRequestError):
     error_code = "VOID_TEAM_LOGO"
     """El logo del equipo no puede estar vacío (VOID_TEAM_LOGO)"""
 
 
-class InvalidLogoFormatError(AppError):
+class InvalidLogoFormatError(BadRequestError):
     error_code = "INVALID_LOGO_FORMAT"
     """El logo proporcionado tiene un formato inválido (INVALID_LOGO_FORMAT)"""
 

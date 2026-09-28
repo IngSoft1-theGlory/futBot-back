@@ -1,16 +1,14 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from src.config.settings import settings
-from src.core.exceptions import AppError
 from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
-
+from src.core.exceptions import AppError, app_error_handler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,15 +31,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
+app.include_router(auth_router)  # suma las rutas de /api/v1/auth/*
 
-
-@app.exception_handler(AppError)
-def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": exc.error_code, "message": exc.message},
-    )
+# conecta la función pura de exceptions.py con ESTE app puntual: cada
+# vez que algo lance una AppError (o subclase), FastAPI va a llamar
+# app_error_handler(request, esa_excepcion) y devolver lo que retorne
+app.add_exception_handler(AppError, app_error_handler)
 
 
 @app.get("/")
@@ -55,6 +50,8 @@ def health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as e:
+        # este sí es un error inesperado de infraestructura (DB caída),
+        # no un AppError de negocio, por eso usa HTTPException directo
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database connection error: {str(e)}",
