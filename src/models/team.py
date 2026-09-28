@@ -1,18 +1,10 @@
 """
 Se define la clase Team como modelo de SQLAlchemy — la tabla teams en la base de datos
-
-Modelo Team — STUB MÍNIMO.
-Este stub existe únicamente porque User.team_id necesita una tabla real a la
-que apuntar como Foreign Key para poder:
-  1. Crear la migración de la tabla users.
-  2. Probar (tests) la transacción atómica User + Team.
-  3. Probar el cascade de borrado User -> Team.
 """
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, String
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
@@ -26,16 +18,16 @@ class Team(Base):
 
     team_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    user_id : Mapped[int] = mapped_column(
-        ForeignKey("User.user_id"),
-        unique=True,
-        nullable=False
-    )
-    
+    # nullable=True acá porque el que no puede estar vacío lo controlamos en
+    # el service (validate_team_name), no en la columna. si lo pusiéramos
+    # obligatorio acá, una cadena de espacios ("   ") igual pasaría
     team_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
- 
+
     team_logo: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    # sin cascade acá a propósito: la cascada vive del lado de User (que es
+    # quien tiene la FK). ponerla también acá sería duplicar la regla en
+    # los dos lados sin necesidad
     user: Mapped[Optional["User"]] = relationship(
         "User",
         back_populates="team",
@@ -43,13 +35,12 @@ class Team(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Team(team_id={self.team_id!r}, name={self.name!r})"
+        return f"Team(team_id={self.team_id!r}, team_name={self.team_name!r})"
 
-    def to_public_dicc(self) -> dict:
+    def to_public_dict(self) -> dict:
         """ Diccionario para mostrar datos en publicos """
-        return{
+        return {
             "team_id": self.team_id,
-            "user_id": self.user_id,
-            "team_name": self.name.name,
-            "team_logo": self.team.logo,
+            "team_name": self.team_name,
+            "team_logo": self.team_logo,
         }
