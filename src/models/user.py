@@ -66,9 +66,10 @@ class User(Base):
             f"email={self.email!r}, team_id={self.team_id!r})"
         )
 
-    # lo que se manda para afuera en las respuestas: mismo motivo que el
-    # repr de arriba, password_hash no tiene nada que hacer viajando por ahí
     def to_public_dict(self) -> dict:
+        """
+        Representación de este usuario sin exponer la contraseña. No es serialización HTTP.
+        """
         return {
             "user_id": self.user_id,
             "team_id": self.team_id,

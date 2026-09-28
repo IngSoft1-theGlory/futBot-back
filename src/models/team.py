@@ -6,12 +6,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String
+from sqlalchemy import Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base
-from sqlalchemy import Text
-
 
 if TYPE_CHECKING:
     from src.models.user import User
