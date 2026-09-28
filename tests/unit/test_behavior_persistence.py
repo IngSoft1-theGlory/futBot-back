@@ -6,7 +6,7 @@ from src.models.behavior import Behavior
 
 
 def test_behavior_tiene_los_atributos_requeridos():
-    """CA1: el modelo expone behavior_id, name, description, code, user_id e is_default."""
+    """El modelo expone behavior_id, name, description, code, user_id e is_default."""
     behavior = Behavior(
         name="Patear pelota",
         description="El jugador patea la pelota",
@@ -49,7 +49,7 @@ def test_behavior_se_persiste_en_la_base_de_datos(session, usuario_con_equipo):
 
 
 def test_behavior_id_es_unico_y_autogenerado(session, usuario_con_equipo):
-    """CA3: cada comportamiento tiene un identificador unico."""
+    """Cada comportamiento tiene un identificador unico."""
     b1 = Behavior(name="A", description="a", code="pass", user_id=usuario_con_equipo.user_id)
     b2 = Behavior(name="B", description="b", code="pass", user_id=usuario_con_equipo.user_id)
 
@@ -61,8 +61,8 @@ def test_behavior_id_es_unico_y_autogenerado(session, usuario_con_equipo):
     assert b1.behavior_id != b2.behavior_id
 
 
-def test_is_default_por_defecto_es_false(session, usuario_con_equipo):
-    """Un comportamiento personalizado, si no se especifica, no es default."""
+def test_is_default_no_especificado_es_false(session, usuario_con_equipo):
+    """Si is_default no se especifica, se asigna is_default = False"""
     behavior = Behavior(
         name="Custom", description="desc", code="pass", user_id=usuario_con_equipo.user_id
     )
