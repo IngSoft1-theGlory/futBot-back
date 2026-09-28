@@ -53,7 +53,7 @@ def usuario_con_equipo(session):
     Crea un User + Team persistidos (Behavior.user_id apunta a users.user_id,
     asi que la mayoria de los tests de Behavior necesitan un User real).
     """
-    team = Team(name="Sacachispas FC")
+    team = Team(team_name="Sacachispas FC")
     user = User(
         username="messi10",
         email="messi10@example.com",
