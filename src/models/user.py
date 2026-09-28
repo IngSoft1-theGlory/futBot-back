@@ -20,6 +20,9 @@ class User(Base):
 
     user_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
+    # obligatorio (nullable=False): todo user se crea siempre junto con su
+    # team, nunca existe uno sin el otro. unique=True: un team no se puede
+    # compartir entre dos users
     team_id: Mapped[int] = mapped_column(
         ForeignKey("teams.team_id"),
         unique=True,
@@ -28,8 +31,11 @@ class User(Base):
 
     username: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    # unique + index porque lo usamos para loguearse y para chequear
+    # duplicados en el registro
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
 
+    # nunca se guarda la password en texto plano, sólo el hash
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # cascada : en cascade="all, delete-orphan", si se borra el usurio 
@@ -60,6 +66,8 @@ class User(Base):
             f"email={self.email!r}, team_id={self.team_id!r})"
         )
 
+    # lo que se manda para afuera en las respuestas: mismo motivo que el
+    # repr de arriba, password_hash no tiene nada que hacer viajando por ahí
     def to_public_dict(self) -> dict:
         return {
             "user_id": self.user_id,
