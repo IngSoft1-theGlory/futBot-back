@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database.base import Base  
-from src.models import Team, User
+from src.models import Team, User, Behavior
 
 
 @pytest.fixture()
@@ -46,3 +46,21 @@ def session() -> Generator[Session, None, None]:
         db_session.close()
         Base.metadata.drop_all(engine)  # limpia todo, incluso si era la DB real
         engine.dispose()
+
+@pytest.fixture()
+def usuario_con_equipo(session):
+    """
+    Crea un User + Team persistidos (Behavior.user_id apunta a users.user_id,
+    asi que la mayoria de los tests de Behavior necesitan un User real).
+    """
+    team = Team(team_name="Sacachispas FC")
+    user = User(
+        username="messi10",
+        email="messi10@example.com",
+        password_hash="hash-falso-de-prueba",
+        team=team,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user

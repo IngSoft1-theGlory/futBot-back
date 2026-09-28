@@ -3,10 +3,12 @@ Se define la clase Team como modelo de SQLAlchemy — la tabla teams en la base 
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from src.database.base import Base
 from sqlalchemy import Text
 
