@@ -59,17 +59,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse
 
     user = get_user_by_email(db, payload.email)
 
-    # 2. si no existe, o si la password no matchea (verify_password),
-    #    tirar el mismo HTTPException(401, detail={"error": "INVALID_CREDENTIALS", "message": "Email o contraseña incorrecto"})
-    #    — mismo bloque para los dos casos, no dupliques el raise
-
+    # si el usuario no existe, o si la password no matchea (verify_password), devolver InvalidCredentialsError (que el exception handler global traduce a 401)  
     if user == None or not verify_password(payload.password, user.password_hash):
         raise InvalidCredentialsError("Email o contraseña incorrecto")
-    # 3. generar el token con create_access_token
-
+    
+    # Si el usuario existe y la password es correcta, generar un JWT firmado con su user_id como sub y devolverlo junto con los datos del usuario (user_id, team_id, username, email) en la response. 
     jwt_firm = create_access_token(user.user_id)
-    # 4. devolver LoginResponse(token=..., token_type="Bearer", user=UserOut(...))
-    response = LoginResponse(token = jwt_firm, token_type="Bearer", user=UserOut(user_id=user.user_id, team_id=user.team_id, username=user.username, email=user.email))
 
+    # para que Pydantic valide la forma de la response, se arma un objeto LoginResponse con los datos del usuario y el token generado.
+    response = LoginResponse(token = jwt_firm, token_type="Bearer", user=UserOut(user_id=user.user_id, team_id=user.team_id, username=user.username, email=user.email))
 
     return response
