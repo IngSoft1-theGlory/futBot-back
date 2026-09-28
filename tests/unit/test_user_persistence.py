@@ -105,6 +105,18 @@ def test_buscar_usuario_por_email(session):
     assert get_user_by_email(session, "no-existe@famaf.unc.edu.ar") is None
     
 
+
+def test_atomicidad_falla_creacion_equipo_no_deja_usuario(session):
+    """Si falla la creación de Team, no debe quedar un User huérfano."""
+    with pytest.raises(TypeError):
+        create_user_with_team(
+            session, username="SinEquipo", email="sinequipo@famaf.unc.edu.ar",
+            password="Password123!", team_data={"campo_inexistente": "valor"},
+        )
+    assert get_user_by_email(session, "sinequipo@famaf.unc.edu.ar") is None
+    assert session.scalars(select(Team)).all() == []
+
+
 def test_atomicidad_falla_usuario_revierte_equipo_ya_flusheado(session, monkeypatch):
     """El Team llega a flushearse (flush #1) pero el User falla (flush #2):
     la transacción entera debe revertirse, sin dejar el Team persistido."""

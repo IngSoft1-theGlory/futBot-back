@@ -14,7 +14,7 @@ from src.models.team import Team
 from src.models.user import User
 from src.services.team_service import validate_team_logo, validate_team_name
 
-# nombre del constraint UNIQUE de la columna email (ver NAMING_CONVENTION en
+# Nombre del constraint UNIQUE de la columna email (ver NAMING_CONVENTION en
 # database/base.py). Se usa para distinguir "email duplicado" de cualquier
 # otro IntegrityError que pueda tirar la DB.
 _EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"

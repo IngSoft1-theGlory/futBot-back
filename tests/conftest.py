@@ -1,6 +1,8 @@
 """
-Fixtures compartidas. SQLite en memoria (StaticPool) para tests rápidos y
-aislados, sin depender de la DATABASE_URL real.
+Fixtures compartidas. Por defecto SQLite en memoria (StaticPool) para tests
+rápidos y aislados. Si se define TEST_DATABASE_URL, corre contra esa DB real
+en cambio (ej: el Postgres de docker-compose) — útil para detectar bugs que
+SQLite no enforcea (longitud de VARCHAR, case-sensitivity, etc.)
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database.base import Base  
-from src.models import Team, User  # noqa: F401
+from src.models import Team, User
 
 
 @pytest.fixture()
