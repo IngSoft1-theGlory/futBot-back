@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database.base import Base
+from sqlalchemy import Text
+
 
 if TYPE_CHECKING:
     from src.models.user import User
@@ -21,9 +23,9 @@ class Team(Base):
     # nullable=True acá porque el que no puede estar vacío lo controlamos en
     # el service (validate_team_name), no en la columna. si lo pusiéramos
     # obligatorio acá, una cadena de espacios ("   ") igual pasaría
-    team_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    team_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    team_logo: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    team_logo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # sin cascade acá a propósito: la cascada vive del lado de User (que es
     # quien tiene la FK). ponerla también acá sería duplicar la regla en
