@@ -16,9 +16,9 @@ canales WebSocket definidos en el contrato de API del proyecto.
 
 ## 1. Requisitos
 
-* Python 3.12+
+* Python 3.12+ (incluye el módulo `venv`)
 * Docker y Docker Compose (para levantar Postgres localmente)
-* Venv 
+* `make`
 
 ## 2. Clonar y configurar el entorno
 
@@ -29,16 +29,17 @@ cd futBot-back
 python3 -m venv .venv
 source .venv/bin/activate          # En Windows: .venv\Scripts\activate
 
+cp .env.example .env               # crear el .env (ver sección 3)
+
 make install                       # equivale a: pip install -r requirements.txt
 ```
 
+> El `.env` se crea **antes** de correr cualquier comando de `make`, ya que
+> targets como `docker-up`, `dev` y `test-postgres` leen sus variables.
+
 ## 3. Variables de entorno
 
-Copiar el archivo de ejemplo y completar los valores necesarios:
-
-```bash
-cp .env.example .env
-```
+Completá los valores necesarios en el `.env` que copiaste en el paso anterior.
 
 Variables disponibles (ver `.env.example`):
 

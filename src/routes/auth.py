@@ -11,12 +11,16 @@ puede seguir este mismo patrón sin repetir manejo de errores.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from src.database.base import get_db
-from src.schemas.auth import RegisterRequest, RegisterResponse
+from src.schemas.auth import RegisterRequest, RegisterResponse, LoginRequest, LoginResponse, UserOut
+
+from src.repositories.user_repository import get_user_by_email
+from src.core.security import verify_password, create_access_token
 from src.services.user_service import create_user_with_team
+from src.core.exceptions import InvalidCredentialsError
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -49,3 +53,23 @@ def register(
         team_name=payload.team_name,
         team_logo=payload.team_logo,
     )
+
+@router.post("/login", response_model=LoginResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+
+    user = get_user_by_email(db, payload.email)
+
+    # 2. si no existe, o si la password no matchea (verify_password),
+    #    tirar el mismo HTTPException(401, detail={"error": "INVALID_CREDENTIALS", "message": "Email o contraseña incorrecto"})
+    #    — mismo bloque para los dos casos, no dupliques el raise
+
+    if user == None or not verify_password(payload.password, user.password_hash):
+        raise InvalidCredentialsError("Email o contraseña incorrecto")
+    # 3. generar el token con create_access_token
+
+    jwt_firm = create_access_token(user.user_id)
+    # 4. devolver LoginResponse(token=..., token_type="Bearer", user=UserOut(...))
+    response = LoginResponse(token = jwt_firm, token_type="Bearer", user=UserOut(user_id=user.user_id, team_id=user.team_id, username=user.username, email=user.email))
+
+
+    return response
