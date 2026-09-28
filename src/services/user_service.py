@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.core.exceptions import AppError
+from src.core.exceptions import BadRequestError
 from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
@@ -21,27 +21,27 @@ from src.services.team_service import validate_team_logo, validate_team_name
 _EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
 
-class EmptyUsernameError(AppError):
+class EmptyUsernameError(BadRequestError):
     error_code = "VOID_USERNAME"
 
 
-class InvalidEmailFormatError(AppError):
+class InvalidEmailFormatError(BadRequestError):
     error_code = "INVALID_FORMAT"
 
 
-class DuplicateEmailError(AppError):
+class DuplicateEmailError(BadRequestError):
     error_code = "DUPLICATE_EMAIL"
 
 
-class EmptyTeamNameError(AppError):
+class EmptyTeamNameError(BadRequestError):
     error_code = "VOID_TEAM_NAME"
 
 
-class EmptyTeamLogoError(AppError):
+class EmptyTeamLogoError(BadRequestError):
     error_code = "VOID_TEAM_LOGO"
 
 
-class InvalidLogoFormatError(AppError):
+class InvalidLogoFormatError(BadRequestError):
     error_code = "INVALID_LOGO_FORMAT"
 
 

@@ -13,8 +13,9 @@ JWT:
 from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from src.config.settings import settings
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from src.core.exceptions import UnauthorizedError
 
 import jwt
 import bcrypt
@@ -80,10 +81,7 @@ def get_current_user(
     """
     # Caso 1: no vino ningun header Authorization.
     if credentials is None:
-        raise HTTPException(
-            status_code=401,
-            detail={"error": "UNAUTHORIZED", "message": "El token de sesión no es válido o ha expirado"},
-        )
+         raise UnauthorizedError("El token de sesión no es válido o ha expirado")
 
     token = credentials.credentials  # el JWT, ya sin el prefijo "Bearer"
 
@@ -91,11 +89,8 @@ def get_current_user(
         payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[ALGORITHM])
 
     except jwt.InvalidTokenError:
-        # Caso 3: cubre tanto token expirado como cualquier otro token invalido: firma inválida, formato corrupto, algoritmo distinto, etc.
-        raise HTTPException(
-            status_code=401,
-            detail={"error": "UNAUTHORIZED", "message": "El token de sesión no es válido o ha expirado"},
-        )
+        # Caso 2: cubre tanto token expirado como cualquier otro token invalido: firma inválida, formato corrupto, algoritmo distinto, etc.
+        raise  UnauthorizedError("El token de sesión no es válido o ha expirado")
 
     # paso user_id de vuelta a int para que el resto del código lo use como user_id
     user_id_str = payload.get("sub")
