@@ -1,6 +1,6 @@
 """
 Consultas de persistencia sobre User.
-Sólo lectura: la escritura vive en app/services/user_service.py.
+Sólo lectura: la escritura vive en src/services/user_service.py.
 """
 
 from __future__ import annotations

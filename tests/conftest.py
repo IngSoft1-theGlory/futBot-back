@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database.base import Base  
-from src.models import Team, User  # noqa: F401
+from src.models import Team, User
 
 
 @pytest.fixture()
