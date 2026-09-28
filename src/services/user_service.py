@@ -63,8 +63,8 @@ def create_user_with_team(
       5. Confirma todo junto; si algo falla, ROLLBACK completo.
     """
     team_data = dict(team_data or {})
-    team_name = team_data.get("name")
-    team_logo = team_data.get("logo")
+    #team_name = team_data.get("team_name")
+    #team_logo = team_data.get("team_logo")
 
     if username is None or username.strip() == "":
         raise EmptyUsernameError("El nombre de usuario no puede estar vacío.")
@@ -72,17 +72,6 @@ def create_user_with_team(
     if not is_valid_email_format(email):
         raise InvalidEmailFormatError("El email ingresado no tiene un formato válido.")
 
-    if team_name is None or team_name.strip() == "":
-        raise EmptyTeamNameError("El nombre del equipo no puede quedar vacío.")
-
-    if team_logo is None or team_logo.strip() == "":
-        raise EmptyTeamLogoError("Debes proporcionar un logo para el equipo.")
-
-    if not is_valid_logo_format(team_logo):
-        raise InvalidLogoFormatError(
-            "El logo ingresado debe ser una URL válida o tener un formato de "
-            "imagen permitido (.png, .jpg, .jpeg, .svg)."
-        )
     username = username.strip()
     email = "" if email is None else email.strip().lower()  # "Juan@X.com" y "juan@x.com" cuentan como el mismo email
 

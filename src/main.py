@@ -8,9 +8,8 @@ from sqlalchemy import text
 
 from src.config.settings import settings
 from src.core.exceptions import AppError
-from src.database.base import Base, engine, get_session
+from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
-from src import models  
 
 
 @asynccontextmanager
@@ -51,7 +50,7 @@ def root():
 
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK)
-def health_check(db: Session = Depends(get_session)):
+def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}

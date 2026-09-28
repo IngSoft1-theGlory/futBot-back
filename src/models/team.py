@@ -6,8 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-# Importamos Text en lugar de String (o además de String, si se usa en otros campos)
-from sqlalchemy import String, Text
+from sqlalchemy import Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base

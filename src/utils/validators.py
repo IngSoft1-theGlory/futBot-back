@@ -15,7 +15,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _ALLOWED_LOGO_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg")
 
-# NUEVO: Agregamos la expresión regular para validar el Base64 (png, jpeg, svg+xml)
+# Agregamos la expresión regular para validar el Base64 (png, jpeg, svg+xml)
 _BASE64_LOGO_RE = re.compile(r"^data:image/(png|jpeg|svg\+xml);base64,")
 
 
@@ -36,7 +36,7 @@ def is_valid_logo_format(logo: str) -> bool:
     looks_like_url = parsed.scheme in ("http", "https") and bool(parsed.netloc)
     has_allowed_extension = logo.lower().endswith(_ALLOWED_LOGO_EXTENSIONS)
     
-    # NUEVO: Comprobamos si coincide con el formato de Data URL base64
+    # Comprobamos si coincide con el formato de Data URL base64
     is_base64_data = bool(_BASE64_LOGO_RE.match(logo))
 
     # Actualizamos el retorno para incluir la nueva validación

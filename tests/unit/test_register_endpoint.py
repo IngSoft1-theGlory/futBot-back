@@ -18,7 +18,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from src.database.base import get_session
+from src.database.base import get_db
 from src.main import app
 
 VALID_PAYLOAD = {
@@ -32,7 +32,7 @@ VALID_PAYLOAD = {
 
 @pytest.fixture()
 def client(session):
-    app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_db] = lambda: session
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

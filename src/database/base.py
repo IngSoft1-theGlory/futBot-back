@@ -54,11 +54,9 @@ engine = create_engine(DATABASE_URL, echo=False, future=True, connect_args=_conn
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True, expire_on_commit=False)
 
 
-def get_session() -> Iterator[Session]:
+def get_db() -> Iterator[Session]:
     """
     Generador de sesiones para inyección de dependencias (ej. en FastAPI).
-    No se usa desde este ticket, pero el desarrollador de `/auth/register`
-    lo va a necesitar como `Depends(get_session)`.
     """
     session = SessionLocal()
     try:
