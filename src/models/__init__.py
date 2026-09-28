@@ -6,5 +6,6 @@ se resuelvan sin importar manualmente cada módulo.
 
 from src.models.team import Team  
 from src.models.user import User 
+from src.models.behavior import Behavior
 
-__all__ = ["Team", "User"]
+__all__ = ["Team", "User", "Behavior"]

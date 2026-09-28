@@ -10,7 +10,7 @@ from src.config.settings import settings
 from src.core.exceptions import AppError
 from src.database.base import Base, engine, get_session
 from src.routes.auth import router as auth_router
-from src import models
+from src import models  
 
 
 @asynccontextmanager

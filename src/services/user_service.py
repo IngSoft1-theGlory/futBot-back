@@ -1,19 +1,7 @@
 """
-Lógica de persistencia de User, incluyendo la operación transaccional
-User + Team.
+Lógica de persistencia de User, incluyendo 
 
-El desarrollador de POST /api/v1/auth/register solo necesita llamar a
-create_user_with_team(...): todas las reglas del contrato (VOID_USERNAME,
-INVALID_FORMAT, VOID_TEAM_NAME, VOID_TEAM_LOGO, INVALID_LOGO_FORMAT,
-DUPLICATE_EMAIL) se validan acá y se señalizan con una excepción propia.
-La ruta no valida nada: solo llama a esta función y deja que el exception
-handler global (ver src/core/exceptions.py y src/main.py) traduzca
-cualquiera de estas excepciones a la respuesta HTTP del contrato.
-
-Orden de validación (todas antes de tocar la DB, salvo el email duplicado
-que depende de la constraint UNIQUE): username -> formato de email ->
-team_name -> team_logo (vacío) -> team_logo (formato). Fail fast con lo
-más barato primero.
+operación transaccional User + Team.
 """
 
 from __future__ import annotations
@@ -28,6 +16,7 @@ from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
 from src.utils.validators import is_valid_email_format, is_valid_logo_format
+from src.services.team_service import validate_team_logo, validate_team_name
 
 _EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
@@ -94,29 +83,43 @@ def create_user_with_team(
             "El logo ingresado debe ser una URL válida o tener un formato de "
             "imagen permitido (.png, .jpg, .jpeg, .svg)."
         )
+    username = username.strip()
+    email = "" if email is None else email.strip().lower()  # "Juan@X.com" y "juan@x.com" cuentan como el mismo email
+
+    team_data = dict(team_data or {})
+
+    # validamos el team antes de tocar la db o hashear la password
+    validate_team_name(team_data.get("team_name"))
+    validate_team_logo(team_data.get("team_logo"))
 
     password_hash = hash_password(password)
 
     try:
-        with session.begin():
-            team = Team(**team_data)
-            session.add(team)
-            session.flush()
+        # el team y el user se crean los dos acá adentro: si uno falla,
+        # tiene que desaparecer el otro también
+        team = Team(**team_data)
+        session.add(team)
+        session.flush()  # guarda el team para conseguirle su id, pero todavía se puede deshacer
 
-            user = User(
-                username=username,
-                email=email,
-                password_hash=password_hash,
-                team_id=team.team_id,
-            )
-            session.add(user)
-            session.flush()
-        # Sale del `with` sin excepción -> COMMIT. Con excepción,
-        # session.begin() ya hizo ROLLBACK y la vuelve a lanzar.
+        user = User(
+            username=username,
+            email=email,
+            password_hash=password_hash,
+            team_id=team.team_id,
+        )
+        session.add(user)
+        session.flush() 
+
+        session.commit()  # recien aca queda guardado de verdad (user y team)
+
     except IntegrityError as exc:
+        session.rollback() # borra todo lo que se hizo en este intento, team incluido
         original_message = str(getattr(exc, "orig", exc))
         if _EMAIL_UNIQUE_CONSTRAINT in original_message or "email" in original_message.lower():
             raise DuplicateEmailError(f"El email '{email}' ya está en uso.") from exc
+        raise
+    except Exception:
+        session.rollback()  # cualquier otro problema tambien deshace todo
         raise
 
     return user

@@ -1,18 +1,12 @@
 """
-Modelo Team
-
-Contempla:
-  * team_id -> Primary Key (autoincremental)
-  * name    -> no puede estar vacío (String de hasta 100 caracteres)
-  * logo    -> texto largo (Text) que soporta URLs o imágenes en formato Base64
-  * user    -> relación 1 a 1 con User (se elimina en cascada desde User)
+Se define la clase Team como modelo de SQLAlchemy — la tabla teams en la base de datos
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-# CAMBIO: Importamos Text en lugar de String (o además de String, si se usa en otros campos)
+# Importamos Text en lugar de String (o además de String, si se usa en otros campos)
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,11 +21,16 @@ class Team(Base):
 
     team_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # nullable=True acá porque el que no puede estar vacío lo controlamos en
+    # el service (validate_team_name), no en la columna. si lo pusiéramos
+    # obligatorio acá, una cadena de espacios ("   ") igual pasaría
+    team_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # CAMBIO: Cambiamos String(200) por Text para soportar los strings enormes de base64
-    logo: Mapped[str] = mapped_column(Text, nullable=False)
+    team_logo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # sin cascade acá a propósito: la cascada vive del lado de User (que es
+    # quien tiene la FK). ponerla también acá sería duplicar la regla en
+    # los dos lados sin necesidad
     user: Mapped[Optional["User"]] = relationship(
         "User",
         back_populates="team",
@@ -39,4 +38,12 @@ class Team(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Team(team_id={self.team_id!r}, name={self.name!r})"
+        return f"Team(team_id={self.team_id!r}, team_name={self.team_name!r})"
+
+    def to_public_dict(self) -> dict:
+        """ Diccionario para mostrar datos en publicos """
+        return {
+            "team_id": self.team_id,
+            "team_name": self.team_name,
+            "team_logo": self.team_logo,
+        }
