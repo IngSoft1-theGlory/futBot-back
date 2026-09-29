@@ -1,13 +1,13 @@
-""" 
+"""
 Modelo persistente Player.
 
-Representa un comptamiento prederminado del sistema
-- Comtrato de API : POST /api/v1/player.
+Representa un jugador de club, asociado a un equipo.
+- Contrato de API: POST /api/v1/players.
 """
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Boolean, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import UniqueConstraint
 
@@ -38,7 +38,7 @@ class Player(Base):
     )
 
     # Relación con respecto al modelo team.
-    team: Mapped[Optional["Team"]] = relationship(back_populates="player")
+    team: Mapped["Team"] = relationship(back_populates="player")
     
     # Nombre del jugador
     name : Mapped[str] = mapped_column(String(100), nullable=False)
