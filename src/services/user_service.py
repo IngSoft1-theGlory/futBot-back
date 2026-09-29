@@ -7,23 +7,43 @@ operación transaccional User + Team.
 from __future__ import annotations
 
 from typing import Any
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+from src.core.exceptions import BadRequestError
 from src.core.security import hash_password
 from src.models.team import Team
 from src.models.user import User
+from src.utils.validators import is_valid_email_format, is_valid_logo_format
 from src.services.team_service import validate_team_logo, validate_team_name
 
-# Nombre del constraint UNIQUE de la columna email (ver NAMING_CONVENTION en
-# database/base.py). Se usa para distinguir "email duplicado" de cualquier
-# otro IntegrityError que pueda tirar la DB.
 _EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
-class EmptyUsernameError(ValueError):
-    """El username es vacío (o sólo espacios)."""
 
-class DuplicateEmailError(ValueError):
-    """El email ya pertenece a otro usuario."""
+class EmptyUsernameError(BadRequestError):
+    error_code = "VOID_USERNAME"
+
+
+class InvalidEmailFormatError(BadRequestError):
+    error_code = "INVALID_FORMAT"
+
+
+class DuplicateEmailError(BadRequestError):
+    error_code = "DUPLICATE_EMAIL"
+
+
+class EmptyTeamNameError(BadRequestError):
+    error_code = "VOID_TEAM_NAME"
+
+
+class EmptyTeamLogoError(BadRequestError):
+    error_code = "VOID_TEAM_LOGO"
+
+
+class InvalidLogoFormatError(BadRequestError):
+    error_code = "INVALID_LOGO_FORMAT"
+
 
 def create_user_with_team(
     session: Session,
@@ -35,11 +55,22 @@ def create_user_with_team(
 ) -> User:
     """
     Crea un User y su Team asociado en una única transacción atómica.
-    Si algo falla, ROLLBACK completo (ni user ni team quedan persistidos).
+
+      1. Valida username, email, team_name, team_logo (sin tocar la DB).
+      2. Hashea la contraseña.
+      3. Crea el Team.
+      4. Crea el User asociado a ese Team.
+      5. Confirma todo junto; si algo falla, ROLLBACK completo.
     """
+    team_data = dict(team_data or {})
+    #team_name = team_data.get("team_name")
+    #team_logo = team_data.get("team_logo")
 
     if username is None or username.strip() == "":
         raise EmptyUsernameError("El nombre de usuario no puede estar vacío.")
+
+    if not is_valid_email_format(email):
+        raise InvalidEmailFormatError("El email ingresado no tiene un formato válido.")
 
     username = username.strip()
     email = "" if email is None else email.strip().lower()  # "Juan@X.com" y "juan@x.com" cuentan como el mismo email

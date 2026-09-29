@@ -51,16 +51,12 @@ _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite"
 
 engine = create_engine(DATABASE_URL, echo=False, future=True, connect_args=_connect_args)
 
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True, expire_on_commit=False)
 
 
 def get_db() -> Iterator[Session]:
     """
     Generador de sesiones para inyección de dependencias (ej. en FastAPI).
-
-    No se usa desde este ticket (no se implementa ningún endpoint), pero se
-    deja preparado porque el desarrollador de `/auth/register` lo va a
-    necesitar como `Depends(get_session)`.
     """
     session = SessionLocal()
     try:
