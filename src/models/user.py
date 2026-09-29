@@ -12,7 +12,7 @@ from src.database.base import Base
 
 if TYPE_CHECKING:
     from src.models.team import Team
-    from src.models.team import Behavior
+    from src.models.behavior import Behavior
 
 
 class User(Base):
