@@ -12,5 +12,6 @@ League, Match, etc.), cada nuevo módulo de modelo debe agregarse acá.
 from src.models.team import Team 
 from src.models.user import User  
 from src.models.behavior import Behavior
+from src.models.player import Player
 
-__all__ = ["Team", "User","Behavior"]
+__all__ = ["Team", "User","Behavior","Player"]
