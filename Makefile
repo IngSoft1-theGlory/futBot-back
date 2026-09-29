@@ -1,6 +1,6 @@
 .PHONY: install run dev test docker-up docker-down docker-logs
 
-include .env
+-include .env
 
 install:
 	pip install -r requirements.txt

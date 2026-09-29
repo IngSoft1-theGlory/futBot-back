@@ -31,6 +31,11 @@ class UnauthorizedError(AppError):
     status_code = 401
     error_code = "UNAUTHORIZED"
 
+class InvalidCredentialsError(AppError):
+    """Rama 401 específica del login: email inexistente O contraseña
+    incorrecta."""
+    status_code = 401
+    error_code = "INVALID_CREDENTIALS"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

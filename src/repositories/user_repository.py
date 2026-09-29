@@ -16,5 +16,5 @@ def get_user_by_id(session: Session, user_id: int) -> User | None:
 """ Obtener un usuario por email """
 def get_user_by_email(session: Session, email: str) -> User | None:
     # Obtener el usuario que posea el mismo email proporcionado.
-    statement = select(User).where(User.email == email)
+    statement = select(User).where(User.email == email.strip().lower())
     return session.scalars(statement).first()

@@ -44,6 +44,27 @@ def hash_password(plain_password: str) -> str:
     hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
     return hashed.decode("utf-8")
 
+
+def verify_password(plain_password: str, hashed_password: str) -> bool: 
+    """
+    Compara una contraseña en texto plano contra un hash ya guardado.
+    No decodifica el hash ni lo revierte, sino que bcrypt vuelve a hashear
+    `plain_password` internamente y compara los resultados.
+
+    `hashed_password` ya es un hash válido generado por
+    hash_password(), no una contraseña sin hashear.
+    """
+
+    # bcrypt trabaja a bajo nivel con bytes, asi que es necesario convertir los textos antes de pasarselos
+    password_bytes = plain_password.encode("utf-8")
+    hashed_bytes = hashed_password.encode("utf-8")
+
+    # bcrypt hashea password_bytes con la misma sal que ya tiene
+    # guardada adentro de hashed_bytes, y compara los dos resultados
+    matches = bcrypt.checkpw(password_bytes, hashed_bytes)
+
+    return matches
+
 def create_access_token(user_id: int, expires_delta: timedelta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),) -> str:
     """
     Genera un JWT firmado que identifica a un usuario ya autenticado.
