@@ -1,4 +1,4 @@
-.PHONY: install run dev test docker-up docker-down docker-logs
+.PHONY: install run dev test docker-up docker-down docker-logs migrate makemigrations
 
 -include .env
 
@@ -26,3 +26,15 @@ test:
 test-postgres:
 	docker compose up -d db
 	TEST_DATABASE_URL=postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB) PYTHONPATH=. pytest tests/ -v
+
+# Aplica migraciones pendientes (equivalente al viejo create_all() en el
+# startup, pero versionado). Correr después de pullear cambios.
+migrate:
+	PYTHONPATH=. alembic upgrade head
+
+# Genera un borrador de migración a partir del diff entre los modelos y
+# la DB actual. SIEMPRE revisar el script generado a mano antes de
+# commitear, autogenerate no detecta bien renames de columna/tabla.
+makemigrations:
+	PYTHONPATH=. alembic revision --autogenerate -m "$(m)"
+
