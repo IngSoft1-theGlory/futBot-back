@@ -41,7 +41,10 @@ target_metadata = Base.metadata
 
 # Una sola fuente de verdad para la URL: la misma que usa la app.
 # Así no hace falta, ni conviene, tener sqlalchemy.url en alembic.ini.
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Sólo si nadie seteó sqlalchemy.url antes puede forzar otra
+# URL sin que se la pisemos acá.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 
 def run_migrations_offline() -> None:
