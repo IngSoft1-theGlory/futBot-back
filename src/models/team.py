@@ -38,10 +38,8 @@ class Team(Base):
     )
 
     # Lado inverso de Player.team (necesario porque Player declara
-    # back_populates="player")Un Equipo puede tener muchos jugadores,
-    # si se borra el usuario -> se borra el equipo -> se borra jugadores,
-    # con el (cascade), no quedan huerfanos.
-    player: Mapped[list["Player"]] = relationship(
+    # back_populates="players"). Un Equipo puede tener muchos jugadores,
+    players: Mapped[list["Player"]] = relationship(
         back_populates="team",
         cascade="all, delete-orphan",
     )

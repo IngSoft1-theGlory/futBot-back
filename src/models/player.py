@@ -38,7 +38,7 @@ class Player(Base):
     )
 
     # Relación con respecto al modelo team.
-    team: Mapped["Team"] = relationship(back_populates="player")
+    team: Mapped["Team"] = relationship(back_populates="players")
     
     # Nombre del jugador
     name : Mapped[str] = mapped_column(String(100), nullable=False)
