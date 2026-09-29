@@ -16,13 +16,12 @@ from fastapi.responses import JSONResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- código de startup (antes del yield) ---
-    Base.metadata.create_all(bind=engine)
+    # El esquema de la base ya no se crea acá — lo maneja Alembic
+    # Este lifespan es el que se utilizará para Event Bus por ejemplo.
+    yield
 
-    yield  # <- acá el server queda corriendo y atendiendo requests
 
-    # --- código de shutdown (después del yield) ---
-    # nada por ahora
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
