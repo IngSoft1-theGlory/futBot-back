@@ -80,9 +80,6 @@ class Match(Base):
     host_team: Mapped["Team"] = relationship(foreign_keys=[team_host_id])
     away_team: Mapped[Optional["Team"]] = relationship(foreign_keys=[team_away_id])
 
-    # Fecha de creacion: la pone la base al insertar. Sirve para ordenar el listado
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     # Texto legible del partido, para el debugger y los logs.
