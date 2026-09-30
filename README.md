@@ -134,11 +134,56 @@ modelo nuevo, etc.):
    sobre su base local. Esto reemplaza al viejo "che, borrate la base y
    volvé a levantarla" cuando cambiaba algo.
 
+**Revertir una migración (downgrade):**
+
+Si aplicaste una migración de prueba (o cualquiera que quieras descartar
+antes de commitear), no se borra a mano ni con `DROP TABLE` — eso te
+desincroniza `alembic_version` del resto y vas a terminar con un estado raro
+(esquema real vacío pero Alembic pensando que está todo aplicado). El camino
+correcto tiene tres pasos, los tres son necesarios:
+
+```bash
+make downgrade                 # deshace la última migración aplicada (un paso)
+# o make downgrade rev=<id>    # retrocede hasta una revisión puntual
+# o make downgrade rev=base    # deshace todas, deja el esquema vacío
+```
+
+1. `make downgrade` — corre el `downgrade()` de la migración actual y mueve
+   `alembic_version` a la revisión anterior.
+2. Borrá el archivo de esa migración en `alembic/versions/` (si era de
+   prueba y no la vas a commitear).
+3. Revertí también el cambio en el modelo (`src/models/...`) que la había
+   generado — si el modelo sigue declarando el campo pero la migración ya
+   no existe, `make makemigrations` te lo va a volver a "detectar" como
+   faltante la próxima vez.
+
+Los tres pasos van juntos: solo el `downgrade` arregla la base, pero deja el
+modelo y el archivo de migración sueltos si no hacés los otros dos.
+
+**Saber cuál es la versión actual de la Base de datos**
+```bash
+alembic current
+```
+
+**Importante — esto NO es lo mismo que borrar la base de datos.**
+`alembic downgrade base` deja el *esquema* vacío (deshace todas las tablas),
+pero la base de datos en sí (`futbot_db` como objeto de Postgres) sigue
+existiendo. Alembic versiona lo que hay *adentro* de una base que ya existe;
+no crea ni destruye la base en sí — eso es un comando de Postgres
+(`DROP DATABASE`) o, en desarrollo local, tirar el volumen de Docker
+(`docker compose down -v`).
+
 **Cosas que conviene tener claras:**
 
 * Los tests **no** usan Alembic para armar su base (ver sección 7) — sí lo
   hace, a propósito, el único test dedicado a probar que Alembic esté bien
   configurado.
+* `make makemigrations` espera `m="mensaje"` (con `=`), **no** `-m "mensaje"`
+  como `git commit` o `alembic` directo. Si usás `-m`, Make lo interpreta
+  como una flag propia (la ignora) y trata `"mensaje"` como otro target a
+  construir — el resultado es una migración generada igual, pero con el
+  mensaje vacío (`alembic revision --autogenerate -m ""`), y un
+  `make: *** No rule to make target...` al final.
 * En Windows, si editás `Makefile` o algún archivo bajo `alembic/` a mano:
   las líneas de comandos del `Makefile` necesitan **tabs literales**, no
   espacios (es una regla de GNU Make, no de estilo). Si después de agregar
@@ -152,7 +197,6 @@ modelo nuevo, etc.):
 
 ```bash
 make test            # equivale a: PYTHONPATH=. pytest tests/ -v
-make test-postgres   # Corre bajo la base de datos Postgres
 ```
 
 Necesitás el `.env` de la sección 3 incluso para correr los tests: importar
@@ -187,7 +231,7 @@ Backend/
 ├── alembic/
 │   ├── versions/     # Scripts de migración (uno por cambio de esquema)
 │   └── env.py        # Configuración de Alembic (target_metadata, DATABASE_URL)
-├── alembic.ini       # Config de Alembic (sin sqlalchemy.url hardcodeada)
+├── alembic.ini        # Config de Alembic (sin sqlalchemy.url hardcodeada)
 ├── tests/
 │   └── unit/
 ├── docker-compose.yml    # Postgres (+ backend opcional) para desarrollo local

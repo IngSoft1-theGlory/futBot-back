@@ -31,6 +31,8 @@ class User(Base):
 
     username: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    username2: Mapped[str] = mapped_column(String(50), nullable=False)
+
     # unique + index porque lo usamos para loguearse y para chequear
     # duplicados en el registro
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
