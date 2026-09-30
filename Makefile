@@ -1,4 +1,4 @@
-.PHONY: install run dev test docker-up docker-down docker-logs
+.PHONY: install run dev test docker-up docker-down docker-logs migrate makemigrations downgrade
 
 -include .env
 
@@ -26,3 +26,20 @@ test:
 test-postgres:
 	docker compose up -d db
 	TEST_DATABASE_URL=postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB) PYTHONPATH=. pytest tests/ -v
+
+# Aplica migraciones pendientes, correr después de pullear cambios de otro.
+migrate:
+	PYTHONPATH=. alembic upgrade head
+
+# Genera un borrador de migración a partir del diff entre los modelos y
+# la DB actual. SIEMPRE revisar el script generado a mano antes de
+# commitear.
+makemigrations:
+	PYTHONPATH=. alembic revision --autogenerate -m "$(m)"
+
+# Revierte migraciones. Por default retrocede un solo paso 
+# útil para descartar una migración de prueba. Para ir a un
+# punto puntual: make downgrade rev=<revision_id>. Para vaciar el
+# esquema entero: make downgrade rev=base.
+downgrade:
+	PYTHONPATH=. alembic downgrade $(if $(rev),$(rev),-1)

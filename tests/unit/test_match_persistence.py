@@ -37,7 +37,7 @@ def test_deberia_asignar_id_y_valores_por_defecto_al_crear_un_partido(session, l
     session.add(partido)
     session.commit()
 
-    # chequea que la base le puso el id, el estado inicial y los goles en 0
+    # chequea que la base le puso el id, el estado inicial y los goles en 0 
     assert partido.match_id is not None
     assert partido.status == MatchStatus.PENDING
     assert partido.home_goals == 0
