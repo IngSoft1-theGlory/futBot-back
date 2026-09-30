@@ -11,7 +11,7 @@ import os
 from collections.abc import Generator
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -36,7 +36,13 @@ def session() -> Generator[Session, None, None]:
             future=True,
         )
 
+        if engine.dialect.name == "sqlite":
+            @event.listens_for(engine, "connect")
+            def _activar_foreign_keys(dbapi_connection, _record):
+                dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(engine)  # crea el schema en la DB elegida
+
 
     testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     db_session = testing_session_local()
@@ -64,3 +70,5 @@ def usuario_con_equipo(session):
     session.commit()
     session.refresh(user)
     return user
+
+
