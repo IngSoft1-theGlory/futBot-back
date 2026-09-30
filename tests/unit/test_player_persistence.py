@@ -1,6 +1,6 @@
 """
 Tests del modelo Player: persistencia y constraints a nivel de base de
-datos (sin pasar por HTTP ni por ningún service — eso es GLORY-133).
+datos.
 """
 
 import pytest
