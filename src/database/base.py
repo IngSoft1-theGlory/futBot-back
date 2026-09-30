@@ -19,6 +19,8 @@ from collections.abc import Iterator
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+from src.config.settings import settings # Importación de DATABASE_URL para unificación con Alembic
+
 # Convención de nombres para constraints/índices. Fija nombres predecibles
 # (ej: "uq_users_email") en vez de los que autogeneraría cada motor de DB,
 # lo cual hace que Alembic pueda autogenerar migraciones de forma consistente
@@ -40,10 +42,11 @@ class Base(DeclarativeBase):
     metadata = metadata_obj
 
 
-# URL de conexión configurable por variable de entorno. Por defecto usa un
-# archivo SQLite local para poder levantar el proyecto sin infraestructura
-# adicional; en producción se espera que DATABASE_URL apunte a Postgres.
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./futbot.db")
+# Única fuente de verdad para la URL de conexión: settings.DATABASE_URL
+# (pydantic-settings, carga .env). Antes esto leía os.environ directo con
+# su propio fallback a SQLite, desincronizado de config/settings.py, previene un
+# riesgo real: env.py de Alembic y este engine tienen que coincidir.
+DATABASE_URL = settings.DATABASE_URL
 
 # `connect_args` sólo es necesario para SQLite (permite usarlo en tests con
 # distintos threads); en otros motores se ignora porque no se pasa.
