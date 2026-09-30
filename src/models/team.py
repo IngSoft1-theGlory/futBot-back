@@ -13,6 +13,7 @@ from src.database.base import Base
 
 if TYPE_CHECKING:
     from src.models.user import User
+    from src.models.player import Player
 
 
 class Team(Base):
@@ -34,6 +35,13 @@ class Team(Base):
         "User",
         back_populates="team",
         uselist=False,
+    )
+
+    # Lado inverso de Player.team (necesario porque Player declara
+    # back_populates="players"). Un Equipo puede tener muchos jugadores,
+    players: Mapped[list["Player"]] = relationship(
+        back_populates="team",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
