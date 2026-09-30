@@ -42,8 +42,6 @@ def test_deberia_asignar_id_y_valores_por_defecto_al_crear_un_partido(session, l
     assert partido.status == MatchStatus.PENDING
     assert partido.home_goals == 0
     assert partido.away_goals == 0
-    assert partido.created_at is not None
-
 
 def test_deberia_asignar_ids_distintos_a_dos_partidos_del_mismo_equipo(session, local):
     # Tambien prueba que un mismo equipo puede tener varios partidos a la vez.

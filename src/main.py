@@ -10,6 +10,8 @@ from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
 from src.core.exceptions import AppError, app_error_handler
 
+from src.routes.friendly import router as friendly_router
+
 from fastapi import Request 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -36,6 +38,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)  # suma las rutas de /api/v1/auth/*
+app.include_router(friendly_router) # suma las rutas de /api/v1/friendly*
 
 # conecta la función pura de exceptions.py con ESTE app puntual: cada
 # vez que algo lance una AppError (o subclase), FastAPI va a llamar
