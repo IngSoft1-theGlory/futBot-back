@@ -17,7 +17,6 @@ class AppError(Exception):
         self.message = message
         super().__init__(message)
 
-
 class BadRequestError(AppError):
     """Rama 400: la mayoría de los errores de validación de negocio
     caen acá. Las subclases (EmptyUsernameError, etc) solo pisan
@@ -36,6 +35,30 @@ class InvalidCredentialsError(AppError):
     incorrecta."""
     status_code = 401
     error_code = "INVALID_CREDENTIALS"
+
+class ForbiddenError(AppError):
+    """Rama 403: el usuario está autenticado pero no puede hacer esta acción."""
+    status_code = 403
+    error_code = "UNAUTHORIZED_ACTION"
+
+class UnprocessableError(AppError):
+    """Rama 422 de negocio: el request está bien armado pero no se puede cumplir."""
+    status_code = 422
+    error_code = "APP_ERROR"
+
+class InvalidSettingsError(BadRequestError):
+    """Rama 400 INVALID_SETTINGS: la configuración del partido es inválida"""
+    error_code = "INVALID_SETTINGS"
+
+class InvalidConfigurationError(BadRequestError):
+    """Rama 400 INVALID_CONFIGURATION: la formación o la alineación elegidas no son
+    válidas (roles, jugadores o comportamientos que no corresponden)."""
+    error_code = "INVALID_CONFIGURATION"
+
+class PreconditionFailedError(UnprocessableError):
+    """Rama 422 PRECONDITION_FAILED: el request está bien armado, pero el equipo
+    no cumple un requisito previo (hoy, tener al menos 6 jugadores)."""
+    error_code = "PRECONDITION_FAILED"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
