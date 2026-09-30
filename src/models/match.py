@@ -80,6 +80,7 @@ class Match(Base):
     host_team: Mapped["Team"] = relationship(foreign_keys=[team_host_id])
     away_team: Mapped[Optional["Team"]] = relationship(foreign_keys=[team_away_id])
 
+
     # Texto legible del partido, para el debugger y los logs.
     def __repr__(self) -> str:
         return (

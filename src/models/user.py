@@ -12,7 +12,7 @@ from src.database.base import Base
 
 if TYPE_CHECKING:
     from src.models.team import Team
-    from src.models.team import Behavior
+    from src.models.behavior import Behavior
 
 
 class User(Base):
@@ -30,6 +30,8 @@ class User(Base):
     )
 
     username: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    username2: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # unique + index porque lo usamos para loguearse y para chequear
     # duplicados en el registro
