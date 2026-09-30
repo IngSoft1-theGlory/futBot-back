@@ -1,3 +1,7 @@
+"""
+Lógica y persistencia de Player
+"""
+
 from __future__ import annotations
 
 from sqlalchemy.exc import IntegrityError
