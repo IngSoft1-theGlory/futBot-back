@@ -66,12 +66,22 @@ levanta y avisa qué variable falta. Es también la misma URL que usa Alembic
 
 ## 4. Levantar la base de datos
 
+Levanta la base de datos Postgres del desarrollo:
 ```bash
 make docker-up      # levanta Postgres vía docker-compose
 ```
 
-Esto crea un contenedor de Postgres con las credenciales definidas en
+Levanta la base de datos Postgres para Testeo:
+```bash
+docker compose exec db psql -U postgres -c "CREATE DATABASE futbot_test_db;"
+# levanta Postgres vía docker-compose, para tests
+```
+
+Esto crea contenedores de Postgres con las credenciales definidas en
 `docker-compose.yml` (coinciden con el `.env.example` por defecto).
+
+**Nota:** Es necesario levantar AMBAS bases de datos para evitar problemas de testing.
+(Ver sección 7)
 
 ## 5. Levantar el backend localmente
 
@@ -211,6 +221,34 @@ es intencional, para que los tests corran rápido y no dependan de un estado
 compartido. La excepción es `test_alembic_migrations.py`, que sí ejecuta
 `alembic upgrade head` de verdad, pero contra un archivo SQLite temporal
 propio (no toca ni tu base local ni la de `.env`).
+
+**Correr los tests contra Postgres real (`make test-postgres`):**
+
+SQLite no enforcea todo lo que Postgres sí (longitud real de `VARCHAR`,
+case-sensitivity, algunos comportamientos de constraints). Para detectar ese
+tipo de bugs, existe:
+
+```bash
+make test-postgres
+```
+
+Esto corre la misma suite de tests, pero contra Postgres de verdad en vez de
+SQLite en memoria — apuntando a **`futbot_test_db`**, una base separada de tu
+`futbot_db` de desarrollo, dentro del mismo contenedor. La separación es
+intencional y necesaria: `tests/conftest.py` hace `Base.metadata.drop_all()`
+al final de cada test para dejar todo limpio, y eso borra todas las tablas de
+la base contra la que corrió. Si apuntara a tu base de desarrollo, cada
+`make test-postgres` te dejaría sin los datos que tenías ahí probando a mano.
+
+**Antes de usarlo por primera vez**, con el contenedor de Postgres levantado
+(`make docker-up`), creá esa base una sola vez:
+```bash
+docker compose exec db psql -U postgres -c "CREATE DATABASE futbot_test_db;"
+```
+
+`futbot_test_db` no necesita migraciones de Alembic corridas a mano —
+`conftest.py` arma el esquema con `create_all()` al principio de cada test y
+lo destruye al final, así que siempre arranca de cero.
 
 ## 8. Estructura del proyecto
 
