@@ -31,3 +31,8 @@ class EventBus:
             except asyncio.QueueFull:
                 pass  # Descarte silencioso, ignora el elem
                         # que no entro en la cola
+
+
+# Instancia unica del bus, compartida por todo el servidor
+# quien publique o se suscriba debe importa este objeto
+event_bus = EventBus
