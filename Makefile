@@ -25,7 +25,7 @@ test:
 
 test-postgres:
 	docker compose up -d db
-	TEST_DATABASE_URL=postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB) PYTHONPATH=. pytest tests/ -v
+	TEST_DATABASE_URL=postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/futbot_test_db PYTHONPATH=. pytest tests/ -v
 
 # Aplica migraciones pendientes, correr después de pullear cambios de otro.
 migrate:
