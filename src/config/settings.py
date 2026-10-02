@@ -39,3 +39,4 @@ class Settings(BaseSettings):
 # Instancia única: el resto de la app importa este `settings` ya armado,
 # en vez de crear un Settings() nuevo (y releer el .env) en cada archivo.
 settings = Settings()
+
