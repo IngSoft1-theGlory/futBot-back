@@ -48,4 +48,4 @@ class EventBus:
 
 # Instancia unica del bus, compartida por todo el servidor
 # quien publique o se suscriba debe importa este objeto
-event_bus = EventBus
+event_bus = EventBus()
