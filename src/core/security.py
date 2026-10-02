@@ -23,6 +23,10 @@ import bcrypt
 _MAX_PASSWORD_BYTES = 72  # límite para algoritmo bcrypt
 ALGORITHM = "HS256"  # fijo a propósito: no es un secreto ni varía por entorno
 
+# claims personalizados para diferenciar tokens de HTTP de los de WS
+HTTP = "http" 
+WS_GLOBAL = "ws_global"
+
 def hash_password(plain_password: str) -> str:
     """ 
     Devuelve el hash de una contraseña en texto plano.
@@ -79,6 +83,9 @@ def create_access_token(user_id: int, expires_delta: timedelta = timedelta(minut
     # pertenece el token.
     encode = {"sub": str(user_id)}
 
+    token_type = HTTP # claim personalizado para diferenciar tokens de HTTP de los de WS
+    encode.update({"type": token_type})
+
     # 'exp' (expiration) es otro claim estándar: pyjwt lo va a comparar
     # solo contra la hora actual al momento de decodificar
     expires = datetime.now(timezone.utc) + expires_delta
@@ -113,8 +120,36 @@ def get_current_user(
         # Caso 2: cubre tanto token expirado como cualquier otro token invalido: firma inválida, formato corrupto, algoritmo distinto, etc.
         raise  UnauthorizedError("El token de sesión no es válido o ha expirado")
 
+    if payload.get("type") != HTTP:
+        raise UnauthorizedError("El token de sesión no es válido o ha expirado")        
+
     # paso user_id de vuelta a int para que el resto del código lo use como user_id
     user_id_str = payload.get("sub")
     user_id = int(user_id_str)
 
     return user_id
+
+
+def create_ws_global_token(user_id: int, expires_delta: timedelta = timedelta(seconds=settings.WS_GLOBAL_TOKEN_EXPIRE_SECONDS),) -> str:
+    """
+    Genera un JWT firmado que identifica a un usuario ya autenticado para WebSocket.
+    No consulta la base de datos ni sabe nada de contraseñas: solo
+    empaqueta un user_id y una expiración, y los firma con SECRET_KEY.
+
+    expires_delta tiene un default (la duración configurada en settings),
+    pero se puede pasar un valor propio, por ejemplo en los tests, para
+    generar a propósito un token ya vencido y probar que se lo rechaza.
+    """
+
+    encode = {"sub": str(user_id)}
+
+    token_type = WS_GLOBAL # claim personalizado para diferenciar tokens de WS de los de HTTP
+    encode.update({"type": token_type})
+
+    iat = datetime.now(timezone.utc) # claim estándar: cuando se emitio / issued at
+    encode.update({"iat": iat}) 
+
+    expires = iat + expires_delta
+    encode.update({"exp": expires}) 
+
+    return jwt.encode(encode, key=settings.SECRET_KEY, algorithm=ALGORITHM)

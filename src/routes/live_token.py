@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from alembic.util import status
 from fastapi import APIRouter, Depends
 
-from src.config import settings
+from src.config.settings import settings
 from src.core.security import create_ws_global_token, get_current_user
 from src.schemas.live_token import LiveTokenResponse
 
 router = APIRouter(prefix="/api/v1/live-token", tags=["live-token"])
 
 
-@router.post("/global", response_model=LiveTokenResponse, status_code=status.HTTP_200_OK)
+@router.post("/global", response_model=LiveTokenResponse)
 def create_live_token_endpoint(user_id: int = Depends(get_current_user)) -> LiveTokenResponse:
     """
     Endpoint para generar un token global de WebSocket.

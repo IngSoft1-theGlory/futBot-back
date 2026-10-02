@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # de nuevo
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
 
+    # Segundos de vida del token temporal para conectarse al WS global
+    # (se emite en POST /live-token/global). 
+    WS_GLOBAL_TOKEN_EXPIRE_SECONDS: int = 60
+
+    # Dirección base de los WebSockets que se entrega al cliente. Sin default: debe definirse en el .env (ver .env.example).
+    WS_BASE_URL: str
+
     # --- General ---
     ENVIRONMENT: str = "development"
 

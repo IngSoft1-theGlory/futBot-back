@@ -5,7 +5,7 @@ Schemas Pydantic para la respuesta de POST /api/v1/live-token/global
 
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 class LiveTokenResponse(BaseModel):
     """
