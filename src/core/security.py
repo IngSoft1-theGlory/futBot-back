@@ -125,8 +125,8 @@ def get_current_user(
 
     # paso user_id de vuelta a int para que el resto del código lo use como user_id
     user_id_str = payload.get("sub")
+    
     user_id = int(user_id_str)
-
     return user_id
 
 
@@ -153,3 +153,24 @@ def create_ws_global_token(user_id: int, expires_delta: timedelta = timedelta(se
     encode.update({"exp": expires}) 
 
     return jwt.encode(encode, key=settings.SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_ws_global_token(token: str) -> int:
+    """
+    Decodifica un JWT de WebSocket y devuelve el user_id que contiene.
+    Si el token es invalido o expiro, lanza UnauthorizedError.
+    """
+
+    try:
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[ALGORITHM])
+
+    except jwt.InvalidTokenError:
+        raise UnauthorizedError("Se requiere autenticación para conectarse a los eventos del sistema")
+
+    if payload.get("type") != WS_GLOBAL:
+        raise UnauthorizedError("Se requiere autenticación para conectarse a los eventos del sistema")        
+
+    user_id_str = payload.get("sub")
+
+    user_id = int(user_id_str)
+
+    return user_id

@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # (se emite en POST /live-token/global). 
     WS_GLOBAL_TOKEN_EXPIRE_SECONDS: int = 60
 
-    # Dirección base de los WebSockets que se entrega al cliente. Sin default: debe definirse en el .env (ver .env.example).
-    WS_BASE_URL: str
+    # URL base para construir las direcciones de conexión WebSocket
+    WS_BASE_URL : str = "ws://localhost:8000"
 
     # --- General ---
     ENVIRONMENT: str = "development"
