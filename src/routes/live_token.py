@@ -16,9 +16,15 @@ def create_live_token_endpoint(user_id: int = Depends(get_current_user)) -> Live
     Este token es temporal y tiene un tiempo de expiración corto.
     Se utiliza para autenticar la conexión WebSocket en el frontend.
     """
+    # get_current_user valida el token HTTP del header Authorization
+    # y extrae el user_id del usuario autenticado
 
+    # Genera un token WS de corta duración a partir del user_id
     global_token = create_ws_global_token(user_id) 
 
+    # Arma la URL completa que el cliente va a usar para conectarse al WS.
+    # El token va como query param porque es la unica forma de autenticar
+    # una conexión WebSocket desde el navegador.
     url = settings.WS_BASE_URL + "/ws/v1/global?token=" + global_token
 
     return LiveTokenResponse(websocket_url=url, expires_in_seconds=settings.WS_GLOBAL_TOKEN_EXPIRE_SECONDS)
