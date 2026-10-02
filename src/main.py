@@ -9,6 +9,7 @@ from src.config.settings import settings
 from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
 from src.routes.players import router as players_router
+from src.routes.friendly import router as friendly_router
 from src.core.exceptions import AppError, app_error_handler
 
 from fastapi import Request 
@@ -17,9 +18,13 @@ from fastapi.responses import JSONResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # El esquema de la base ya no se crea acá — lo maneja Alembic
-    # Este lifespan es el que se utilizará para Event Bus por ejemplo.
-    yield
+    # --- código de startup (antes del yield) ---
+    Base.metadata.create_all(bind=engine)
+
+    yield  # <- acá el server queda corriendo y atendiendo requests
+
+    # --- código de shutdown (después del yield) ---
+    # nada por ahora
 
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
@@ -34,7 +39,7 @@ app.add_middleware(
 
 app.include_router(auth_router)  # suma las rutas de /api/v1/auth/*
 app.include_router(players_router)  # suma las rutas de /api/v1/players
-
+app.include_router(friendly_router)  # suma las rutas de /api/v1/friendly
 # conecta la función pura de exceptions.py con ESTE app puntual: cada
 # vez que algo lance una AppError (o subclase), FastAPI va a llamar
 # app_error_handler(request, esa_excepcion) y devolver lo que retorne
