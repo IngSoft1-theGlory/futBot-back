@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 
 from src.core.exceptions import BadRequestError, UnauthorizedError
 from src.models.player import Player
+from src.repositories.player_repository import (
+    get_players_count_by_team_id,
+    get_players_by_team_id,
+)
 from src.repositories.user_repository import get_user_by_id
 
 _NAME_MAX_LENGTH = 50  # mismo límite que la columna players.name
@@ -16,6 +20,9 @@ _NUMBER_MAX = 2**31 - 1  # máximo de la columna Integer en Postgres en 32 bits
 _ATTRIBUTE_MIN = 20
 _ATTRIBUTE_MAX = 100
 _ATTRIBUTES_TOTAL = 300
+DEFAULT_PAGE = 1
+DEFAULT_LIMIT = 20
+MAX_LIMIT = 100
 
 
 class InvalidPlayerDataError(BadRequestError):
@@ -28,6 +35,22 @@ class InvalidPacssTotalError(BadRequestError):
 
 class DuplicateJerseyNumberError(BadRequestError):
     error_code = "DUPLICATE_JERSEY_NUMBER"
+
+
+class InvalidQueryParamsError(BadRequestError):
+    error_code = "INVALID_QUERY_PARAMS"
+
+"""Entero positivo desde un query param ; None -> default."""
+def _parse_positive_int(raw: str | None, default: int, name: str) -> int: ##name: el nombre del parámetro, usado para construir el mensaje de error.
+    if raw is None: ##raw: es el valor recibido desde el query param, puede ser un str o None
+        return default ##default: el valor que se usará si raw es None
+    try:
+        value = int(raw) ##intenta convertir el valor a entero
+    except ValueError:
+        raise InvalidQueryParamsError(f"{name} debe ser un entero positivo.") from None
+    if value < 1:
+        raise InvalidQueryParamsError(f"{name} debe ser un entero positivo.")
+    return value
 
 
 def create_player(
@@ -98,3 +121,33 @@ def create_player(
         raise
 
     return player
+
+
+def list_players(
+    session: Session,
+    *,
+    user_id: int,
+    page: str | None = None,
+    limit: str | None = None,
+) -> tuple[list[Player], int, int, int]:
+    """
+    Lista paginada de los jugadores del equipo del usuario autenticado.
+    page/limit llegan crudos (str) para poder responder 400
+    INVALID_QUERY_PARAMS en vez del 422 genérico de FastAPI.
+
+    Devuelve (jugadores, page, limit, total_items).
+    """
+    user = get_user_by_id(session, user_id)
+    if user is None:
+        raise UnauthorizedError("El token de sesión no es válido o ha expirado")
+
+    page_number = _parse_positive_int(page, DEFAULT_PAGE, "page")
+    per_page = _parse_positive_int(limit, DEFAULT_LIMIT, "limit")
+    if per_page > MAX_LIMIT:
+        raise InvalidQueryParamsError(f"limit no puede superar {MAX_LIMIT}.")
+
+    total_items = get_players_count_by_team_id(session, user.team_id)
+    players = get_players_by_team_id(
+        session, user.team_id, offset=(page_number - 1) * per_page, limit=per_page
+    )
+    return players, page_number, per_page, total_items

@@ -31,3 +31,21 @@ class PlayerResponse(BaseModel):
     control: int
     speed: int
     strength: int
+
+
+class PlayerListItem(BaseModel):
+    player_id: int
+    name: str
+    number: int
+
+
+class Pagination(BaseModel):
+    current_page: int
+    per_page: int
+    total_items: int
+    total_pages: int
+
+
+class PlayerListResponse(BaseModel):
+    data: list[PlayerListItem]
+    pagination: Pagination
