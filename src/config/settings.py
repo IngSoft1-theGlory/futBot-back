@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # de nuevo
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
 
+    # Segundos de vida del token temporal para conectarse al WS global
+    # (se emite en POST /live-token/global). 
+    WS_GLOBAL_TOKEN_EXPIRE_SECONDS: int = 60
+
+    # URL base para construir las direcciones de conexión WebSocket
+    WS_BASE_URL : str = "ws://localhost:8000"
+
     # --- General ---
     ENVIRONMENT: str = "development"
 
@@ -39,3 +46,4 @@ class Settings(BaseSettings):
 # Instancia única: el resto de la app importa este `settings` ya armado,
 # en vez de crear un Settings() nuevo (y releer el .env) en cada archivo.
 settings = Settings()
+

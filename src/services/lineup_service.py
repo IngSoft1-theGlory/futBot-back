@@ -1,6 +1,13 @@
 """
-Validaciones de la configuración de un partido: duración, equipo y alineación.
-Las usan todos los endpoints que arman una configuración táctica (amistoso, liga).
+Configuración de un partido: guardado y validación de lo que elige un equipo
+antes de jugar (duración, equipo, jugadores, formación y comportamientos).
+
+Lo usan todos los endpoints que arman una configuración de partido
+(amistoso, liga), así las reglas viven en un solo lugar.
+
+- validate_*  : chequeos sueltos (equipo del usuario, duración, mínimo de jugadores).
+- validate_lineup : formación, jugadores y comportamientos de la alineación.
+- save_lineup : guarda la alineación en la DB 
 """
 
 from __future__ import annotations
@@ -65,7 +72,7 @@ def validate_team_belongs_to_user(session: Session, user_id: int, team_id: int) 
 
 def validate_match_duration(match_duration: int) -> None:
     """400 INVALID_SETTINGS si la duración no es válida."""
-    if match_duration <= 0 or match_duration > 10:  
+    if match_duration != 2 and match_duration != 5:  
         raise InvalidSettingsError("La duración del partido es inválida")
 
 
