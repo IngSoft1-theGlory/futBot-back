@@ -55,7 +55,7 @@ def partido(session, local, visitante):
     match = Match(
         team_host_id=local.team_id,
         team_away_id=visitante.team_id,
-        match_duration=10,
+        match_duration=5,
         status=MatchStatus.IN_PROGRESS,
     )
     session.add(match)
@@ -118,7 +118,6 @@ def test_deberia_fallar_si_el_equipo_no_pertenece_al_usuario(session, usuario_co
 
 @pytest.mark.parametrize("duracion", [0, -5, 11])
 def test_deberia_fallar_si_la_duracion_es_invalida(duracion):
-    # corre tres veces. El maximo valido es 10
     with pytest.raises(InvalidSettingsError):
         validate_match_duration(duracion)
 
