@@ -7,14 +7,9 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from src.models import Match, MatchStatus
-<<<<<<< HEAD
-from src.schemas.friendly import CreateFriendlyRequest
-from src.repositories.match_repository import get_available_matches
-=======
 from src.core.exceptions import InvalidSettingsError, MatchNotFoundError, MatchUnavailableError
-from src.repositories.match_repository import claim_pending_match, get_match_by_id
+from src.repositories.match_repository import claim_pending_match, get_match_by_id, get_available_matches
 from src.schemas.friendly import CreateFriendlyRequest, JoinFriendlyRequest
->>>>>>> origin/develop
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
