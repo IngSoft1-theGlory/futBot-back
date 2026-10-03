@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.models import Match, MatchStatus
 from src.core.exceptions import InvalidSettingsError, MatchNotFoundError, MatchUnavailableError
-from src.repositories.match_repository import claim_pending_match, get_match_by_id
+from src.repositories.match_repository import claim_pending_match, get_match_by_id, get_available_matches
 from src.schemas.friendly import CreateFriendlyRequest, JoinFriendlyRequest
 from src.services.lineup_service import (
     save_lineup,
@@ -53,6 +53,13 @@ def create_friendly(session: Session, user_id: int, payload: CreateFriendlyReque
         raise
 
     return match
+                
+def list_friendly_matches(
+    session: Session, status: MatchStatus, page: int, limit: int) -> list[Match]:
+    """
+    Devuelve una página de amistosos filtrados por estado.
+    """
+    return get_available_matches(session, status=status, page=page, limit=limit)
 
 
 def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFriendlyRequest) -> Match:
