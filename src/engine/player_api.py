@@ -6,6 +6,7 @@ Las primitivas de acción solo registran una Intention.
 
 from src.engine.game_types import AttributeType, GameState
 from src.engine.intentions import ActionType, Intention
+from src.engine.constants import reach_distance
 
 
 class PlayerAPI:
@@ -35,6 +36,11 @@ class PlayerAPI:
         """@brief Devuelve el valor del atributo consultado (del snapshot)."""
         return self._attributes[attribute_name]
 
+    def get_reach_distance(self) -> float:
+        """
+        @brief Devuelve la distancia máxima a la que el jugador puede alcanzar la pelota.
+        """
+        return reach_distance(self.get_attribute(AttributeType.CONTROL))
     # --- Acción (solo registran intención) ---
 
     def idle(self) -> None:
