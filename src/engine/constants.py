@@ -1,16 +1,15 @@
 """
-Constantes PROVISORIAS del motor que el contrato todavía no define.
+Constantes PROVISORIAS
 
-Están todas acá, en un único lugar, para que cuando el equipo las
-confirme haya que tocar un solo archivo.
+Estan todas aca, en un unico lugar, para modificarlas de forma facil
 
-Otras constantes del motor que YA existen y no se repiten acá:
+Otras constantes del motor que YA existen y no se repiten aca:
   - Dimensiones de la cancha: PITCH_LENGTH / PITCH_WIDTH en pitch.py.
   - Duración de un tick: TICK_DURATION_SECONDS en timing.py.
 """
 
-# [PREGUNTA ABIERTA] Fórmula de SPEED.
-# Propuesta: la velocidad máxima de carrera es proporcional al atributo.
+# [PREGUNTA ABIERTA] Formula de SPEED.
+# Propuesta: la velocidad máxima de carrera es proporcional al atributo
 #   velocidad (m/s) = MAX_RUN_SPEED_METERS_PER_SECOND * SPEED / MAX_ATTRIBUTE_VALUE
 # Ejemplos: SPEED 100 -> 8 m/s, SPEED 50 -> 4 m/s, SPEED 20 -> 1.6 m/s.
 MAX_RUN_SPEED_METERS_PER_SECOND = 8.0
