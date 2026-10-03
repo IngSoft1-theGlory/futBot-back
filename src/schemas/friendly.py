@@ -21,3 +21,18 @@ class CreateFriendlyResponse(BaseModel):
     team_host_id: int
     status: str # texto PENDING, no el Enum 
     match_duration: int
+
+
+# Lo que el cliente manda en el body del POST de unirse a un amistoso
+class JoinFriendlyRequest(LineupConfig):
+    team_id: int
+    # hereda formation_type, starting_players y substitute_players de LineupConfig
+
+
+# Lo que el endpoint de unirse a un amistoso devuelve si todo sale bien.
+class JoinFriendlyResponse(BaseModel):
+    match_id: int
+    team_host_id: int
+    team_away_id: int
+    status: str  # texto IN_PROGRESS, no el Enum
+    match_duration: int
