@@ -41,6 +41,16 @@ class ForbiddenError(AppError):
     status_code = 403
     error_code = "UNAUTHORIZED_ACTION"
 
+class NotFoundError(AppError):
+    """Rama 404: el recurso pedido no existe."""
+    status_code = 404
+    error_code = "NOT_FOUND"
+
+class ConflictError(AppError):
+    """Rama 409: el request choca con el estado actual del recurso."""
+    status_code = 409
+    error_code = "CONFLICT"
+
 class UnprocessableError(AppError):
     """Rama 422 de negocio: el request está bien armado pero no se puede cumplir."""
     status_code = 422
@@ -59,6 +69,14 @@ class PreconditionFailedError(UnprocessableError):
     """Rama 422 PRECONDITION_FAILED: el request está bien armado, pero el equipo
     no cumple un requisito previo (hoy, tener al menos 6 jugadores)."""
     error_code = "PRECONDITION_FAILED"
+
+class MatchNotFoundError(NotFoundError):
+    """Rama 404 MATCH_NOT_FOUND: el partido no existe o fue cancelado."""
+    error_code = "MATCH_NOT_FOUND"
+
+class MatchUnavailableError(ConflictError):
+    """Rama 409 MATCH_UNAVAILABLE: el partido ya empezó o ya tiene rival."""
+    error_code = "MATCH_UNAVAILABLE"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

@@ -4,9 +4,20 @@ Los getters leen de un snapshot ya armado (no consultan la base de datos).
 Las primitivas de acción solo registran una Intention.
 """
 
+import math
+
 from src.engine.game_types import AttributeType, GameState
+from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.constants import reach_distance
+
+
+def _is_finite_number(value) -> bool:
+    """True si `value` es un int o float común (no NaN, no infinito, no bool)."""
+    # bool se excluye a propósito: en Python True es un int (True == 1).
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value)
 
 
 class PlayerAPI:
@@ -46,6 +57,43 @@ class PlayerAPI:
     def idle(self) -> None:
         """@brief Registra la intención de permanecer detenido en el lugar."""
         self._intention = Intention(ActionType.IDLE)
+
+    def run_to(self, target: Point2D, speed_percentage: float) -> None:
+        """
+        lo que hace es registrar la intencion de correr en linea recta hacia `target`
+        osea hacia una posicion (x,y)
+        Point2D es el destino encoordenadas finitas
+        speed_percentage es que porcentaje de su velocidad máxima usa,
+               entre 0.1 (practicamente no se mueve) y 1.0 (a fondo).
+
+        solo REGISTRA la intencion: el movimiento real lo calcula resolve (osea em resolve.py)
+
+        argumentos invalidos: lanza ValueError y deja la intención en IDLE
+        Si on_tick no atrapa el error, el motor (match_runner.run_tick) lo
+        atrapa y le asigna IDLE al jugador; si on_tick lo atrapa y sigue,
+        el jugador igual queda en IDLE, salvo que llame a otra primitiva.
+        """
+        # primero se descarta cualquier intencion anterior: si los argumentos son invalidos, el jugador queda quieto este tick.
+        self._intention = Intention(ActionType.IDLE)
+
+        if not isinstance(target, Point2D):
+            raise ValueError(f"run_to: target debe ser un Point2D (recibido: {target!r}).")
+        if not (_is_finite_number(target.x) and _is_finite_number(target.y)):
+            raise ValueError(f"run_to: target debe tener coordenadas finitas (recibido: {target!r}).")
+        if not _is_finite_number(speed_percentage):
+            raise ValueError(
+                f"run_to: speed_percentage debe ser un número finito (recibido: {speed_percentage!r})."
+            )
+        if not 0.0 <= speed_percentage <= 1.0:
+            raise ValueError(
+                f"run_to: speed_percentage debe estar entre 0.0 y 1.0 (recibido: {speed_percentage!r})."
+            )
+
+        self._intention = Intention(
+            ActionType.RUN_TO,
+            target=target,
+            speed_percentage=float(speed_percentage),
+        )
 
     # --- Lectura por parte del motor ---
 

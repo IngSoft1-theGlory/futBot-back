@@ -76,17 +76,22 @@ def test_deberia_idle_registrar_intencion_idle():
 
 
 def test_deberia_llamadas_multiples_en_un_tick_ganar_la_ultima():
-    """
-    Política: gana la última llamada. Se pisa la intención directamente
-    porque run_to todavía no existe; cuando exista, reemplazar por
-    api.run_to(...) seguido de api.idle().
-    """
+    """Política: gana la última llamada (run_to y después idle -> IDLE)."""
     api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
-    api._intention = Intention(ActionType.RUN_TO, target=Point2D(1, 1), speed_percentage=1.0)
+    api.run_to(Point2D(1, 1), 1.0)
 
     api.idle()
 
     assert api.intention.action == ActionType.IDLE
+
+
+def test_deberia_idle_y_despues_run_to_quedar_en_run_to():
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+    api.idle()
+
+    api.run_to(Point2D(1, 1), 1.0)
+
+    assert api.intention.action == ActionType.RUN_TO
 
 
 def test_deberia_dos_playerapi_no_compartir_la_intencion():
@@ -98,3 +103,73 @@ def test_deberia_dos_playerapi_no_compartir_la_intencion():
     api_a.idle()
 
     assert api_b.intention.action == ActionType.IDLE
+
+
+# --- run_to ---
+
+def test_deberia_run_to_registrar_intencion_con_target_y_speed_percentage():
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.run_to(Point2D(50, 30), 0.75)
+
+    assert api.intention == Intention(ActionType.RUN_TO, target=Point2D(50, 30), speed_percentage=0.75)
+
+
+@pytest.mark.parametrize("speed_percentage", [0.0, 0.5, 1.0, 0, 1])
+def test_deberia_run_to_aceptar_speed_percentage_entre_cero_y_uno(speed_percentage):
+    """Los extremos 0.0 y 1.0 son válidos; también los enteros 0 y 1."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.run_to(Point2D(50, 30), speed_percentage)
+
+    assert api.intention.action == ActionType.RUN_TO
+    assert api.intention.speed_percentage == float(speed_percentage)
+
+
+def test_deberia_run_to_aceptar_target_fuera_de_la_cancha():
+    """Target fuera de la cancha es válido: el resolver lo limita al borde."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.run_to(Point2D(-10, 500), 1.0)
+
+    assert api.intention.action == ActionType.RUN_TO
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        None,
+        (50, 30),                        # tupla, no Point2D
+        Point2D(float("nan"), 30),
+        Point2D(50, float("inf")),
+        Point2D(float("-inf"), 30),
+        Point2D("50", 30),               # coordenada que no es número
+    ],
+)
+def test_deberia_run_to_con_target_invalido_lanzar_value_error(target):
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    with pytest.raises(ValueError):
+        api.run_to(target, 1.0)
+
+
+@pytest.mark.parametrize(
+    "speed_percentage",
+    [-0.1, 1.1, 100, float("nan"), float("inf"), None, "1.0", True],
+)
+def test_deberia_run_to_con_speed_percentage_invalido_lanzar_value_error(speed_percentage):
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    with pytest.raises(ValueError):
+        api.run_to(Point2D(50, 30), speed_percentage)
+
+
+def test_deberia_run_to_invalido_dejar_la_intencion_en_idle():
+    """Aunque antes hubiera un run_to válido, una llamada inválida deja IDLE."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+    api.run_to(Point2D(50, 30), 1.0)
+
+    with pytest.raises(ValueError):
+        api.run_to(Point2D(50, 30), 2.0)
+
+    assert api.intention.action == ActionType.IDLE
