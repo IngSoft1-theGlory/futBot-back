@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.models import Match, MatchStatus
 from src.schemas.friendly import CreateFriendlyRequest
+from src.repositories.match_repository import get_available_matches
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -52,3 +53,9 @@ def create_friendly(session: Session, user_id: int, payload: CreateFriendlyReque
 
     return match
                 
+def list_friendly_matches(
+    session: Session, status: MatchStatus, page: int, limit: int) -> list[Match]:
+    """
+    Devuelve una página de amistosos filtrados por estado.
+    """
+    return get_available_matches(session, status=status, page=page, limit=limit)

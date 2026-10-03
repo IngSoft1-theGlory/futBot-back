@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from src.core.security import get_current_user
 from src.database.base import get_db
-from src.schemas.friendly import CreateFriendlyRequest, CreateFriendlyResponse
-from src.services.friendly_service import create_friendly
+from src.schemas.friendly import CreateFriendlyRequest, CreateFriendlyResponse, FriendlyListOut
+from src.services.friendly_service import create_friendly, list_friendly_matches
+from src.models.match import MatchStatus
 
 # Todas las rutas de este archivo empiezan con /api/v1/friendly
 router = APIRouter(prefix="/api/v1/friendly", tags=["friendly"])
@@ -40,3 +41,19 @@ def create_friendly_endpoint(
         status = match.status.value,  # create_friendly siempre devuelve PENDING
         match_duration = match.match_duration,
     )
+
+# GET /api/v1/friendly
+# El path va vacío ("") porque el prefix ya tiene la URL completa.
+@router.get(
+    "",
+    response_model=FriendlyListOut,
+    dependencies=[Depends(get_current_user)],  
+)
+def list_friendly(
+    page: int = Query(1, ge=1),                        # ge=1: page=0 o negativo → 422
+    limit: int = Query(20, ge=1, le=100),              # le=100: tope para que nadie pida la tabla entera
+    status: MatchStatus = Query(MatchStatus.PENDING),  # valor inválido → 422
+    session: Session = Depends(get_db),
+):
+    matches = list_friendly_matches(session, status=status, page=page, limit=limit)
+    return {"matches": matches}
