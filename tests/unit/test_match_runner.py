@@ -325,3 +325,62 @@ async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
     assert state_b.score.home == 0
     assert state_a.current_tick == 2
     assert state_b.current_tick == 5
+
+
+# --- Fallas de las piezas que NO son comportamientos ---
+# Un bug en apply_intentions, detect_goal o notify no debe dejar el
+# partido muerto a la mitad: el ciclo lo loguea y sigue.
+# están no accedidas pues es responsabilidad de otras implementaciones el
+# crear y generar estas detecciones
+
+
+def _apply_que_falla(state, intentions) -> None:
+    raise RuntimeError("bug en apply_intentions")
+
+
+def _detect_goal_que_falla(state):
+    raise RuntimeError("bug en detect_goal")
+
+
+async def _notify_que_falla(state) -> None:
+    raise RuntimeError("bug en notify")
+
+
+def test_deberia_run_tick_seguir_si_apply_intentions_falla():
+    state = _build_state()
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_apply_que_falla, detect_goal=_no_goal)
+
+    assert state.current_tick == 1
+
+
+def test_deberia_run_tick_seguir_sin_gol_si_detect_goal_falla():
+    state = _build_state()
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=_detect_goal_que_falla)
+
+    assert state.current_tick == 1
+    assert (state.score.home, state.score.away) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_deberia_run_match_terminar_aunque_apply_detect_y_notify_fallen_siempre():
+    state = _build_state(total_ticks=4)
+    registry = MatchRegistry()
+    resultados = []
+
+    await run_match(
+        state,
+        registry,
+        execute_behavior=_idle_behavior,
+        apply_intentions=_apply_que_falla,
+        detect_goal=_detect_goal_que_falla,
+        notify=_notify_que_falla,
+        tick_interval_seconds=0,
+        on_finished=resultados.append,
+    )
+
+    assert state.current_tick == 4
+    assert state.phase is MatchPhase.FINISHED
+    assert resultados == [state]  # el resultado igual se guardó
+    assert MATCH_ID not in registry
