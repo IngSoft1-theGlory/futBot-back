@@ -2,11 +2,11 @@
 Geometría fija de la cancha: dimensiones, arcos y posiciones iniciales
 por formación/rol/lado.
 
-IMPORTANTE - valores asumidos, a confirmar:
+IMPORTANTE - valores asumidos:
   - PITCH_LENGTH / PITCH_WIDTH: ya aparecían implícitas en los tests de
     resolve.py y player_api.py (team_goal=Point2D(0,30), opponent_goal=
     Point2D(105,30)). Las mantenemos para no romper esos tests.
-  - GOAL_WIDTH: ancho de arco FIFA 7.32m, reescalado a esta cancha.
+  - GOAL_WIDTH: ancho de arco FIFA (7.32m), reescalado a esta cancha.
   - FORMATION_POSITIONS: posiciones de ejemplo, razonables pero arbitrarias.
 
 GameState.team_goal / opponent_goal (contrato de Primitivas, en
@@ -19,13 +19,18 @@ motor: nunca se expone a los comportamientos (no es parte de GameState).
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from src.engine.geometry_types import Point2D
 
+if TYPE_CHECKING:
+    # Solo para anotar el tipo: state.py importa pitch.py, así que importarlo
+    # de verdad acá armaría un import circular.
+    from src.engine.state import MatchState
+
 PITCH_LENGTH = 105.0  # eje x: 0 (línea de fondo de HOME) a 105 (línea de AWAY)
 PITCH_WIDTH = 60.0    # eje y: 0 a 60, centro en 30
-GOAL_WIDTH = 7.32     # ancho del arco, centrado en y = PITCH_WIDTH / 2
+GOAL_WIDTH = 7.32     # ancho del arco (FIFA), centrado en y = PITCH_WIDTH / 2
 
 
 class TeamSide(Enum):
@@ -75,7 +80,7 @@ def opponent_goal_center(side: TeamSide) -> Point2D:
     return goal_center(other)
 
 
-def default_detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
+def default_detect_goal(state: "MatchState") -> Optional[TeamSide]:
     """
     Implementación de referencia de detección de gol (PLACEHOLDER, a
     confirmar con el equipo -- ver "Decisiones pendientes" del ticket).
@@ -87,10 +92,14 @@ def default_detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
       - Reiniciar la posición de la pelota tras el gol (eso es de
         apply_intentions / del ciclo, no de la detección en sí).
 
+    Recibe el MatchState entero (como pide match_runner.DetectGoal) para
+    que una regla más fina pueda usar más que la posición de la pelota.
+
     Devuelve el lado que CONVIERTE el gol (quien lo mete), no el que lo
     recibe: si la pelota entra en el arco que defiende HOME, el gol es
     de AWAY.
     """
+    ball_position = state.ball.position
     if ball_position.x <= HOME_GOAL.line_x and HOME_GOAL.contains_y(ball_position.y):
         return TeamSide.AWAY
     if ball_position.x >= AWAY_GOAL.line_x and AWAY_GOAL.contains_y(ball_position.y):
