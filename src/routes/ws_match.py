@@ -7,6 +7,7 @@ from src.core.exceptions import AppError
 from src.core.security import decode_ws_global_token
 from src.database.base import get_db
 from src.services.match_access_service import get_match_in_progress, user_participates
+from src.realtime.match_connection_manager import match_connections
 
 router = APIRouter(prefix="/ws/v1", tags=["websocket"])
 
@@ -61,7 +62,9 @@ async def ws_match_endpoint(
 
     # handshake aceptado, el cliente puede recibir TICK_UPDATE de este partido
     await websocket.accept()
-
+    # registrar la conexión para que el motor de simulación pueda enviarle TICK_UPDATE
+    match_connections.register(match_id, websocket)
+    
     try:
         # loop infinito hasta que el cliente se desconecte  o cierre el Ws 
         while True:
@@ -71,5 +74,5 @@ async def ws_match_endpoint(
             if message["type"] == "websocket.disconnect":
                 break
     finally:
-        # acá se des-registra la conexión del partido
-        pass
+        # si el cliente se desconecta, se rompe el loop y se sale del endpoint
+        match_connections.unregister(match_id, websocket)

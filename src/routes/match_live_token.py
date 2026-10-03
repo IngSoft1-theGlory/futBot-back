@@ -33,11 +33,6 @@ def create_match_live_token_endpoint(
     # si el partido no existe o no está en ejecución -> MatchNotFoundError (404)
     match = get_match_in_progress(session, match_id)
 
-    # si el usuario no existe -> UnauthorizedError (401); si no participa -> 403
-    # espectadores: si el PO los aprueba, borrar este if
-    if not user_participates(session, user_id, match):
-        raise ForbiddenError("No se permite conectarse a partidos en los que no participas")
-
     # mismo token que el del canal global - type ws_global
     token = create_ws_global_token(user_id)
 
