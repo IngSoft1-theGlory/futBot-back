@@ -10,6 +10,8 @@ from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
 from src.routes.players import router as players_router
 from src.routes.live_token import router as live_token_router
+from src.routes.match_live_token import router as match_live_token_router
+from src.routes.ws_match import router as ws_match_router
 from src.routes.behaviors import router as behaviors_router
 from src.core.exceptions import AppError, app_error_handler
 
@@ -37,6 +39,8 @@ app.add_middleware(
 app.include_router(auth_router)  # suma las rutas de /api/v1/auth/*
 app.include_router(players_router)  # suma las rutas de /api/v1/players
 app.include_router(live_token_router)  # suma las rutas de /api/v1/live-token/*
+app.include_router(match_live_token_router) # suma las rutas de /api/v1/matches/*/live-token
+app.include_router(ws_match_router) # suma las rutas de /ws/v1/matches/*
 
 app.include_router(behaviors_router)  # suma las rutas de /api/v1/behaviors
 # conecta la función pura de exceptions.py con ESTE app puntual: cada

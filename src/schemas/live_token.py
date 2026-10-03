@@ -13,3 +13,9 @@ class LiveTokenResponse(BaseModel):
     """
     websocket_url: str 
     expires_in_seconds: int
+
+class MatchLiveTokenResponse(BaseModel):
+    """ Lo que devolvemos si la solicitud de token de partido sale bien (200 OK). """
+    match_id: int
+    websocket_url: str
+    expires_in_seconds: int

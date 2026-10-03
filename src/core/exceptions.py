@@ -60,6 +60,15 @@ class PreconditionFailedError(UnprocessableError):
     no cumple un requisito previo (hoy, tener al menos 6 jugadores)."""
     error_code = "PRECONDITION_FAILED"
 
+class NotFoundError(AppError):
+    """Rama 404: el recurso no existe."""
+    status_code = 404
+    error_code = "NOT_FOUND"
+
+class MatchNotFoundError(NotFoundError):
+    """ Rama 404 específica de partidos: el partido no existe o no está iniciado"""
+    error_code = "MATCH_NOT_FOUND"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
