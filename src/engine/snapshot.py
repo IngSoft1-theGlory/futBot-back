@@ -36,7 +36,7 @@ def build_player_snapshot(match_state: MatchState, player_id: int) -> tuple[Game
         opponents = list(rivals_positions),      # a otros jugadores ni al estado del motor
         team_goal = team_goal, 
         opponent_goal = rivals_goal,
-    ), player.attributes
+    ), player.attributes.copy() # al igual que arriba, devuelvo una copia asi un comportamiento no puede modificar el estado real del partido 
 
 
 
