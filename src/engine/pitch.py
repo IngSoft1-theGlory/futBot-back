@@ -19,14 +19,9 @@ motor: nunca se expone a los comportamientos (no es parte de GameState).
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from src.engine.geometry_types import Point2D
-
-if TYPE_CHECKING:
-    # Solo para anotar el tipo: state.py importa pitch.py, así que importarlo
-    # de verdad acá armaría un import circular.
-    from src.engine.state import MatchState
 
 PITCH_LENGTH = 105.0  # eje x: 0 (línea de fondo de HOME) a 105 (línea de AWAY)
 PITCH_WIDTH = 60.0    # eje y: 0 a 60, centro en 30
@@ -80,26 +75,21 @@ def opponent_goal_center(side: TeamSide) -> Point2D:
     return goal_center(other)
 
 
-def default_detect_goal(state: "MatchState") -> Optional[TeamSide]:
+def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
     """
-    Implementación de referencia de detección de gol (PLACEHOLDER, a
-    confirmar con el equipo -- ver "Decisiones pendientes" del ticket).
-
-    Regla: gol si la pelota cruzó una línea de fondo dentro del ancho
-    del arco. NO contempla:
-      - Qué pasa si la pelota sale por el costado (y fuera de [0, PITCH_WIDTH]).
-      - Rebotes contra el palo o el travesaño.
-      - Reiniciar la posición de la pelota tras el gol (eso es de
-        apply_intentions / del ciclo, no de la detección en sí).
-
-    Recibe el MatchState entero (como pide match_runner.DetectGoal) para
-    que una regla más fina pueda usar más que la posición de la pelota.
+    Regla de gol: hay gol cuando la pelota llega a una línea de fondo
+    dentro del ancho del arco (entre los dos postes).
 
     Devuelve el lado que CONVIERTE el gol (quien lo mete), no el que lo
     recibe: si la pelota entra en el arco que defiende HOME, el gol es
-    de AWAY.
+    de AWAY. Devuelve None si no hay gol.
+
+    Solo mira la posición de la pelota. Lo que esta regla NO hace:
+      - Mover la pelota ni reiniciarla al centro después de un gol: eso
+        es de apply_intentions. Mientras la pelota siga dentro del arco,
+        esta función va a seguir devolviendo gol en cada tick.
+      - Contemplar la salida por el costado, los rebotes ni los palos.
     """
-    ball_position = state.ball.position
     if ball_position.x <= HOME_GOAL.line_x and HOME_GOAL.contains_y(ball_position.y):
         return TeamSide.AWAY
     if ball_position.x >= AWAY_GOAL.line_x and AWAY_GOAL.contains_y(ball_position.y):

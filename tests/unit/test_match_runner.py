@@ -11,8 +11,9 @@ import asyncio
 
 import pytest
 
+from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.pitch import TeamSide
+from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
 from src.engine.state import (
     LineupPlayer,
     MatchPhase,
@@ -45,6 +46,10 @@ def _build_state(total_ticks: int = 3):
 
 
 # --- Fakes de las piezas inyectadas ---
+# Cada fake respeta la firma que run_tick/run_match esperan (ver los tipos
+# en match_runner.py), pero no usa todos sus parámetros: el editor los
+# marca como "is not accessed" y es esperado. Los fakes solo tienen que
+# poder recibir los argumentos con los que el ciclo los llama.
 
 
 def _idle_behavior(state, player_id) -> Intention:
@@ -55,7 +60,7 @@ def _noop_apply(state, intentions) -> None:
     pass
 
 
-def _no_goal(state):
+def _no_goal(ball_position):
     return None
 
 
@@ -130,7 +135,7 @@ def test_deberia_una_excepcion_no_frenar_el_resto_del_ciclo():
     def apply_que_cuenta(state, intentions):
         llamadas["apply"] += 1
 
-    def goal_que_cuenta(state):
+    def goal_que_cuenta(ball_position):
         llamadas["goal"] += 1
         return None
 
@@ -165,7 +170,7 @@ def test_deberia_recolectar_todas_las_intenciones_antes_de_aplicar_ninguna():
 def test_deberia_actualizar_el_marcador_segun_detect_goal(ganador, home_esperado, away_esperado):
     state = _build_state()
 
-    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=lambda s: ganador)
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=lambda ball_position: ganador)
 
     assert state.score.home == home_esperado
     assert state.score.away == away_esperado
@@ -294,11 +299,9 @@ async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
     )
     registry = MatchRegistry()
 
-    async def goleador_de_a(state):
-        pass
-
-    def detect_goal_solo_en_a(state):
-        return TeamSide.HOME if state.match_id == 1 else None
+    # La pelota del partido A está dentro del arco de AWAY (gol de HOME en
+    # cada tick); la del B sigue en el centro. Se usa la regla real.
+    state_a.ball.position = Point2D(PITCH_LENGTH, PITCH_WIDTH / 2)
 
     await asyncio.gather(
         run_match(
@@ -306,7 +309,7 @@ async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
             registry,
             execute_behavior=_idle_behavior,
             apply_intentions=_noop_apply,
-            detect_goal=detect_goal_solo_en_a,
+            detect_goal=detect_goal,
             notify=_noop_notify,
             tick_interval_seconds=0,
         ),
@@ -315,7 +318,7 @@ async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
             registry,
             execute_behavior=_idle_behavior,
             apply_intentions=_noop_apply,
-            detect_goal=detect_goal_solo_en_a,
+            detect_goal=detect_goal,
             notify=_noop_notify,
             tick_interval_seconds=0,
         ),
@@ -329,16 +332,16 @@ async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
 
 # --- Fallas de las piezas que NO son comportamientos ---
 # Un bug en apply_intentions, detect_goal o notify no debe dejar el
-# partido muerto a la mitad: el ciclo lo loguea y sigue.
-# están no accedidas pues es responsabilidad de otras implementaciones el
-# crear y generar estas detecciones
+# partido muerto a la mitad: el ciclo lo loguea y sigue. Estos fakes
+# siempre lanzan una excepción y no usan sus parámetros ("is not
+# accessed"): solo simulan una pieza rota que otro ticket implementará.
 
 
 def _apply_que_falla(state, intentions) -> None:
     raise RuntimeError("bug en apply_intentions")
 
 
-def _detect_goal_que_falla(state):
+def _detect_goal_que_falla(ball_position):
     raise RuntimeError("bug en detect_goal")
 
 

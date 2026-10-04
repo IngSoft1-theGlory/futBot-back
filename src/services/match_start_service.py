@@ -41,7 +41,8 @@ from src.engine.match_runner import (
     OnFinished,
     run_match,
 )
-from src.engine.pitch import FORMATION_POSITIONS, TeamSide, default_detect_goal
+from src.engine import pitch
+from src.engine.pitch import FORMATION_POSITIONS, TeamSide
 from src.engine.state import (
     LineupPlayer,
     MatchInitializationError,
@@ -211,7 +212,7 @@ def launch_match(
     *,
     execute_behavior: ExecuteBehavior,
     apply_intentions: ApplyIntentions,
-    detect_goal: DetectGoal = default_detect_goal,
+    detect_goal: DetectGoal = pitch.detect_goal,
     notify: NotifyTick = broadcast_tick,
     on_finished: OnFinished | None = None,
     registry: MatchRegistry = match_registry,

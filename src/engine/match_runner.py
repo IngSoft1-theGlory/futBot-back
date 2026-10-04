@@ -19,6 +19,8 @@ Lo que YA está decidido y por eso vive directamente acá adentro:
   - Las intenciones de TODOS los jugadores se recolectan sobre el
     MISMO snapshot antes de aplicar ninguna: nadie tiene ventaja por
     estar antes en el diccionario de jugadores.
+  - La regla de gol es pitch.detect_goal y solo mira la posición de la
+    pelota: run_tick se la pasa como detect_goal(state.ball.position).
   - Al llegar a total_ticks: la fase pasa a FINISHED, se persiste el
     resultado (on_finished) ANTES de liberar el estado de memoria del
     registry (si el orden se invirtiera, se perdería el resultado).
@@ -30,8 +32,6 @@ vez de código fijo acá (seguimos esa conversación aparte):
     poder aislar sus excepciones una por una.
   - apply_intentions: qué le hace cada Intention a la pelota y a las
     posiciones -- acá vive el desempate de pateo simultáneo.
-  - detect_goal: la regla exacta de gol. pitch.default_detect_goal es
-    un placeholder razonable, no la decisión final.
   - notify / tick_interval_seconds: el canal WS de partido todavía no
     existe (src/realtime/ws_routes.py está vacío).
 """
@@ -42,6 +42,7 @@ import asyncio
 import logging
 from typing import Awaitable, Callable, Optional
 
+from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide
 from src.engine.state import MatchPhase, MatchRegistry, MatchState
@@ -54,7 +55,7 @@ logger = logging.getLogger(__name__)
 # en los tests.
 ExecuteBehavior = Callable[[MatchState, int], Intention]
 ApplyIntentions = Callable[[MatchState, dict[int, Intention]], None]
-DetectGoal = Callable[[MatchState], Optional[TeamSide]]
+DetectGoal = Callable[[Point2D], Optional[TeamSide]]
 NotifyTick = Callable[[MatchState], Awaitable[None]]
 OnFinished = Callable[[MatchState], None]
 
@@ -103,7 +104,7 @@ def run_tick(
         )
 
     try:
-        scoring_side = detect_goal(state)
+        scoring_side = detect_goal(state.ball.position)
     except Exception:
         logger.exception(
             "detect_goal falló en el tick %s del partido %s; se asume que no hubo gol.",

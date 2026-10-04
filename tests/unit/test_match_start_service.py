@@ -93,7 +93,10 @@ def partido(session, comportamiento):
 
 
 # --- Fakes de las piezas inyectadas -----------------------------------------
-
+# Respetan la firma que launch_match/run_match esperan (ver los tipos en
+# match_runner.py) pero no usan todos sus parámetros: el editor los marca
+# como "is not accessed" y es esperado. Solo tienen que poder recibir los
+# argumentos con los que el ciclo los llama.
 
 def _idle_behavior(state, player_id) -> Intention:
     return Intention(ActionType.IDLE)
