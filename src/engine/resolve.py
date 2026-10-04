@@ -4,9 +4,14 @@ resolve: función pura que aplica una Intention a un GameState.
 
 from dataclasses import replace
 
-from src.engine.constants import MAX_ATTRIBUTE_VALUE, MAX_RUN_SPEED_METERS_PER_SECOND
+from src.engine.constants import (
+    MAX_ATTRIBUTE_VALUE,
+    MAX_RUN_SPEED_METERS_PER_SECOND,
+    kick_speed,
+    reach_distance,
+)
 from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D
+from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH
 from src.engine.timing import TICK_DURATION_SECONDS
@@ -17,8 +22,8 @@ def resolve(state: GameState, intention: Intention, attributes: dict[AttributeTy
     Devuelve el GameState resultante de aplicar `intention`.
     `attributes` son los atributos del jugador (RUN_TO usa su SPEED).
 
-    Implementadas: IDLE y RUN_TO. kick_ball todavía no; hasta entonces
-    falla fuerte para que nadie crea que está implementada.
+    Implementadas: IDLE, RUN_TO y KICK_BALL (usa POWER y CONTROL del jugador).
+    Una acción desconocida falla fuerte en vez de ignorarse en silencio.
     """
     if intention.action == ActionType.IDLE:
         return state
@@ -29,7 +34,27 @@ def resolve(state: GameState, intention: Intention, attributes: dict[AttributeTy
         # replace() crea un GameState nuevo, igual al anterior salvo my_position
         return replace(state, my_position=new_position)
 
+    if intention.action == ActionType.KICK_BALL:
+        return _resolve_kick_ball(state, intention, attributes)
+
     raise NotImplementedError(f"Acción no implementada: {intention.action}")
+
+
+def _resolve_kick_ball(state: GameState, intention: Intention, attributes: dict[AttributeType, int]) -> GameState:
+    """
+    Patada: solo cambia ball_velocity, y solo si la pelota está al alcance
+    (distancia <= reach_distance(CONTROL), borde inclusive).
+    Fuera de alcance devuelve el MISMO estado (no se pisa la velocidad de la pelota).
+    El movimiento de la pelota por tick (posición += velocidad) no es de acá.
+    """
+    reach = reach_distance(attributes[AttributeType.CONTROL])
+    if state.my_position.distance_to(state.ball_position) > reach:
+        return state
+
+    speed = kick_speed(attributes[AttributeType.POWER], intention.power_percentage)
+    direction = intention.direction.normalize()
+    new_velocity = Vector2D(direction.x * speed, direction.y * speed)
+    return replace(state, ball_velocity=new_velocity)
 
 
 def max_run_distance_per_tick(speed_attribute: int, speed_percentage: float) -> float:
