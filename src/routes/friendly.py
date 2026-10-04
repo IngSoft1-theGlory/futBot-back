@@ -43,6 +43,16 @@ def create_friendly_endpoint(
     # valido y guardo el partido con create_friendly. Si falla, lanza un error 
     match = create_friendly(session, user_id, payload)
 
+    # después de hacer commit, aviso a los suscriptores del evento FRIENDLY_CREATED
+    # los payloads siguen el catálogo de eventos del contrato de API
+    # el evento se publica despues del commit para que los suscriptores vean la DB consistente.
+    event_bus.publish("FRIENDLY_CREATED", {
+        "match_id": match.match_id,
+        "team_host_id": match.team_host_id,
+        "match_duration": match.match_duration,
+        "status": match.status.value,
+    })
+
     # armo la respuesta con los datos del partido recien creado y la devuelvo. FastAPI lo convierte a JSON.
     return CreateFriendlyResponse(
         match_id = match.match_id,
