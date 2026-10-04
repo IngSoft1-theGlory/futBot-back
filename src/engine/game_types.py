@@ -30,5 +30,4 @@ class GameState:
     team_goal: Point2D        # Posición del arco aliado
     opponent_goal: Point2D    # Posición del arco rival
 
-    # TODO (ticket del snapshot): frozen=True NO protege las listas
-    # teammates/opponents; el builder debe entregar copias.
+    # tener en cuenta que frozen=True no protege las listas de teammates/opponents; el builder debe entregar copias (en snapshot.py)
