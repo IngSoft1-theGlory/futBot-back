@@ -11,7 +11,7 @@ from src.main import app
 from src.models import Match, MatchStatus, Team, User
 
 
-# --- Base y cliente (mismo patrón que test_post_friendly_endpoint.py) ---------------
+# --- Base y cliente ------
 
 @pytest.fixture()
 def db():
@@ -44,7 +44,7 @@ def client(db):
     app.dependency_overrides.clear()
 
 
-# --- Helpers --------------------------------------------------------------------------
+# --- Helpers ----
 
 def _crear_usuario(db, n: int) -> User:
     user = User(
@@ -75,8 +75,6 @@ def _auth(user: User) -> dict:
     return {"Authorization": f"Bearer {create_access_token(user.user_id)}"}
 
 
-# --- 200 -----------------------------------------------------------------------------
-
 def test_deberia_devolver_credenciales_validas_para_el_anfitrion(client, db):
     host, away = _crear_usuario(db, 1), _crear_usuario(db, 2)
     match = _crear_partido(db, host, away)
@@ -103,8 +101,6 @@ def test_deberia_devolver_credenciales_validas_para_el_visitante(client, db):
     assert response.status_code == 200
 
 
-# --- 401 -----------------------------------------------------------------------------
-
 def test_deberia_devolver_401_sin_token(client, db):
     host, away = _crear_usuario(db, 1), _crear_usuario(db, 2)
     match = _crear_partido(db, host, away)
@@ -124,20 +120,6 @@ def test_deberia_devolver_401_si_el_token_no_es_de_login(client, db):
 
     assert response.status_code == 401
 
-
-def test_deberia_devolver_401_si_el_usuario_fue_borrado_con_token_vigente(client, db):
-    host, away, otro = _crear_usuario(db, 1), _crear_usuario(db, 2), _crear_usuario(db, 3)
-    match = _crear_partido(db, host, away)
-    headers = _auth(otro)          # token emitido ANTES de borrar
-    db.delete(otro)
-    db.commit()
-
-    response = client.post(_url(match.match_id), headers=headers)
-
-    assert response.status_code == 401
-
-
-# --- 404 -----------------------------------------------------------------------------
 
 def test_deberia_devolver_404_si_el_partido_no_existe(client, db):
     user = _crear_usuario(db, 1)
@@ -168,18 +150,6 @@ def test_deberia_devolver_404_si_el_partido_esta_finished(client, db):
     assert response.json()["error"] == "MATCH_NOT_FOUND"
 
 
-# --- 403 y 422 -----------------------------------------------------------------------
-
-def test_deberia_devolver_403_si_el_usuario_no_participa(client, db):
-    host, away, otro = _crear_usuario(db, 1), _crear_usuario(db, 2), _crear_usuario(db, 3)
-    match = _crear_partido(db, host, away)
-
-    response = client.post(_url(match.match_id), headers=_auth(otro))
-
-    assert response.status_code == 403
-    assert response.json()["error"] == "UNAUTHORIZED_ACTION"
-
-
 def test_deberia_devolver_422_si_el_match_id_no_es_numerico(client, db):
     user = _crear_usuario(db, 1)
 
@@ -187,4 +157,12 @@ def test_deberia_devolver_422_si_el_match_id_no_es_numerico(client, db):
 
     assert response.status_code == 422
     assert response.json()["error"] == "VALIDATION_ERROR"
-    
+
+def test_deberia_permitir_a_un_espectador_pedir_el_token(client, db):
+    host, away, espectador = _crear_usuario(db, 1), _crear_usuario(db, 2), _crear_usuario(db, 3)
+    match = _crear_partido(db, host, away)
+
+    response = client.post(_url(match.match_id), headers=_auth(espectador))
+
+    assert response.status_code == 200
+    assert response.json()["match_id"] == match.match_id

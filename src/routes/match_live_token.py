@@ -8,11 +8,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
-from src.core.exceptions import ForbiddenError
 from src.core.security import create_ws_global_token, get_current_user
 from src.database.base import get_db
 from src.schemas.live_token import MatchLiveTokenResponse
-from src.services.match_access_service import get_match_in_progress, user_participates
+from src.services.match_access_service import get_match_in_progress
+
 
 router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
