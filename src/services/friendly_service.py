@@ -62,6 +62,16 @@ def list_friendly_matches(
     return get_available_matches(session, status=status, page=page, limit=limit)
 
 
+def get_friendly(session: Session, match_id: int) -> Match:
+    """
+    Devuelve el amistoso con ese id. Si no existe, lanza MATCH_NOT_FOUND (404).
+    """
+    match = get_match_by_id(session, match_id)
+    if match is None:
+        raise MatchNotFoundError("El partido no existe o fue cancelado.")
+    return match
+
+
 def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFriendlyRequest) -> Match:
     """
     Inscribe al equipo rival en un amistoso en espera y lo pasa a IN_PROGRESS.

@@ -54,3 +54,19 @@ class JoinFriendlyResponse(BaseModel):
     team_away_id: int
     status: str  # texto IN_PROGRESS, no el Enum
     match_duration: int
+
+
+# Datos publicos de un equipo que se muestran en la sala de espera
+class LobbyTeamOut(BaseModel):
+    team_id: int
+    team_name: str | None
+    team_logo: str | None = None
+
+
+# Lo que devuelve el endpoint de obtener el estado del lobby de un amistoso
+class FriendlyLobbyResponse(BaseModel):
+    match_id: int
+    status: str  # texto PENDING o IN_PROGRESS, no el Enum
+    match_duration: int
+    team_host: LobbyTeamOut
+    team_away: LobbyTeamOut | None  # null mientras el partido espera rival
