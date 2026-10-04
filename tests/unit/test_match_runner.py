@@ -14,6 +14,7 @@ import pytest
 from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
+from src.engine.player_api import PlayerAPI
 from src.engine.state import (
     LineupPlayer,
     MatchPhase,
@@ -124,6 +125,26 @@ def test_deberia_aislar_la_excepcion_de_un_solo_jugador():
     assert state.players[101].current_action == ActionType.IDLE
     otros_titulares = [pid for pid in state.on_pitch_player_ids() if pid != 101]
     assert all(state.players[pid].current_action == ActionType.KICK_BALL for pid in otros_titulares)
+
+
+def test_deberia_run_to_con_argumentos_invalidos_dejar_al_jugador_en_idle_sin_frenar_el_ciclo():
+    """Un on_tick que llama run_to con speed_percentage inválido: el
+    ValueError lo atrapa run_tick, ese jugador queda IDLE, los demás
+    corren normalmente y el tick se completa."""
+    state = _build_state()
+
+    def behavior_con_run_to(state, player_id):
+        api = PlayerAPI(game_state=None, attributes={})
+        speed_percentage = 5.0 if player_id == 101 else 1.0  # 5.0 es inválido
+        api.run_to(Point2D(50, 30), speed_percentage)
+        return api.intention
+
+    run_tick(state, execute_behavior=behavior_con_run_to, apply_intentions=_noop_apply, detect_goal=_no_goal)
+
+    assert state.players[101].current_action == ActionType.IDLE
+    otros_titulares = [pid for pid in state.on_pitch_player_ids() if pid != 101]
+    assert all(state.players[pid].current_action == ActionType.RUN_TO for pid in otros_titulares)
+    assert state.current_tick == 1
 
 
 def test_deberia_una_excepcion_no_frenar_el_resto_del_ciclo():
