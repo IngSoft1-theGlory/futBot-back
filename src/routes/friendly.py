@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.core.security import get_current_user
 from src.database.base import get_db
-from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly
+from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly, get_friendly
 from src.models.match import MatchStatus
 from src.realtime.event_bus import event_bus
 from src.schemas.friendly import (
@@ -14,7 +14,8 @@ from src.schemas.friendly import (
     CreateFriendlyResponse,
     JoinFriendlyRequest,
     JoinFriendlyResponse,
-    FriendlyListOut
+    FriendlyListOut,
+    FriendlyLobbyResponse,
 )
 
 # Todas las rutas de este archivo empiezan con /api/v1/friendly
@@ -65,6 +66,35 @@ def list_friendly(
 ):
     matches = list_friendly_matches(session, status=status, page=page, limit=limit)
     return {"matches": matches}
+
+# GET /api/v1/friendly/{match_id}
+@router.get(
+    "/{match_id}",
+    response_model=FriendlyLobbyResponse,
+    # solo pide que el usuario esté logueado (o 401); cualquiera puede ver cualquier amistoso
+    dependencies=[Depends(get_current_user)],
+)
+def get_friendly_lobby(
+    match_id: int,
+    session: Session = Depends(get_db),
+) -> FriendlyLobbyResponse:
+    ## devuelve el estado del lobby de un amistoso: estado, duracion y los equipos
+
+    # busco el partido, si no existe, lanza 404 MATCH_NOT_FOUND
+    match = get_friendly(session, match_id)
+
+    # el rival es None mientras nadie se unio al partido (status PENDING)
+    team_away = None
+    if match.away_team is not None:
+        team_away = match.away_team.to_public_dict()
+
+    return FriendlyLobbyResponse(
+        match_id = match.match_id,
+        status = match.status.value,
+        match_duration = match.match_duration,
+        team_host = match.host_team.to_public_dict(),
+        team_away = team_away,
+    )
 
 # POST /api/v1/friendly/{match_id}/teams
 @router.post( ##sto le dice a fastapi que la funcion de abajo va a atender una petición HTTP POST
