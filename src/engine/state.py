@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType
 from src.engine.pitch import BALL_INITIAL_POSITION, FORMATION_POSITIONS, TeamSide, starter_position
@@ -81,12 +82,13 @@ class MatchPlayerState:
 
     player_id: int
     team_id: int
+    side: TeamSide # lado de la cancha que defiende ese jugador
     is_starter: bool
     role: Optional[str]  # None en suplentes
     behavior_id: Optional[int]
     position: Optional[Point2D] = None  # None = en el banco
     current_action: ActionType = ActionType.IDLE
-
+    attributes: dict[AttributeType, int]= field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
 
 @dataclass
 class MatchState:
@@ -225,10 +227,12 @@ def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
         players[lineup_player.player_id] = MatchPlayerState(
             player_id=lineup_player.player_id,
             team_id=setup.team_id,
+            side=setup.side,
             is_starter=lineup_player.is_starter,
             role=lineup_player.role,
             behavior_id=lineup_player.behavior_id,
             position=position,
+            # no necesito pasarle attributes porque al tener default_factory=dict, su default es un diccionario vacio, y estos tests no utilizan ese argumento para nada asi que no importa
         )
     return players
 
