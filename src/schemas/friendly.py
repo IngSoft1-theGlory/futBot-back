@@ -60,6 +60,7 @@ class JoinFriendlyResponse(BaseModel):
 class LobbyTeamOut(BaseModel):
     team_id: int
     team_name: str | None
+    team_logo: str | None = None
 
 
 # Lo que devuelve el endpoint de obtener el estado del lobby de un amistoso
