@@ -16,21 +16,23 @@ Orden dentro de un tick: run_tick hace  comportamientos -> apply_intentions
 apply_intentions: si se reiniciara al final, detect_goal nunca vería el gol.
 Un gol entonces se detecta en el tick en que la pelota entra al arco y la
 pelota vuelve al centro al comienzo del tick siguiente.
+Al final de apply_intentions la pelota avanza según su velocidad (_move_ball).
 
-Fuera de alcance (otros tickets, se dejan documentados acá):
-  - Mover la pelota según su velocidad en cada tick (posición += velocidad * dt).
-  - Rebotes, cooldown de patada (AGILITY), STRENGTH.
+Fuera de alcance:
+  - Qué pasa si la pelota sale por un lateral o por el fondo fuera del arco
+    (hoy sigue de largo: no hay rebote ni saque).
   - Dos jugadores pateando en el mismo tick. POLÍTICA PROVISORIA: se
     aplican en orden de player_id ascendente y gana la última patada
     (es determinista, pero no es una decisión de diseño definitiva).
 """
 
-from src.engine.geometry_types import Vector2D
+from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import BALL_INITIAL_POSITION, default_detect_goal
 from src.engine.resolve import resolve
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import MatchState
+from src.engine.timing import TICK_DURATION_SECONDS
 
 
 def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> None:
@@ -55,9 +57,12 @@ def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> Non
             state.players[player_id].position = resolved.my_position
         elif intention.action == ActionType.KICK_BALL and resolved is not game_state:
             # `resolve` devuelve el MISMO objeto cuando la pelota estaba fuera
-            # de alcance: en ese caso no se toca la pelota (así no pisa la
-            # patada de otro jugador con la velocidad vieja).
+            # de alcance: en ese caso no se toca la pelota.
             state.ball.velocity = resolved.ball_velocity
+
+    # Con las patadas ya aplicadas, la pelota avanza según su velocidad.
+    # Corre ANTES de detect_goal (run_tick), así que el gol se ve en este mismo tick.
+    _move_ball(state)
 
 
 def _reset_ball_if_goal(state: MatchState) -> None:
@@ -65,3 +70,11 @@ def _reset_ball_if_goal(state: MatchState) -> None:
     if default_detect_goal(state.ball.position) is not None:
         state.ball.position = BALL_INITIAL_POSITION
         state.ball.velocity = Vector2D(0.0, 0.0)
+
+
+def _move_ball(state: MatchState) -> None:
+    """Avanza la pelota un tick: posición += velocidad * duración del tick."""
+    state.ball.position = Point2D(
+        state.ball.position.x + state.ball.velocity.x * TICK_DURATION_SECONDS,
+        state.ball.position.y + state.ball.velocity.y * TICK_DURATION_SECONDS,
+    )

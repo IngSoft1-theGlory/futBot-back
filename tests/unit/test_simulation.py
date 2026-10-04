@@ -12,11 +12,12 @@ from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.match_runner import run_tick
-from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide
+from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, default_detect_goal
 from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import LineupPlayer, TeamMatchSetup, build_initial_state
+from src.engine.timing import TICK_DURATION_SECONDS
 
 # Todos distintos, para detectar cruces entre atributos.
 ATTRIBUTES = {
@@ -86,7 +87,7 @@ def _run_to(target: Point2D, speed_percentage: float = 1.0) -> Intention:
 def test_deberia_idle_no_cambiar_posiciones_ni_pelota():
     state = _state()
     posiciones = {pid: p.position for pid, p in state.players.items()}
-    pelota = (state.ball.position, state.ball.velocity)
+    pelota = (state.ball.position, state.ball.velocity)  # en reposo
 
     apply_intentions(state, {pid: Intention(ActionType.IDLE) for pid in state.on_pitch_player_ids()})
 
@@ -125,14 +126,13 @@ def test_deberia_run_to_mover_solo_al_jugador_que_corre():
     assert {pid: p.position for pid, p in state.players.items() if pid != FORWARD_HOME} == otros
 
 
-def test_deberia_run_to_no_tocar_la_pelota():
+def test_deberia_run_to_no_cambiar_la_velocidad_de_la_pelota():
     state = _state()
     state.ball.velocity = Vector2D(2.0, 3.0)
 
     apply_intentions(state, {FORWARD_HOME: _run_to(Point2D(100, 30))})
 
-    assert state.ball.position == BALL_INITIAL_POSITION
-    assert state.ball.velocity == Vector2D(2.0, 3.0)
+    assert state.ball.velocity == Vector2D(2.0, 3.0)  # correr no cambia la velocidad de la pelota
 
 
 def test_deberia_varios_run_to_en_el_mismo_tick_moverse_todos():
@@ -160,14 +160,14 @@ def test_deberia_kick_ball_en_alcance_cambiar_la_velocidad_de_la_pelota():
     assert state.ball.velocity.y == pytest.approx(MAX_KICK_SPEED)
 
 
-def test_deberia_kick_ball_no_mover_la_posicion_de_la_pelota():
-    """Mover la pelota según su velocidad es del motor, no de la patada."""
+def test_deberia_kick_ball_mover_la_pelota_en_el_mismo_tick():
     state = _state_con_pelota_junto_al(FORWARD_HOME, 1.0)
     antes = state.ball.position
 
     apply_intentions(state, {FORWARD_HOME: _kick(Vector2D(1, 0))})
 
-    assert state.ball.position == antes
+    assert state.ball.position.x == pytest.approx(antes.x + MAX_KICK_SPEED * TICK_DURATION_SECONDS)
+    assert state.ball.position.y == pytest.approx(antes.y)
 
 
 def test_deberia_kick_ball_no_mover_al_jugador_que_patea():
@@ -182,11 +182,9 @@ def test_deberia_kick_ball_no_mover_al_jugador_que_patea():
 def test_deberia_kick_ball_fuera_de_alcance_dejar_la_pelota_sin_cambios():
     state = _state_con_pelota_junto_al(FORWARD_HOME, REACH + 0.01)
     state.ball.velocity = Vector2D(1.0, 2.0)
-    posicion = state.ball.position
 
     apply_intentions(state, {FORWARD_HOME: _kick(Vector2D(1, 0))})
 
-    assert state.ball.position == posicion
     assert state.ball.velocity == Vector2D(1.0, 2.0)
 
 
@@ -287,6 +285,43 @@ def test_deberia_correr_y_patear_en_el_mismo_tick_aplicar_las_dos_cosas():
     assert state.players[FORWARD_AWAY].position.x < inicio_rival.x
 
 
+# --- Movimiento de la pelota ---
+
+def test_deberia_pelota_en_movimiento_avanzar_velocidad_por_duracion_del_tick():
+    state = _state()
+    state.ball.velocity = Vector2D(4.0, -2.0)
+
+    apply_intentions(state, {})
+
+    assert state.ball.position.x == pytest.approx(BALL_INITIAL_POSITION.x + 4.0 * TICK_DURATION_SECONDS)
+    assert state.ball.position.y == pytest.approx(BALL_INITIAL_POSITION.y - 2.0 * TICK_DURATION_SECONDS)
+
+
+def test_deberia_pelota_quieta_quedarse_donde_esta():
+    state = _state()
+
+    apply_intentions(state, {})
+
+    assert state.ball.position == BALL_INITIAL_POSITION
+
+
+def test_deberia_pelota_patada_hacia_el_arco_terminar_dentro_y_run_tick_contar_el_gol():
+    """Patada desde cerca del arco AWAY: en el mismo tick entra y se cuenta el gol."""
+    state = _state()
+    state.ball.position = Point2D(104.0, 30.0)
+    state.players[FORWARD_HOME].position = Point2D(103.5, 30.0)
+    # el arco está a 1 m: con 6 m/s * 0.5 s = 3 m la pelota cruza la línea de fondo
+
+    run_tick(
+        state,
+        execute_behavior=_behavior_que_patea(Vector2D(1, 0), 1.0),
+        apply_intentions=apply_intentions,
+        detect_goal=lambda s: default_detect_goal(s.ball.position),
+    )
+
+    assert state.score.home == 1
+
+
 # --- Reinicio de la pelota tras un gol ---
 
 @pytest.mark.parametrize(
@@ -324,8 +359,10 @@ def test_deberia_pelota_fuera_de_un_arco_no_reiniciarse(posicion):
 
     apply_intentions(state, {})
 
-    assert state.ball.position == posicion
     assert state.ball.velocity == Vector2D(5.0, 5.0)
+    # no hubo reinicio: la pelota siguió su camino desde donde estaba
+    assert state.ball.position.x == pytest.approx(posicion.x + 5.0 * TICK_DURATION_SECONDS)
+    assert state.ball.position.y == pytest.approx(posicion.y + 5.0 * TICK_DURATION_SECONDS)
 
 
 def test_deberia_reiniciar_la_pelota_antes_de_resolver_las_patadas():
@@ -339,7 +376,8 @@ def test_deberia_reiniciar_la_pelota_antes_de_resolver_las_patadas():
 
     apply_intentions(state, {FORWARD_HOME: _kick(Vector2D(1, 0))})
 
-    assert state.ball.position == BALL_INITIAL_POSITION
+    # reiniciada al centro y luego pateada: avanza desde el centro, no desde el arco
+    assert state.ball.position.x == pytest.approx(BALL_INITIAL_POSITION.x + MAX_KICK_SPEED * TICK_DURATION_SECONDS)
     assert state.ball.velocity.x == pytest.approx(MAX_KICK_SPEED)
 
 
