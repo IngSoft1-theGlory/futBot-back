@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/v1/friendly", tags=["friendly"])
     response_model=CreateFriendlyResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_friendly_endpoint(
+async def create_friendly_endpoint(
     # FastAPI lee el body del pedido y lo valida contra este schema.
     # Si el formato es incorrecto, responde 422 antes de entrar acá.
     payload: CreateFriendlyRequest,
@@ -40,8 +40,10 @@ def create_friendly_endpoint(
 ) -> CreateFriendlyResponse:
     """Crea un amistoso."""
 
-    # valido y guardo el partido con create_friendly. Si falla, lanza un error 
-    match = create_friendly(session, user_id, payload)
+    # valido y guardo el partido con create_friendly. Si falla, lanza un error
+    # y ademas si falla no llega hacer publish del evento, asi que no hay riesgo 
+    # de avisar a los suscriptores de un partido que no se creo.
+    match = await run_in_threadpool(create_friendly, session, user_id, payload)
 
     # después de hacer commit, aviso a los suscriptores del evento FRIENDLY_CREATED
     # los payloads siguen el catálogo de eventos del contrato de API
