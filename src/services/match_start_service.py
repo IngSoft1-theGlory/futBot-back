@@ -58,6 +58,9 @@ from src.models import LineupEntry, MatchStatus
 from src.realtime.match_broadcast import notify as broadcast_tick
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id
 
+from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
+from src.models.match import MatchStatus
+
 logger = logging.getLogger(__name__)
 
 # Referencias fuertes a las tareas de partido en curso. asyncio solo guarda
@@ -147,7 +150,7 @@ def prepare_match(session: Session, match_id: int) -> MatchState:
 
 
 def save_match_result(session: Session, match_id: int, home_goals: int, away_goals: int) -> None:
-    """Guarda el marcador final y pasa el partido a FINISHED."""
+    """Guarda el marcador final, pasa el partido a FINISHED y publica MATCH_FINISHED como evento."""
     match = get_match_by_id(session, match_id)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
@@ -156,7 +159,10 @@ def save_match_result(session: Session, match_id: int, home_goals: int, away_goa
     match.away_goals = away_goals
     match.status = MatchStatus.FINISHED
     session.commit()
-
+    event_bus.publish("MATCH_FINISHED", {
+        "match_id": match.match_id,
+        "status": match.status.value,
+    })
 
 def make_on_finished(session_factory: Callable[[], Session] = SessionLocal) -> OnFinished:
     """

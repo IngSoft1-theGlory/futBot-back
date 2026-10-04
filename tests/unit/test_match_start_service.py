@@ -25,6 +25,8 @@ from src.services.match_start_service import (
     start_match,
 )
 
+from src.realtime.event_bus import event_bus
+
 ROLES_2_1 = ["DEF_LEFT", "DEF_RIGHT", "FORWARD"]
 ROLES_1_2 = ["DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"]
 
@@ -236,6 +238,101 @@ def test_deberia_save_match_result_guardar_marcador_y_pasar_a_finished(session, 
 def test_deberia_save_match_result_fallar_si_el_partido_no_existe(session):
     with pytest.raises(LookupError):
         save_match_result(session, 999, 0, 0)
+
+@pytest.fixture()
+def eventos_globales():
+    """Un suscriptor al bus GLOBAL (el mismo bus que alimenta al WS global).
+    Se desuscribe al terminar para no ensuciar a los otros tests."""
+    cola = event_bus.subscribe()
+    yield cola
+    event_bus.unsubscribe(cola)
+
+
+# --- evento MATCH_FINISHED --------------------------------------------------
+
+
+def test_deberia_save_match_result_publicar_match_finished_con_el_formato_del_contrato(
+    session, partido, eventos_globales
+):
+    save_match_result(session, partido.match_id, home_goals=2, away_goals=1)
+
+    assert eventos_globales.qsize() == 1
+    assert eventos_globales.get_nowait() == {
+        "event": "MATCH_FINISHED",
+        "data": {"match_id": partido.match_id, "status": "FINISHED"},
+    }
+
+
+def test_deberia_save_match_result_publicar_despues_de_guardar_en_la_base(session, partido, monkeypatch):
+    fabrica = _fabrica_de_sesiones(session)
+    estado_visto = []
+
+    def publish_espia(nombre, data) -> None:
+        # Una sesión distinta solo ve lo que ya está confirmado (commit).
+        with fabrica() as otra_sesion:
+            estado_visto.append(otra_sesion.get(Match, data["match_id"]).status)
+
+    monkeypatch.setattr(event_bus, "publish", publish_espia)
+
+    save_match_result(session, partido.match_id, home_goals=0, away_goals=0)
+
+    assert estado_visto == [MatchStatus.FINISHED]
+
+
+def test_deberia_save_match_result_no_publicar_si_el_partido_no_existe(session, eventos_globales):
+    with pytest.raises(LookupError):
+        save_match_result(session, 999, 0, 0)
+
+    assert eventos_globales.qsize() == 0
+
+
+@pytest.mark.asyncio
+async def test_deberia_start_match_publicar_match_finished_una_sola_vez_al_terminar(
+    session, partido, eventos_globales
+):
+    eventos_en_cola_durante_el_partido = []
+
+    async def notify(state) -> None:
+        eventos_en_cola_durante_el_partido.append(eventos_globales.qsize())
+
+    task = start_match(
+        session,
+        partido.match_id,
+        execute_behavior=_idle_behavior,
+        apply_intentions=_noop_apply,
+        notify=notify,
+        registry=MatchRegistry(),
+        on_finished=make_on_finished(_fabrica_de_sesiones(session)),
+        tick_interval_seconds=0,
+    )
+    await task
+
+    assert set(eventos_en_cola_durante_el_partido) == {0}  # nada se anuncia antes del final
+    assert eventos_globales.qsize() == 1
+    assert eventos_globales.get_nowait()["data"]["match_id"] == partido.match_id
+
+
+@pytest.mark.asyncio
+async def test_deberia_publicar_match_finished_tambien_con_el_resultado_parcial(
+    session, partido, eventos_globales
+):
+    # Mismo truco que el test del resultado parcial: tick_interval_seconds=None
+    # hace explotar el motor a la mitad.
+    task = start_match(
+        session,
+        partido.match_id,
+        execute_behavior=_idle_behavior,
+        apply_intentions=_noop_apply,
+        notify=_noop_notify,
+        registry=MatchRegistry(),
+        on_finished=make_on_finished(_fabrica_de_sesiones(session)),
+        tick_interval_seconds=None,
+    )
+    with pytest.raises(TypeError):
+        await task
+    await asyncio.sleep(0)  # deja correr el callback de fin de tarea
+
+    assert eventos_globales.qsize() == 1
 
 
 # --- launch_match / start_match ---------------------------------------------
