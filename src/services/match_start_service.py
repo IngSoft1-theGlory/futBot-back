@@ -44,19 +44,20 @@ from src.engine.match_runner import (
 from src.engine import pitch
 from src.engine.pitch import FORMATION_POSITIONS, TeamSide
 from src.engine.state import (
-    LineupPlayer,
     MatchInitializationError,
     MatchPhase,
     MatchRegistry,
     MatchState,
     TeamMatchSetup,
+    attributes_of,
     build_initial_state,
     match_registry,
 )
 from src.engine.timing import TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, total_ticks_for
-from src.models import LineupEntry, MatchStatus
+from src.models import LineupEntry, MatchStatus, Player
 from src.realtime.match_broadcast import notify as broadcast_tick
-from src.repositories.match_repository import get_lineup_entries, get_match_by_id
+from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
 from src.models.match import MatchStatus
@@ -82,27 +83,48 @@ def _formation_from_roles(roles: set[str | None]) -> str | None:
     return None
 
 
-def _team_setup(team_id: int, side: TeamSide, entries: list[LineupEntry]) -> TeamMatchSetup:
-    starter_roles = {entry.role for entry in entries if entry.is_starter}
+# Una alineación guardada tiene 3 titulares y 3 suplentes (lo valida lineup_service
+# al guardarla). Se revisa de nuevo acá porque estos datos vienen de la base.
+STARTERS_PER_TEAM = 3
+SUBSTITUTES_PER_TEAM = 3
+
+
+def _team_setup(
+    team_id: int, side: TeamSide, entries: list[LineupEntry], players: list[Player]
+) -> TeamMatchSetup:
+    """
+    Arma lo que un equipo aporta al motor: su LineupConfig (la formación se
+    deduce de los roles) y los atributos de cada jugador, leídos de la
+    tabla players (los atributos NO están en la alineación).
+    """
+    starters = [entry for entry in entries if entry.is_starter]
+    substitutes = [entry for entry in entries if not entry.is_starter]
+
+    if len(starters) != STARTERS_PER_TEAM or len(substitutes) != SUBSTITUTES_PER_TEAM:
+        raise MatchInitializationError(
+            f"El equipo {team_id} no tiene {STARTERS_PER_TEAM} titulares y {SUBSTITUTES_PER_TEAM} "
+            f"suplentes (tiene {len(starters)} y {len(substitutes)})."
+        )
+
+    starter_roles = {entry.role for entry in starters}
     formation_type = _formation_from_roles(starter_roles)
     if formation_type is None:
         raise MatchInitializationError(
             f"No se pudo deducir la formación del equipo {team_id} a partir de los roles {sorted(map(str, starter_roles))}."
         )
 
-    # Hoy el estado del motor solo necesita estos 4 campos de la alineación.
-    # Cuando el ticket del snapshot sume los atributos PACSS, se completan
-    # acá (Player ya los tiene) y en LineupPlayer.
-    players = [
-        LineupPlayer(
-            player_id=entry.player_id,
-            is_starter=entry.is_starter,
-            role=entry.role,
-            behavior_id=entry.behavior_id,
-        )
-        for entry in entries
-    ]
-    return TeamMatchSetup(team_id=team_id, formation_type=formation_type, side=side, players=players)
+    if any(entry.behavior_id is None for entry in entries):
+        raise MatchInitializationError(f"Un jugador del equipo {team_id} no tiene comportamiento asignado.")
+
+    lineup = LineupConfig(
+        formation_type=formation_type,
+        starting_players=[
+            StartingPlayer(player_id=e.player_id, role=e.role, behavior_id=e.behavior_id) for e in starters
+        ],
+        substitute_players=[SubstitutePlayer(player_id=e.player_id, behavior_id=e.behavior_id) for e in substitutes],
+    )
+    attributes = {player.player_id: attributes_of(player) for player in players}
+    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup, attributes=attributes)
 
 
 def prepare_match(session: Session, match_id: int) -> MatchState:
@@ -140,8 +162,14 @@ def prepare_match(session: Session, match_id: int) -> MatchState:
         if not entries:
             raise MatchInitializationError(f"El equipo {team_id} no tiene alineación en el partido {match_id}.")
 
-    home = _team_setup(match.team_host_id, TeamSide.HOME, entries_by_team[match.team_host_id])
-    away = _team_setup(match.team_away_id, TeamSide.AWAY, entries_by_team[match.team_away_id])
+    home = _team_setup(
+        match.team_host_id, TeamSide.HOME, entries_by_team[match.team_host_id],
+        get_players_by_team(session, match.team_host_id),
+    )
+    away = _team_setup(
+        match.team_away_id, TeamSide.AWAY, entries_by_team[match.team_away_id],
+        get_players_by_team(session, match.team_away_id),
+    )
 
     return build_initial_state(match_id, total_ticks_for(match.match_duration), home, away)
 

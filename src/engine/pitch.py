@@ -2,15 +2,13 @@
 Geometría fija de la cancha: dimensiones, arcos y posiciones iniciales
 por formación/rol/lado.
 
-IMPORTANTE - valores asumidos:
-  - PITCH_LENGTH / PITCH_WIDTH: ya aparecían implícitas en los tests de
-    resolve.py y player_api.py (team_goal=Point2D(0,30), opponent_goal=
-    Point2D(105,30)). Las mantenemos para no romper esos tests.
-  - GOAL_WIDTH: ancho de arco FIFA (7.32m), reescalado a esta cancha.
-  - FORMATION_POSITIONS: posiciones de ejemplo, razonables pero arbitrarias.
+- PITCH_LENGTH / PITCH_WIDTH: ya aparecían implícitas en los tests de
+resolve.py y player_api.py (team_goal=Point2D(0,30), opponent_goal=
+Point2D(105,30)). Las mantenemos para no romper esos tests.
+- GOAL_WIDTH: ancho de arco FIFA 7.32m, reescalado a esta cancha.
+- FORMATION_POSITIONS: posiciones de ejemplo, razonables pero arbitrarias.
 
-GameState.team_goal / opponent_goal (contrato de Primitivas, en
-game_types.py) son un único Point2D: sirven para que un comportamiento
+GameState.team_goal / opponent_goal son un único Point2D: sirven para que un comportamiento
 calcule hacia dónde patear (`direction_to`), no para detectar el gol.
 Para detectar el gol hace falta un RANGO (el ancho del arco), que acá
 modelamos aparte como GoalArea. GoalArea es un detalle INTERNO del
@@ -104,14 +102,14 @@ def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
 # equipo mirando hacia el arco rival, no una coordenada absoluta fija.
 FORMATION_POSITIONS: dict[str, dict[str, Point2D]] = {
     "2-1": {
-        "DEF_LEFT": Point2D(25.0, 45.0),
-        "DEF_RIGHT": Point2D(25.0, 15.0),
-        "FORWARD": Point2D(70.0, 30.0),
+        "DEF_LEFT": Point2D(25.0, 15.0),
+        "DEF_RIGHT": Point2D(25.0, 45.0),
+        "FORWARD": Point2D(45.0, 30.0),
     },
     "1-2": {
         "DEFENDER": Point2D(25.0, 30.0),
-        "FORWARD_LEFT": Point2D(70.0, 45.0),
-        "FORWARD_RIGHT": Point2D(70.0, 15.0),
+        "FORWARD_LEFT": Point2D(45.0, 15.0),
+        "FORWARD_RIGHT": Point2D(45.0, 45.0),
     },
 }
 
@@ -121,11 +119,6 @@ BALL_INITIAL_POSITION = Point2D(PITCH_LENGTH / 2, PITCH_WIDTH / 2)  # centro de 
 def starter_position(formation_type: str, role: str, side: TeamSide) -> Point2D:
     """
     Posición inicial de un titular según su formación, rol y lado.
-
-    Lanza KeyError si la formación o el rol no existen: quien arma el
-    estado inicial valida esto ANTES de llamar acá (ver
-    state._validate_team_setup), así que si esto explota es un bug de
-    ese chequeo, no un caso de negocio a manejar acá.
     """
     base = FORMATION_POSITIONS[formation_type][role]
     if side is TeamSide.HOME:

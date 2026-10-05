@@ -13,8 +13,11 @@ import asyncio
 import pytest
 from sqlalchemy.orm import sessionmaker
 
+from src.engine.behavior_executor import make_execute_behavior
+from src.engine.game_types import AttributeType
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide, starter_position
+from src.engine.simulation import apply_intentions
 from src.engine.state import MatchInitializationError, MatchRegistry
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player, Team
 from src.services.match_start_service import (
@@ -148,6 +151,24 @@ def test_deberia_prepare_match_deducir_la_formacion_de_cada_equipo(session, comp
 
     defensor = next(p for p in state.players_of(partido.team_away_id) if p.role == "DEFENDER")
     assert defensor.position == starter_position("1-2", "DEFENDER", TeamSide.AWAY)
+
+
+def test_deberia_prepare_match_cargar_los_atributos_de_cada_jugador_desde_la_base(session, partido):
+    jugador = session.query(Player).filter_by(team_id=partido.team_away_id, number=3).one()
+    jugador.power, jugador.agility, jugador.control, jugador.speed, jugador.strength = 11, 22, 33, 44, 55
+    session.commit()
+
+    state = prepare_match(session, partido.match_id)
+
+    assert state.players[jugador.player_id].attributes == {
+        AttributeType.POWER: 11,
+        AttributeType.AGILITY: 22,
+        AttributeType.CONTROL: 33,
+        AttributeType.SPEED: 44,
+        AttributeType.STRENGTH: 55,
+    }
+    # y los 12 jugadores tienen sus 5 atributos
+    assert all(len(p.attributes) == 5 for p in state.players.values())
 
 
 @pytest.mark.parametrize("minutos, ticks", [(2, 240), (5, 600)])
@@ -367,6 +388,37 @@ async def test_deberia_start_match_correr_el_partido_y_persistir_el_resultado(se
     guardado = session.get(Match, partido.match_id)
     assert guardado.status is MatchStatus.FINISHED
     assert (guardado.home_goals, guardado.away_goals) == (0, 0)
+
+
+CODIGO_CORRER_A_LA_PELOTA = """
+def on_tick(api):
+    api.run_to(api.get_game_state().ball_position, 1.0)
+"""
+
+
+@pytest.mark.asyncio
+async def test_deberia_el_motor_real_mover_a_los_jugadores_con_los_atributos_de_la_base(session, partido, comportamiento):
+    """Acople completo: base -> prepare_match -> execute_behavior y apply_intentions reales."""
+    state = prepare_match(session, partido.match_id)
+    posiciones_iniciales = {pid: p.position for pid, p in state.players.items() if p.position is not None}
+    execute_behavior = make_execute_behavior({comportamiento.behavior_id: CODIGO_CORRER_A_LA_PELOTA})
+
+    task = launch_match(
+        state,
+        execute_behavior=execute_behavior,
+        apply_intentions=apply_intentions,
+        notify=_noop_notify,
+        registry=MatchRegistry(),
+        on_finished=make_on_finished(_fabrica_de_sesiones(session)),
+        tick_interval_seconds=0,
+    )
+    await task
+
+    movidos = [pid for pid, pos in posiciones_iniciales.items() if state.players[pid].position != pos]
+    assert len(movidos) == 6  # los 6 titulares corrieron: sin atributos cargados no se mueve nadie
+
+    session.expire_all()
+    assert session.get(Match, partido.match_id).status is MatchStatus.FINISHED
 
 
 @pytest.mark.asyncio
