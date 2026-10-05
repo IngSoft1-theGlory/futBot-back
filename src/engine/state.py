@@ -3,9 +3,8 @@ Estado interno del partido en memoria.
 
 Dos niveles de estado, para no confundirlos:
   - GameState (src.engine.game_types): la FOTO que ve UN jugador en un
-    tick (inmutable; la arma el ticket del snapshot/GameState por
-    jugador -- todavía no implementado acá).
-  - MatchState (acá): el estado GLOBAL del partido completo -- los dos
+    tick.
+  - MatchState: el estado GLOBAL del partido completo -- los dos
     equipos, la pelota, el marcador y los ticks. Es MUTABLE: el loop
     del partido (match_runner.py) lo actualiza tick a tick. De acá
     sale el GameState de cada jugador, y es lo que deberían leer tanto
@@ -25,11 +24,8 @@ from typing import Optional
 from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType
-from src.engine.pitch import BALL_INITIAL_POSITION, FORMATION_POSITIONS, TeamSide, starter_position
-
-STARTERS_PER_TEAM = 3
-SUBSTITUTES_PER_TEAM = 3
-
+from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
+from src.schemas.lineup_config import LineupConfig
 
 class MatchPhase(Enum):
     """
@@ -150,89 +146,27 @@ match_registry = MatchRegistry()
 # (ticket "construir estado actual del partido y ubicarlos en cancha")
 
 @dataclass(frozen=True)
-class LineupPlayer:
-    """
-    Una fila de LineupEntry, pero sin SQLAlchemy: el motor no debe
-    importar el modelo persistente (no sabe de la base de datos).
-    Quien arma el partido (el service, ya con los datos consultados)
-    traduce las filas reales de la DB a esto antes de llamar a
-    build_initial_state.
-    """
-
-    player_id: int
-    is_starter: bool
-    role: Optional[str]  # None en suplentes
-    behavior_id: Optional[int]
-
-
-@dataclass(frozen=True)
 class TeamMatchSetup:
     """Lo que un equipo aporta al armar el estado inicial: su lineup
-    completa (6 filas: 3 titulares + 3 suplentes) y la formación con
+    completa (3 titulares + 3 suplentes) y la formación con
     la que entra a jugar."""
 
     team_id: int
-    formation_type: str
     side: TeamSide
-    players: list[LineupPlayer]
-
-
-def _validate_team_setup(setup: TeamMatchSetup) -> None:
-    starters = [p for p in setup.players if p.is_starter]
-    substitutes = [p for p in setup.players if not p.is_starter]
-
-    if len(starters) != STARTERS_PER_TEAM or len(substitutes) != SUBSTITUTES_PER_TEAM:
-        raise MatchInitializationError(
-            f"El equipo {setup.team_id} no tiene {STARTERS_PER_TEAM} titulares "
-            f"y {SUBSTITUTES_PER_TEAM} suplentes (tiene {len(starters)} y {len(substitutes)})."
-        )
-
-    if setup.formation_type not in FORMATION_POSITIONS:
-        raise MatchInitializationError(
-            f"Formación desconocida para el equipo {setup.team_id}: {setup.formation_type!r}"
-        )
-
-    expected_roles = set(FORMATION_POSITIONS[setup.formation_type])
-    starter_roles = [p.role for p in starters]
-
-    if any(role is None for role in starter_roles):
-        raise MatchInitializationError(f"Un titular del equipo {setup.team_id} no tiene rol asignado.")
-
-    if set(starter_roles) != expected_roles:
-        raise MatchInitializationError(
-            f"Los roles de los titulares del equipo {setup.team_id} ({set(starter_roles)}) "
-            f"no corresponden a la formación {setup.formation_type!r} (esperados: {expected_roles})."
-        )
-
-    if any(p.role is not None for p in substitutes):
-        raise MatchInitializationError(f"Un suplente del equipo {setup.team_id} tiene rol asignado.")
-
-    if any(p.behavior_id is None for p in setup.players):
-        raise MatchInitializationError(
-            f"Un jugador del equipo {setup.team_id} no tiene comportamiento asignado."
-        )
-
-    player_ids = [p.player_id for p in setup.players]
-    if len(set(player_ids)) != len(player_ids):
-        raise MatchInitializationError(f"El equipo {setup.team_id} tiene un jugador repetido en la alineación.")
-
+    lineup: LineupConfig
 
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
-    players: dict[int, MatchPlayerState] = {}
-    for lineup_player in setup.players:
-        position = None
-        if lineup_player.is_starter:
-            position = starter_position(setup.formation_type, lineup_player.role, setup.side)
-
-        players[lineup_player.player_id] = MatchPlayerState(
-            player_id=lineup_player.player_id,
-            team_id=setup.team_id,
-            side=setup.side,
-            is_starter=lineup_player.is_starter,
-            role=lineup_player.role,
-            behavior_id=lineup_player.behavior_id,
-            position=position,
-            # no necesito pasarle attributes porque al tener default_factory=dict, su default es un diccionario vacio, y estos tests no utilizan ese argumento para nada asi que no importa
+    players = {}
+    for starter in setup.lineup.starting_players:
+        players[starter.player_id] = MatchPlayerState(
+            player_id=starter.player_id, team_id=setup.team_id, side=setup.side,
+            is_starter=True, role=starter.role, behavior_id=starter.behavior_id,
+            position=starter_position(setup.lineup.formation_type, starter.role, setup.side),
+        )
+    for substitute in setup.lineup.substitute_players:
+        players[substitute.player_id] = MatchPlayerState(
+            player_id=substitute.player_id, team_id=setup.team_id, side=setup.side,
+            is_starter=False, role=None, behavior_id=substitute.behavior_id,
         )
     return players
 
@@ -268,10 +202,7 @@ def build_initial_state(
         raise MatchInitializationError("Los dos equipos no pueden defender el mismo lado de la cancha.")
     if total_ticks <= 0:
         raise MatchInitializationError(f"total_ticks debe ser positivo (recibido: {total_ticks}).")
-
-    _validate_team_setup(home)
-    _validate_team_setup(away)
-
+    
     players = _build_player_states(home)
     players.update(_build_player_states(away))
 
