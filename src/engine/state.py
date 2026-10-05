@@ -85,6 +85,9 @@ class MatchPlayerState:
     position: Optional[Point2D] = None  # None = en el banco
     current_action: ActionType = ActionType.IDLE
     attributes: dict[AttributeType, int]= field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
+    # Posición con la que arrancó el partido: a donde vuelve el jugador tras un
+    # gol (ver simulation._reset_after_goal). None en suplentes.
+    initial_position: Optional[Point2D] = None
 
 @dataclass
 class MatchState:
@@ -185,11 +188,13 @@ def _attributes_for(setup: TeamMatchSetup, player_id: int) -> dict[AttributeType
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
     players = {}
     for starter in setup.lineup.starting_players:
+        start = starter_position(setup.lineup.formation_type, starter.role, setup.side)
         players[starter.player_id] = MatchPlayerState(
             player_id=starter.player_id, team_id=setup.team_id, side=setup.side,
             is_starter=True, role=starter.role, behavior_id=starter.behavior_id,
-            position=starter_position(setup.lineup.formation_type, starter.role, setup.side),
+            position=start,
             attributes=_attributes_for(setup, starter.player_id),
+            initial_position=start,
         )
     for substitute in setup.lineup.substitute_players:
         players[substitute.player_id] = MatchPlayerState(

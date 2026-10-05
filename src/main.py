@@ -1,12 +1,10 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from src.config.settings import settings
-from src.database.base import Base, engine, get_db
+from src.database.base import get_db
 from src.routes.auth import router as auth_router
 from src.routes.players import router as players_router
 from src.routes.friendly import router as friendly_router
@@ -25,18 +23,8 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # --- código de startup (antes del yield) ---
-    Base.metadata.create_all(bind=engine)
-
-    yield  # <- acá el server queda corriendo y atendiendo requests
-
-    # --- código de shutdown (después del yield) ---
-    # nada por ahora
-
-
-app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+# El esquema de la base lo crean las migraciones de Alembic (make migrate), no la app.
+app = FastAPI(title=settings.PROJECT_NAME)
 
 app.add_middleware(
     CORSMiddleware,

@@ -7,7 +7,12 @@ Se trabaja con un MatchState armado con build_initial_state, sin base de datos.
 
 import pytest
 
-from src.engine.constants import MAX_ATTRIBUTE_VALUE, MAX_KICK_SPEED_METERS_PER_SECOND, reach_distance
+from src.engine.constants import (
+    MAX_ATTRIBUTE_VALUE,
+    MAX_KICK_SPEED_METERS_PER_SECOND,
+    MAX_RUN_SPEED_METERS_PER_SECOND,
+    reach_distance,
+)
 from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
@@ -370,12 +375,12 @@ def test_deberia_pelota_fuera_de_un_arco_no_reiniciarse(posicion):
 
 def test_deberia_reiniciar_la_pelota_antes_de_resolver_las_patadas():
     """
-    Pelota en el arco + jugador parado junto al centro: tras el reinicio la
-    pelota queda a su alcance y la patada del mismo tick se aplica.
+    Pelota en el arco; el jugador arranca el partido junto al centro: tras el
+    reinicio la pelota queda a su alcance y la patada del mismo tick se aplica.
     """
     state = _state()
     state.ball.position = Point2D(0.0, 30.0)
-    state.players[FORWARD_HOME].position = Point2D(BALL_INITIAL_POSITION.x - 1.0, BALL_INITIAL_POSITION.y)
+    state.players[FORWARD_HOME].initial_position = Point2D(BALL_INITIAL_POSITION.x - 1.0, BALL_INITIAL_POSITION.y)
 
     apply_intentions(state, {FORWARD_HOME: _kick(Vector2D(1, 0))})
 
@@ -384,15 +389,47 @@ def test_deberia_reiniciar_la_pelota_antes_de_resolver_las_patadas():
     assert state.ball.velocity.x == pytest.approx(MAX_KICK_SPEED)
 
 
-def test_deberia_no_mover_a_los_jugadores_al_reiniciar_la_pelota():
+def _state_con_los_jugadores_lejos_de_su_posicion_inicial():
+    """Devuelve (state, posiciones iniciales) con los 6 titulares movidos a otro lado."""
     state = _state()
-    posiciones = {pid: p.position for pid, p in state.players.items()}
+    iniciales = {pid: p.position for pid, p in state.players.items() if p.position is not None}
+    for jugador in state.players.values():
+        if jugador.position is not None:
+            jugador.position = Point2D(jugador.position.x + 7.0, jugador.position.y - 3.0)
+    return state, iniciales
+
+
+def test_deberia_devolver_a_todos_los_jugadores_en_cancha_a_su_posicion_inicial_tras_un_gol():
+    state, iniciales = _state_con_los_jugadores_lejos_de_su_posicion_inicial()
+    state.ball.position = Point2D(0.0, 30.0)  # gol del tick anterior
+
+    apply_intentions(state, {})
+
+    assert {pid: p.position for pid, p in state.players.items() if p.position is not None} == iniciales
+    assert len(iniciales) == 6  # los dos equipos
+
+def test_deberia_no_reubicar_a_un_jugador_fuera_de_cancha_aunque_tenga_posicion_inicial():
+    """Un titular que salió del campo (position=None) no reaparece en cancha tras un gol."""
+    state = _state()
+    state.players[FORWARD_HOME].position = None  # fuera de cancha, pero con su initial_position cargada
     state.ball.position = Point2D(0.0, 30.0)
 
     apply_intentions(state, {})
 
-    assert {pid: p.position for pid, p in state.players.items()} == posiciones
+    assert state.players[FORWARD_HOME].position is None
 
+
+def test_deberia_el_jugador_correr_desde_su_posicion_inicial_en_el_tick_del_reinicio():
+    """La carrera del tick del reinicio parte de donde quedó el jugador tras volver, no de donde estaba."""
+    state, iniciales = _state_con_los_jugadores_lejos_de_su_posicion_inicial()
+    state.ball.position = Point2D(0.0, 30.0)
+    inicial = iniciales[FORWARD_HOME]
+    destino = Point2D(inicial.x + 10.0, inicial.y)
+
+    apply_intentions(state, {FORWARD_HOME: _run_to(destino)})
+
+    paso = state.players[FORWARD_HOME].position.distance_to(inicial)
+    assert 0.0 < paso <= MAX_RUN_SPEED_METERS_PER_SECOND * TICK_DURATION_SECONDS + 1e-9
 
 # --- Jugadores en el banco ---
 

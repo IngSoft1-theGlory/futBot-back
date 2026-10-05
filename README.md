@@ -1,295 +1,252 @@
 # FutBot — Backend
 
-Backend de FutBot construido con **FastAPI**. Expone la API REST y los
-canales WebSocket definidos en el contrato de API del proyecto.
+Backend de FutBot: API REST con **FastAPI**, base de datos con **SQLAlchemy 2.0**
+(migraciones con **Alembic**) y WebSockets para los eventos en vivo.
 
 ---
 
-## Índice
-1. [Requisitos](#1-requisitos)
-2. [Clonar y configurar el entorno](#2-clonar-y-configurar-el-entorno)
-3. [Variables de entorno](#3-variables-de-entorno)
-4. [Levantar la base de datos](#4-levantar-la-base-de-datos)
-5. [Levantar el backend localmente](#5-levantar-el-backend-localmente)
-6. [Migraciones con Alembic](#6-migraciones-con-alembic)
-7. [Correr los tests](#7-correr-los-tests)
-8. [Estructura del proyecto](#8-estructura-del-proyecto)
-9. [Notas](#9-notas)
+## Antes de empezar
 
-## 1. Requisitos
+Necesitás tener instalado:
 
-* Python 3.12+ (incluye el módulo `venv`)
-* Docker y Docker Compose (para levantar Postgres localmente)
-* `make`
-  * **Windows:** `make` no viene instalado por default. Usá Git Bash (viene
-    con Git for Windows) o WSL para tener `make` disponible, o instalalo con
-    `choco install make` / `scoop install make`. Todos los comandos de este
-    README que empiezan con `make` asumen una de estas opciones.
+| Herramienta | Para qué | Notas |
+|---|---|---|
+| **Python 3.12+** | correr el backend | Incluye `venv` |
+| **Docker Desktop** (o Docker + Compose) | levantar Postgres | Tiene que estar abierto/corriendo |
+| **make** | atajos de comandos | Opcional: cada paso trae su versión "sin make" |
 
-## 2. Clonar y configurar el entorno
+> **Windows:** `make` no viene instalado. Podés usar **Git Bash** (viene con Git for
+> Windows) o **WSL**, o instalarlo con `choco install make`. Si preferís no usarlo,
+> usá los comandos de la columna **Sin make**: andan en PowerShell.
 
+---
+
+## ÍNDICE
+- [Paso a paso: levantar el backend](paso-a-paso-levantar-el-backend)
+   - [1. Clonar y crear el entorno virtual](#1-clonar-y-crear-el-entorno-virtual)
+   - [2. Instalar dependencias y crear el .env](#2-instalar-dependencias-y-crear-el-env)
+   - [3. Levantar la base de datos (Postgres en Docker)](#3-levantar-la-base-de-datos-postgres-en-docker)
+   - [4. Crear las tablas (migraciones de Alembic)](#4-crear-las-tablas-migraciones-de-alembic)
+   - [5. Cargar los comportamientos por defecto (seed)](#5-cargar-los-comportamientos-por-defecto-seed)
+   - [6. Levantar el servidor](#6-levantar-el-servidor)
+- [Correr los tests](#correr-los-tests)
+- [Migraciones (cuando cambiás un modelo)](#migraciones-cuando-cambiás-un-modelo)
+- [Si algo falla](#si-algo-falla)
+- [Estructura del proyecto](#estructura-del-proyecto)
+
+
+## Paso a paso: levantar el backend
+
+Los pasos van en orden. Hacelos una sola vez la primera vez; después alcanza con
+los pasos 1 (activar el venv), 4 (si hay migraciones nuevas) y 5.
+
+### 1. Clonar y crear el entorno virtual
+
+**Linux / macOS**
 ```bash
 git clone https://github.com/IngSoft1-theGlory/futBot-back.git
 cd futBot-back
 
 python3 -m venv .venv
-source .venv/bin/activate          # En Windows: .venv\Scripts\activate
-
-cp .env.example .env               # crear el .env (ver sección 3)
-
-make install                       # equivale a: pip install -r requirements.txt
+source .venv/bin/activate
 ```
 
-> El `.env` se crea **antes** de correr cualquier comando de `make`, ya que
-> targets como `docker-up`, `dev`, `migrate` y hasta `test` leen sus
-> variables (`DATABASE_URL` no tiene default: si falta, ni siquiera importar
-> `src.database.base` funciona — y eso incluye los tests).
+**Windows (PowerShell)**
+```powershell
+git clone https://github.com/IngSoft1-theGlory/futBot-back.git
+cd futBot-back
 
-## 3. Variables de entorno
-
-Completá los valores necesarios en el `.env` que copiaste en el paso anterior.
-
-Variables disponibles (ver `.env.example`):
-
-| Variable       | Descripción                                              | Default (ejemplo)                                      |
-|----------------|-------------------------------------------------------------|----------------------------------------------------------|
-| `ENVIRONMENT`      | Entorno de ejecución                                  | `development`                                             |
-| `DATABASE_URL` | Cadena de conexión a la base de datos (**requerida**)     | `postgresql://postgres:secretpassword@localhost:5432/futbot_db` |
-| `CORS_ORIGINS` | Orígenes permitidos para el frontend  | `http://localhost:5173` |
-| `POSTGRES_USER` | Usuario con el que se inicializa el contenedor de Postgres (usado por `docker-compose.yml`) | `postgres` |
-| `POSTGRES_PASSWORD` | Contraseña del usuario de Postgres en el contenedor (usado por `docker-compose.yml`) | `secretpassword` |
-| `POSTGRES_DB` | Nombre de la base de datos creada al inicializar el contenedor | `futbot_db` |
-
-`DATABASE_URL` no tiene valor hardcodeado en el código: si falta, la app no
-levanta y avisa qué variable falta. Es también la misma URL que usa Alembic
-(sección siguiente) — no hay una URL separada para migraciones.
-
-## 4. Levantar la base de datos
-
-Levanta la base de datos Postgres del desarrollo:
-```bash
-make docker-up      # levanta Postgres vía docker-compose
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
-Levanta la base de datos Postgres para Testeo:
-```bash
-docker compose exec db psql -U postgres -c "CREATE DATABASE futbot_test_db;"
-# levanta Postgres vía docker-compose, para tests
+Si PowerShell dice que *"la ejecución de scripts está deshabilitada"*, corré esto
+una vez y volvé a activar:
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-Esto crea contenedores de Postgres con las credenciales definidas en
-`docker-compose.yml` (coinciden con el `.env.example` por defecto).
+Sabés que el entorno está activo cuando ves `(.venv)` al principio de la línea.
+**Todos los comandos siguientes se corren con el entorno activado**, parado en la
+carpeta `futBot-back`.
 
-**Nota:** Es necesario levantar AMBAS bases de datos para evitar problemas de testing.
-(Ver sección 7)
+### 2. Instalar dependencias y crear el `.env`
 
-## 5. Levantar el backend localmente
+| | Con make | Sin make |
+|---|---|---|
+| Dependencias | `make install` | `pip install -r requirements.txt` |
+
+Crear el `.env` a partir del ejemplo:
 
 ```bash
-make dev             # uvicorn con auto-reload en http://localhost:8000
+# Linux / macOS
+cp .env.example .env
+```
+```powershell
+# Windows (PowerShell)
+Copy-Item .env.example .env
 ```
 
-o directamente:
+Para desarrollo local **solo hay que generar una SECRET_KEY** mediante terminal: 
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+Luego, los demás valores del ejemplo funcionan tal cual. El `.env` nunca se sube a git.
+
+### 3. Levantar la base de datos (Postgres en Docker)
+
+| | Comando Principal | Alternativo |
+|---|---|---|
+| **Levantar Postgres para producción** | `make docker-up` | `docker compose up --build -d db` |
+| **Levantar Postgres para tests** | `docker compose exec db psql -U postgres -c "CREATE DATABASE futbot_test_db;"` |
+
+Esto deja dos Postgres escuchando en `localhost:5432` con las bases **`futbot_db`**
+(la base principal que usa el backend) y **`futbot_test_db`** (la base para correr los tests).Para verificar que está arriba:
 
 ```bash
-uvicorn src.main:app --reload
+docker compose ps        # la columna STATUS del servicio "db" debe decir "healthy"
 ```
 
-Endpoints de prueba:
+### 4. Crear las tablas (migraciones de Alembic)
 
-* `GET http://localhost:8000/` → mensaje de bienvenida
-* `GET http://localhost:8000/api/v1/health` → `{"status": "ok"}` (200 OK)
-* Documentación interactiva: `http://localhost:8000/docs`
+El backend **no crea las tablas solo**: las crea Alembic. Sin este paso la API
+levanta pero falla en cuanto toca la base.
 
-> **Importante:** el server ya **no** crea las tablas al arrancar. Antes de
-> levantar el backend por primera vez (checkout limpio, o base de datos
-> nueva) tenés que aplicar las migraciones — ver sección 6. Si te salteás
-> este paso vas a ver `no such table: teams/users` (SQLite) o el equivalente
-> en Postgres en el primer request.
+| | Con make | Sin make |
+|---|---|---|
+| Crear/Actualizar tablas | `make migrate` | `alembic upgrade head` |
 
-## 6. Migraciones con Alembic
+Repetí este paso **cada vez que hagas pull** de cambios que traigan migraciones
+nuevas (carpeta `alembic/versions/`).
 
-El esquema de la base de datos (tablas, columnas, FKs, constraints) está
-versionado con [Alembic](https://alembic.sqlalchemy.org/), no se genera más
-con `Base.metadata.create_all()` al arrancar la app. Esto permite aplicar
-cambios de esquema de forma reproducible en cualquier ambiente (tu máquina,
-la de un compañero, CI, producción) sin que cada uno tenga que borrar su
-base local a mano cada vez que alguien cambia un modelo.
+### 5. Cargar los comportamientos por defecto (seed)
 
-**La primera vez que levantás el proyecto** (o cada vez que la base está
-vacía):
+Sin esto no hay comportamientos predeterminados (Neutro, Ofensivo, Defensor) y no
+se pueden armar alineaciones ni jugar un amistoso. Se corre **después** de migrar y
+se puede repetir sin problema: no duplica nada.
 
 ```bash
-make migrate         # aplica todas las migraciones pendientes (alembic upgrade head)
+python -m src.seed
 ```
 
-**Flujo de trabajo cuando cambiás un modelo** (agregás una columna, un
-modelo nuevo, etc.):
+(Es el mismo comando en Linux y en Windows.)
 
-1. Modificá la clase en `src/models/`, como siempre.
-2. Generá el borrador de migración a partir del diff entre los modelos y la
-   base actual:
-   ```bash
-   make makemigrations m="descripción corta del cambio"
-   ```
-   Esto crea un archivo nuevo en `alembic/versions/`.
-3. **Revisá ese archivo a mano antes de commitearlo.** `--autogenerate` no
-   es confiable con renames de columna/tabla (los ve como un DROP + un ADD,
-   lo que en una base con datos reales te borraría la columna entera) ni
-   con algunos tipos de constraints. Si el diff no es lo que esperabas,
-   corregilo vos en el archivo generado.
-4. Commiteá el script de migración **junto con** el cambio del modelo que lo
-   generó — son un solo cambio lógico, no dos PRs separados.
-5. Quien pullee tu cambio corre `make migrate` para aplicar la migración
-   sobre su base local. Esto reemplaza al viejo "che, borrate la base y
-   volvé a levantarla" cuando cambiaba algo.
+### 6. Levantar el servidor
 
-**Revertir una migración (downgrade):**
+| | Con make | Sin make |
+|---|---|---|
+| Desarrollo (recarga solo al editar) | `make dev` | `uvicorn src.main:app --reload --port 8000` |
+| Sin recarga | `make run` | `uvicorn src.main:app --port 8000` |
 
-Si aplicaste una migración de prueba (o cualquiera que quieras descartar
-antes de commitear), no se borra a mano ni con `DROP TABLE` — eso te
-desincroniza `alembic_version` del resto y vas a terminar con un estado raro
-(esquema real vacío pero Alembic pensando que está todo aplicado). El camino
-correcto tiene tres pasos, los tres son necesarios:
+Listo. Probá abrir:
 
-```bash
-make downgrade                 # deshace la última migración aplicada (un paso)
-# o make downgrade rev=<id>    # retrocede hasta una revisión puntual
-# o make downgrade rev=base    # deshace todas, deja el esquema vacío
-```
+- Documentación interactiva: <http://localhost:8000/docs>
+- Salud del servidor: <http://localhost:8000/api/v1/health>
 
-1. `make downgrade` — corre el `downgrade()` de la migración actual y mueve
-   `alembic_version` a la revisión anterior.
-2. Borrá el archivo de esa migración en `alembic/versions/` (si era de
-   prueba y no la vas a commitear).
-3. Revertí también el cambio en el modelo (`src/models/...`) que la había
-   generado — si el modelo sigue declarando el campo pero la migración ya
-   no existe, `make makemigrations` te lo va a volver a "detectar" como
-   faltante la próxima vez.
+Para frenar el servidor: `Ctrl + C`. Para apagar la base: `make docker-down`
+(o `docker compose down`). Los datos se conservan entre reinicios.
 
-Los tres pasos van juntos: solo el `downgrade` arregla la base, pero deja el
-modelo y el archivo de migración sueltos si no hacés los otros dos.
+---
 
-**Saber cuál es la versión actual de la Base de datos**
-```bash
-alembic current
-```
+## Correr los tests
 
-**Importante — esto NO es lo mismo que borrar la base de datos.**
-`alembic downgrade base` deja el *esquema* vacío (deshace todas las tablas),
-pero la base de datos en sí (`futbot_db` como objeto de Postgres) sigue
-existiendo. Alembic versiona lo que hay *adentro* de una base que ya existe;
-no crea ni destruye la base en sí — eso es un comando de Postgres
-(`DROP DATABASE`) o, en desarrollo local, tirar el volumen de Docker
-(`docker compose down -v`).
+Hay dos formas. **La rápida es la que usás todos los días**; la de Postgres sirve
+para chequear que todo ande también contra la base real antes de abrir una PR.
 
-**Cosas que conviene tener claras:**
+### 1. Tests rápidos (SQLite en memoria)
 
-* Los tests **no** usan Alembic para armar su base (ver sección 7) — sí lo
-  hace, a propósito, el único test dedicado a probar que Alembic esté bien
-  configurado.
-* `make makemigrations` espera `m="mensaje"` (con `=`), **no** `-m "mensaje"`
-  como `git commit` o `alembic` directo. Si usás `-m`, Make lo interpreta
-  como una flag propia (la ignora) y trata `"mensaje"` como otro target a
-  construir — el resultado es una migración generada igual, pero con el
-  mensaje vacío (`alembic revision --autogenerate -m ""`), y un
-  `make: *** No rule to make target...` al final.
-* En Windows, si editás `Makefile` o algún archivo bajo `alembic/` a mano:
-  las líneas de comandos del `Makefile` necesitan **tabs literales**, no
-  espacios (es una regla de GNU Make, no de estilo). Si después de agregar
-  o tocar un target te tira `make: Nothing to be done for '<target>'`, es
-  casi siempre esto — muchos editores (VS Code incluido) autoconvierten
-  tabs a espacios al pegar código. Si pasa, revisá con un editor que
-  muestre whitespace, o volvé a copiar el `Makefile` sin dejar que el
-  editor lo reformatee.
+No necesitan Docker ni base levantada.
 
-## 7. Correr los tests
+| | Con make | Sin make |
+|---|---|---|
+| Correr todos los tests | `make test` | `pytest tests/ -v` |
 
-```bash
-make test            # equivale a: PYTHONPATH=. pytest tests/ -v
-```
+### 2. Tests contra Postgres (`futbot_test_db`)
 
-Necesitás el `.env` de la sección 3 incluso para correr los tests: importar
-cualquier modelo pasa por `src/database/base.py`, que lee
-`settings.DATABASE_URL` al importarse (aunque el motor real de esa URL no
-se use en los tests — ver el punto siguiente).
+Usan una base **separada** de la principal, para que los tests nunca toquen tus
+datos de desarrollo (los tests crean y borran tablas en ella).
 
-La mayoría de los tests (`tests/unit/test_user_persistence.py`,
-`test_register_endpoint.py`, etc.) arma su propia base SQLite en memoria vía
-`tests/conftest.py`, completamente aislada de `DATABASE_URL` y de Alembic —
-es intencional, para que los tests corran rápido y no dependan de un estado
-compartido. La excepción es `test_alembic_migrations.py`, que sí ejecuta
-`alembic upgrade head` de verdad, pero contra un archivo SQLite temporal
-propio (no toca ni tu base local ni la de `.env`).
-
-**Correr los tests contra Postgres real (`make test-postgres`):**
-
-SQLite no enforcea todo lo que Postgres sí (longitud real de `VARCHAR`,
-case-sensitivity, algunos comportamientos de constraints). Para detectar ese
-tipo de bugs, existe:
-
+**Con make** (Linux / macOS / Git Bash / WSL)
 ```bash
 make test-postgres
 ```
 
-Esto corre la misma suite de tests, pero contra Postgres de verdad en vez de
-SQLite en memoria — apuntando a **`futbot_test_db`**, una base separada de tu
-`futbot_db` de desarrollo, dentro del mismo contenedor. La separación es
-intencional y necesaria: `tests/conftest.py` hace `Base.metadata.drop_all()`
-al final de cada test para dejar todo limpio, y eso borra todas las tablas de
-la base contra la que corrió. Si apuntara a tu base de desarrollo, cada
-`make test-postgres` te dejaría sin los datos que tenías ahí probando a mano.
-
-**Antes de usarlo por primera vez**, con el contenedor de Postgres levantado
-(`make docker-up`), creá esa base una sola vez:
+**Sin make — Linux / macOS**
 ```bash
-docker compose exec db psql -U postgres -c "CREATE DATABASE futbot_test_db;"
+TEST_DATABASE_URL=postgresql://postgres:secretpassword@localhost:5432/futbot_test_db pytest tests/ -v
 ```
 
-`futbot_test_db` no necesita migraciones de Alembic corridas a mano —
-`conftest.py` arma el esquema con `create_all()` al principio de cada test y
-lo destruye al final, así que siempre arranca de cero.
+**Sin make — Windows (PowerShell)**
+```powershell
+$env:TEST_DATABASE_URL="postgresql://postgres:secretpassword@localhost:5432/futbot_test_db"
+pytest tests/ -v
+Remove-Item Env:TEST_DATABASE_URL     # para volver a los tests rápidos
+```
 
-## 8. Estructura del proyecto
+> Si cambiaste `POSTGRES_USER` o `POSTGRES_PASSWORD` en tu `.env`, usá esos valores
+> en la URL.
+
+---
+
+## Migraciones (cuando cambiás un modelo)
+
+Si agregás o modificás una tabla/columna en `src/models/`, hay que generar una
+migración:
+
+| Qué querés hacer | Con make | Sin make |
+|---|---|---|
+| Aplicar migraciones pendientes | `make migrate` | `alembic upgrade head` |
+| Generar una migración nueva | `make makemigrations m="agrego columna X"` | `alembic revision --autogenerate -m "agrego columna X"` |
+| Deshacer la última migración | `make downgrade` | `alembic downgrade -1` |
+| Volver a una migración puntual | `make downgrade rev=<id>` | `alembic downgrade <id>` |
+| Vaciar todo el esquema | `make downgrade rev=base` | `alembic downgrade base` |
+
+**Siempre revisá a mano** el archivo generado en `alembic/versions/` antes de
+commitearlo: el autogenerado puede equivocarse.
+
+---
+
+## Si algo falla
+
+| Síntoma | Qué hacer |
+|---|---|
+| `connection refused` en `localhost:5432` | Postgres no está levantado: `make docker-up` y esperá a que diga `healthy`. Verificá que Docker Desktop esté abierto. |
+| `relation "users" does not exist` / tablas inexistentes | Falta correr las migraciones: `make migrate`. |
+| No hay comportamientos / no se puede armar la alineación | Falta el seed: `python -m src.seed`. |
+| `port is already allocated` (5432) | Ya tenés otro Postgres usando ese puerto. Apagalo o cambiá el puerto en `docker-compose.yml`. |
+| `ModuleNotFoundError` | El entorno virtual no está activo (no ves `(.venv)`) o falta `make install`. |
+| En PowerShell, `make migrate` / `make test` fallan | Esos comandos del Makefile solo andan en Git Bash/WSL. En PowerShell usá la columna **Sin make**. |
+| Tras un pull, errores raros de columnas | `make migrate`. Si tu base de desarrollo es vieja (creada antes de Alembic), la forma más simple es recrearla: `docker compose down -v`, `make docker-up`, `make migrate`, `python -m src.seed`. **Esto borra tus datos locales.** |
+
+---
+
+## Estructura del proyecto
 
 ```
-Backend/
+futBot-back/
 ├── src/
-│   ├── config/       # Settings (variables de entorno)
-│   ├── database/     # Engine, sesión y Base de SQLAlchemy
-│   ├── schemas/      # Modelos Pydantic (request/response)
-│   ├── routes/       # Routers de FastAPI (endpoints HTTP)
-│   ├── services/     # Lógica de negocio por dominio
-│   ├── engine/       # Motor de simulación del partido (tick a tick)
-│   ├── sandbox/      # Validación y ejecución aislada de comportamientos Python
-│   ├── realtime/     # Event Bus y canales WebSocket (global y por partido)
-│   ├── core/         # Excepciones, seguridad y utilidades transversales
-│   ├── utils/        # Helpers generales
-│   └── main.py       # Punto de entrada de la app FastAPI
-├── alembic/
-│   ├── versions/     # Scripts de migración (uno por cambio de esquema)
-│   └── env.py        # Configuración de Alembic (target_metadata, DATABASE_URL)
-├── alembic.ini        # Config de Alembic (sin sqlalchemy.url hardcodeada)
-├── tests/
-│   └── unit/
-├── docker-compose.yml    # Postgres (+ backend opcional) para desarrollo local
-├── Dockerfile
-├── Makefile
+│   ├── main.py             # App FastAPI (registra routers y WebSockets)
+│   ├── config/             # Settings (lee el .env)
+│   ├── core/               # Excepciones, seguridad, utilidades base
+│   ├── database/           # Conexión a la base y Base declarativa
+│   ├── models/             # Modelos SQLAlchemy (tablas)
+│   ├── schemas/            # Esquemas Pydantic (entrada/salida de la API)
+│   ├── repositories/       # Acceso a datos
+│   ├── services/           # Lógica de negocio
+│   ├── routes/             # Endpoints REST
+│   ├── realtime/           # WebSockets y bus de eventos
+│   ├── engine/             # Motor de simulación del partido (sin base de datos)
+│   ├── sandbox/            # Ejecución del código de los comportamientos
+│   ├── utils/
+│   ├── default_behaviors.py  # Comportamientos predeterminados
+│   └── seed.py             # Carga los comportamientos por defecto
+├── alembic/versions/       # Migraciones
+├── tests/unit/             # Tests
+├── docker-compose.yml      # Postgres (y backend)
+├── Makefile                # Atajos de comandos
 ├── requirements.txt
-├── .env.example
-└── .gitignore
+└── .env.example            # Plantilla del .env
 ```
 
-## 9. Notas
+---
 
-* Los módulos de `engine/`, `sandbox/` y `realtime/` están inicializados como
-  esqueleto funcional (imports correctos, clases base) para que el resto de
-  los endpoints y la lógica de simulación se puedan implementar en los
-  próximos tickets sin reorganizar la estructura de carpetas.
-* CORS está habilitado para los orígenes definidos en `CORS_ORIGINS`, pensado
-  para el desarrollo local del frontend en React.
-* **Windows en general:** el resto del flujo (venv, Docker, `make dev`,
-  `make migrate`) funciona igual que en Linux/Mac una vez que tenés `make`
-  disponible (ver sección 1) — no hay pasos manuales extra específicos de
-  Windows más allá de activar el venv con `.venv\Scripts\activate` y tener
-  cuidado con tabs vs. espacios si editás el `Makefile` (sección 6).
