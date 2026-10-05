@@ -11,6 +11,7 @@ import pytest
 
 from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
+from src.engine.game_types import AttributeType
 from src.engine.pitch import TeamSide
 from src.engine.player_api import PlayerAPI
 from src.engine.state import (
@@ -23,6 +24,15 @@ from src.engine.match_runner import run_match, run_tick
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 MATCH_ID = 1
+
+
+ATTRIBUTES = {
+    AttributeType.POWER: 80,
+    AttributeType.AGILITY: 50,
+    AttributeType.CONTROL: 60,
+    AttributeType.SPEED: 80,
+    AttributeType.STRENGTH: 50,
+}
 
 
 def _setup(team_id: int, side: TeamSide, base_player_id: int) -> TeamMatchSetup:
@@ -38,7 +48,9 @@ def _setup(team_id: int, side: TeamSide, base_player_id: int) -> TeamMatchSetup:
             for i in range(3)
         ],
     )
-    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup)
+    # los mismos atributos para los 6 jugadores del equipo
+    attributes = {base_player_id + i: dict(ATTRIBUTES) for i in range(6)}
+    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup, attributes=attributes)
 
 
 def _build_state(total_ticks: int = 3):

@@ -145,15 +145,42 @@ match_registry = MatchRegistry()
 # --- Construcción del estado inicial ---
 # (ticket "construir estado actual del partido y ubicarlos en cancha")
 
+def attributes_of(player) -> dict[AttributeType, int]:
+    """
+    Pasa los atributos de un jugador de la base (modelo Player) al dict que
+    usa el motor. `player` es cualquier objeto con power, agility, control,
+    speed y strength (no se importa el modelo para que el motor no dependa de él).
+    """
+    return {
+        AttributeType.POWER: player.power,
+        AttributeType.AGILITY: player.agility,
+        AttributeType.CONTROL: player.control,
+        AttributeType.SPEED: player.speed,
+        AttributeType.STRENGTH: player.strength,
+    }
+
+
 @dataclass(frozen=True)
 class TeamMatchSetup:
     """Lo que un equipo aporta al armar el estado inicial: su lineup
-    completa (3 titulares + 3 suplentes) y la formación con
-    la que entra a jugar."""
+    (formación, 3 titulares y 3 suplentes) y los atributos de cada uno.
+
+    Los atributos NO viajan en el LineupConfig (es lo que manda el cliente):
+    los carga quien arranca el partido, leyendo la tabla players y usando
+    attributes_of. Tiene que haber una entrada por cada player_id del lineup."""
 
     team_id: int
     side: TeamSide
     lineup: LineupConfig
+    attributes: dict[int, dict[AttributeType, int]]  # player_id -> atributos
+
+
+def _attributes_for(setup: TeamMatchSetup, player_id: int) -> dict[AttributeType, int]:
+    """Copia de los atributos del jugador; falla si el setup no los trae."""
+    if player_id not in setup.attributes:
+        raise MatchInitializationError(f"Faltan los atributos del jugador {player_id}.")
+    return dict(setup.attributes[player_id])  # copia: cada jugador tiene su propio dict
+
 
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
     players = {}
@@ -162,11 +189,13 @@ def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
             player_id=starter.player_id, team_id=setup.team_id, side=setup.side,
             is_starter=True, role=starter.role, behavior_id=starter.behavior_id,
             position=starter_position(setup.lineup.formation_type, starter.role, setup.side),
+            attributes=_attributes_for(setup, starter.player_id),
         )
     for substitute in setup.lineup.substitute_players:
         players[substitute.player_id] = MatchPlayerState(
             player_id=substitute.player_id, team_id=setup.team_id, side=setup.side,
             is_starter=False, role=None, behavior_id=substitute.behavior_id,
+            attributes=_attributes_for(setup, substitute.player_id),
         )
     return players
 

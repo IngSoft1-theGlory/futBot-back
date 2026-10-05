@@ -6,11 +6,21 @@ Tests de match_broadcast: notify
 import pytest
 
 from src.engine.intentions import ActionType
+from src.engine.game_types import AttributeType
 from src.engine.pitch import TeamSide
 from src.engine.state import TeamMatchSetup, build_initial_state
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 from src.realtime.match_broadcast import build_tick_update_payload, notify
 from src.realtime.match_connection_manager import match_connections
+
+
+ATTRIBUTES = {
+    AttributeType.POWER: 80,
+    AttributeType.AGILITY: 50,
+    AttributeType.CONTROL: 60,
+    AttributeType.SPEED: 80,
+    AttributeType.STRENGTH: 50,
+}
 
 
 def _setup(team_id: int, side: TeamSide, base_player_id: int) -> TeamMatchSetup:
@@ -26,7 +36,9 @@ def _setup(team_id: int, side: TeamSide, base_player_id: int) -> TeamMatchSetup:
             for i in range(3)
         ],
     )
-    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup)
+    # los mismos atributos para los 6 jugadores del equipo
+    attributes = {base_player_id + i: dict(ATTRIBUTES) for i in range(6)}
+    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup, attributes=attributes)
 
 
 def _build_state(match_id: int = 1):
