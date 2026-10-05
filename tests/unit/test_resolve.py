@@ -1,13 +1,18 @@
 """
 Tests del resolve: aplica una Intention a un GameState.
-IDLE y RUN_TO; kick_ball todavía no.
+IDLE, RUN_TO y KICK_BALL.
 """
 
 from dataclasses import replace
 
 import pytest
 
-from src.engine.constants import MAX_ATTRIBUTE_VALUE, MAX_RUN_SPEED_METERS_PER_SECOND
+from src.engine.constants import (
+    MAX_ATTRIBUTE_VALUE,
+    MAX_KICK_SPEED_METERS_PER_SECOND,
+    MAX_RUN_SPEED_METERS_PER_SECOND,
+    reach_distance,
+)
 from src.engine.game_types import AttributeType, GameState
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
@@ -64,12 +69,6 @@ def test_deberia_resolve_idle_no_cambiar_el_resto_del_estado():
     estado = _game_state_valido()
 
     assert resolve(estado, Intention(ActionType.IDLE), ATTRIBUTES) == estado
-
-
-def test_deberia_resolve_accion_no_implementada_fallar_en_vez_de_ignorarla():
-    """KICK_BALL todavía no se resuelve: lanza NotImplementedError (no pasa en silencio)."""
-    with pytest.raises(NotImplementedError):
-        resolve(_game_state_valido(), Intention(ActionType.KICK_BALL), ATTRIBUTES)
 
 
 # --- Distancia máxima por tick ---
@@ -201,3 +200,106 @@ def test_deberia_jugador_nunca_terminar_fuera_de_la_cancha(inicio, target):
     nuevo = resolve(_game_state_valido(inicio), _run_to(target), ATTRIBUTES)
 
     assert _esta_en_cancha(nuevo.my_position)
+
+
+# --- KICK_BALL ---
+# Con ATTRIBUTES: POWER 20 y CONTROL 40
+#   rapidez a fondo = 30 m/s * 20/100 = 6 m/s
+#   alcance         = reach_distance(40) = 1.625 m
+
+REACH = reach_distance(ATTRIBUTES[AttributeType.CONTROL])
+MAX_KICK_SPEED = MAX_KICK_SPEED_METERS_PER_SECOND * ATTRIBUTES[AttributeType.POWER] / MAX_ATTRIBUTE_VALUE
+
+
+def _kick(direction: Vector2D, power_percentage: float = 1.0) -> Intention:
+    return Intention(ActionType.KICK_BALL, direction=direction, power_percentage=power_percentage)
+
+
+def _con_pelota_a(distancia: float) -> GameState:
+    """Jugador en (0, 0) y pelota en reposo a `distancia` metros sobre el eje x."""
+    return replace(
+        _game_state_valido(Point2D(0, 0)),
+        ball_position=Point2D(distancia, 0),
+        ball_velocity=Vector2D(0, 0),
+    )
+
+
+def test_deberia_kick_ball_en_alcance_darle_a_la_pelota_la_direccion_pedida():
+    nuevo = resolve(_con_pelota_a(1.0), _kick(Vector2D(0, 1)), ATTRIBUTES)
+
+    assert nuevo.ball_velocity.x == pytest.approx(0.0)
+    assert nuevo.ball_velocity.y == pytest.approx(MAX_KICK_SPEED)
+
+
+def test_deberia_kick_ball_normalizar_la_direccion_antes_de_aplicarla():
+    """(30, 40) y (0.3, 0.4) apuntan igual: la velocidad solo depende de power_percentage."""
+    grande = resolve(_con_pelota_a(1.0), _kick(Vector2D(30, 40)), ATTRIBUTES)
+    chica = resolve(_con_pelota_a(1.0), _kick(Vector2D(0.3, 0.4)), ATTRIBUTES)
+
+    assert grande.ball_velocity.x == pytest.approx(0.6 * MAX_KICK_SPEED)
+    assert grande.ball_velocity.y == pytest.approx(0.8 * MAX_KICK_SPEED)
+    assert chica.ball_velocity == grande.ball_velocity
+
+
+def test_deberia_kick_ball_dar_velocidad_proporcional_a_power_percentage():
+    a_fondo = resolve(_con_pelota_a(1.0), _kick(Vector2D(1, 0), 1.0), ATTRIBUTES)
+    a_la_mitad = resolve(_con_pelota_a(1.0), _kick(Vector2D(1, 0), 0.5), ATTRIBUTES)
+
+    assert a_la_mitad.ball_velocity.magnitude() == pytest.approx(a_fondo.ball_velocity.magnitude() * 0.5)
+
+
+def test_deberia_kick_ball_con_mas_power_dar_mas_velocidad():
+    poco = resolve(_con_pelota_a(1.0), _kick(Vector2D(1, 0)), {**ATTRIBUTES, AttributeType.POWER: 20})
+    mucho = resolve(_con_pelota_a(1.0), _kick(Vector2D(1, 0)), {**ATTRIBUTES, AttributeType.POWER: 100})
+
+    assert mucho.ball_velocity.magnitude() > poco.ball_velocity.magnitude()
+
+
+def test_deberia_kick_ball_pisar_la_velocidad_anterior_de_la_pelota():
+    """La patada reemplaza la velocidad (no la suma a la que traía)."""
+    estado = replace(_con_pelota_a(1.0), ball_velocity=Vector2D(-9, -9))
+
+    nuevo = resolve(estado, _kick(Vector2D(1, 0)), ATTRIBUTES)
+
+    assert nuevo.ball_velocity.x == pytest.approx(MAX_KICK_SPEED)
+    assert nuevo.ball_velocity.y == pytest.approx(0.0)
+
+
+def test_deberia_kick_ball_no_cambiar_nada_mas_que_ball_velocity():
+    estado = _con_pelota_a(1.0)
+
+    nuevo = resolve(estado, _kick(Vector2D(1, 0)), ATTRIBUTES)
+
+    assert replace(nuevo, ball_velocity=estado.ball_velocity) == estado
+
+
+def test_deberia_kick_ball_fuera_de_alcance_dejar_el_estado_sin_cambios():
+    estado = replace(_con_pelota_a(REACH + 0.01), ball_velocity=Vector2D(1, 2))
+
+    assert resolve(estado, _kick(Vector2D(1, 0)), ATTRIBUTES) == estado
+
+
+def test_deberia_kick_ball_justo_en_el_borde_del_alcance_patear():
+    """Borde inclusive: distancia == reach_distance() sí patea."""
+    nuevo = resolve(_con_pelota_a(REACH), _kick(Vector2D(1, 0)), ATTRIBUTES)
+
+    assert nuevo.ball_velocity.x == pytest.approx(MAX_KICK_SPEED)
+
+
+def test_deberia_kick_ball_con_power_percentage_cero_dejar_la_pelota_sin_velocidad():
+    estado = replace(_con_pelota_a(1.0), ball_velocity=Vector2D(3, 4))
+
+    nuevo = resolve(estado, _kick(Vector2D(1, 0), 0.0), ATTRIBUTES)
+
+    assert nuevo.ball_velocity.magnitude() == pytest.approx(0.0)
+
+
+def test_deberia_el_alcance_depender_del_control_del_jugador():
+    """A 3 m: con CONTROL 40 (alcance 1.6 m) no llega, con CONTROL 100 (5 m) sí."""
+    estado = _con_pelota_a(3.0)
+
+    sin_alcance = resolve(estado, _kick(Vector2D(1, 0)), {**ATTRIBUTES, AttributeType.CONTROL: 40})
+    con_alcance = resolve(estado, _kick(Vector2D(1, 0)), {**ATTRIBUTES, AttributeType.CONTROL: 100})
+
+    assert sin_alcance == estado
+    assert con_alcance.ball_velocity.magnitude() > 0

@@ -41,3 +41,16 @@ def reach_distance(control: int) -> float:
     # reach_distance(control) = 0.05625 * control - 0.625
             
     return 0.05625 * control - 0.625
+
+# --- Patada (kick_ball) ---
+# PROVISORIO: la fórmula f(POWER, power_percentage) del ticket no está
+# definida todavía. Mientras tanto la rapidez de la pelota es lineal:
+#   rapidez (m/s) = MAX_KICK_SPEED_METERS_PER_SECOND * POWER / MAX_ATTRIBUTE_VALUE * power_percentage
+# Ejemplos: POWER 100 a fondo -> 30 m/s, POWER 50 a fondo -> 15 m/s,
+#           POWER 50 con power_percentage 0.5 -> 7.5 m/s
+MAX_KICK_SPEED_METERS_PER_SECOND = 30.0
+
+
+def kick_speed(power: int, power_percentage: float) -> float:
+    """Rapidez (m/s) que un jugador le da a la pelota. Proporcional a power_percentage."""
+    return MAX_KICK_SPEED_METERS_PER_SECOND * power / MAX_ATTRIBUTE_VALUE * power_percentage
