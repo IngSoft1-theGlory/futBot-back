@@ -12,7 +12,7 @@ from src.models import Match, MatchStatus, Team, User
 from tests.unit.test_post_friendly_endpoint import (  # noqa: F401
     client, comportamiento, db, headers, usuario,
 )
-from tests.unit.test_join_friendly_endpoint import body_rival, partido, rival  # noqa: F401
+from tests.unit.test_join_friendly_endpoint import body_rival, motor_lanzado, partido, rival  # noqa: F401
 
 
 def url(match_id):

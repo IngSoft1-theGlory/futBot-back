@@ -48,14 +48,14 @@ def comportamientos(session, usuario_con_equipo, otro_usuario):
     2 predeterminados del sistema, 1 personalizado del usuario logueado
     y 1 personalizado de otro usuario.
     """
-    default_1 = Behavior(name="Patear al arco", description="d1", code="pass", is_default=True)
-    default_2 = Behavior(name="Defensor", description="d2", code="pass", is_default=True)
+    default_1 = Behavior(name="Patear al arco", description="d1", code="def on_tick(api): pass", is_default=True)
+    default_2 = Behavior(name="Defensor", description="d2", code="def on_tick(api): pass", is_default=True)
     propio = Behavior(
-        name="Mi comportamiento", description="p", code="pass",
+        name="Mi comportamiento", description="p", code="def on_tick(api): pass",
         user_id=usuario_con_equipo.user_id, is_default=False,
     )
     ajeno = Behavior(
-        name="De otro", description="a", code="pass",
+        name="De otro", description="a", code="def on_tick(api): pass",
         user_id=otro_usuario.user_id, is_default=False,
     )
     session.add_all([default_1, default_2, propio, ajeno])

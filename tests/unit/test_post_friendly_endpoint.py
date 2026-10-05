@@ -73,7 +73,7 @@ def usuario(db):
 
 @pytest.fixture()
 def comportamiento(db):
-    behavior = Behavior(name="Patear", description="Patea", code="pass", is_default=True)
+    behavior = Behavior(name="Patear", description="Patea", code="def on_tick(api): pass", is_default=True)
     db.add(behavior)
     db.commit()
     return behavior

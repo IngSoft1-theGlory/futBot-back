@@ -50,8 +50,8 @@ def test_behavior_se_persiste_en_la_base_de_datos(session, usuario_con_equipo):
 
 def test_behavior_id_es_unico_y_autogenerado(session, usuario_con_equipo):
     """Cada comportamiento tiene un identificador unico."""
-    b1 = Behavior(name="A", description="a", code="pass", user_id=usuario_con_equipo.user_id)
-    b2 = Behavior(name="B", description="b", code="pass", user_id=usuario_con_equipo.user_id)
+    b1 = Behavior(name="A", description="a", code="def on_tick(api): pass", user_id=usuario_con_equipo.user_id)
+    b2 = Behavior(name="B", description="b", code="def on_tick(api): pass", user_id=usuario_con_equipo.user_id)
 
     session.add_all([b1, b2])
     session.commit()
@@ -64,7 +64,7 @@ def test_behavior_id_es_unico_y_autogenerado(session, usuario_con_equipo):
 def test_is_default_no_especificado_es_false(session, usuario_con_equipo):
     """Si is_default no se especifica, se asigna is_default = False"""
     behavior = Behavior(
-        name="Custom", description="desc", code="pass", user_id=usuario_con_equipo.user_id
+        name="Custom", description="desc", code="def on_tick(api): pass", user_id=usuario_con_equipo.user_id
     )
 
     session.add(behavior)
@@ -80,7 +80,7 @@ def test_behavior_default_puede_no_tener_usuario(session):
     behavior = Behavior(
         name="Patear pelota",
         description="Comportamiento del sistema",
-        code="pass",
+        code="def on_tick(api): pass",
         user_id=None,
         is_default=True,
     )
@@ -100,7 +100,7 @@ def test_relacion_user_behaviors(session, usuario_con_equipo):
     behavior = Behavior(
         name="Defender",
         description="desc",
-        code="pass",
+        code="def on_tick(api): pass",
         user_id=usuario_con_equipo.user_id,
     )
     session.add(behavior)
@@ -117,7 +117,7 @@ def test_borrar_usuario_borra_sus_comportamientos_personalizados(session, usuari
     behavior = Behavior(
         name="Defender",
         description="desc",
-        code="pass",
+        code="def on_tick(api): pass",
         user_id=usuario_con_equipo.user_id,
     )
     session.add(behavior)
