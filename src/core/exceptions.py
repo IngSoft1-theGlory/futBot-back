@@ -78,6 +78,14 @@ class MatchUnavailableError(ConflictError):
     """Rama 409 MATCH_UNAVAILABLE: el partido ya empezó o ya tiene rival."""
     error_code = "MATCH_UNAVAILABLE"
 
+class MatchPendingError(BadRequestError):
+    """Rama 400 MATCH_PENDING: el partido todavía no empezó (espera rival)."""
+    error_code = "MATCH_PENDING"
+
+class MatchFinishedError(BadRequestError):
+    """Rama 400 MATCH_FINISHED: el partido ya terminó."""
+    error_code = "MATCH_FINISHED"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
