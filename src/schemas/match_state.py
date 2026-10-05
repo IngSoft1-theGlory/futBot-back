@@ -22,7 +22,8 @@ class MatchPlayerOut(BaseModel):
     behavior_id: int | None   # sin default a propósito: hay que pasarlo siempre
 
 # Respuesta del endpoint GET /matches/{match_id}/state.
-# Incluye el marcador y los jugadores con sus atributos.class MatchStateResponse(BaseModel):
+# Incluye el marcador y los jugadores con sus atributos.
+class MatchStateResponse(BaseModel):
     match_id: int
     current_tick: int
     total_ticks: int
