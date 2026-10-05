@@ -82,7 +82,7 @@ def create_player(
         raise InvalidPlayerDataError(
             f"El nombre no puede estar vacío ni superar los {_NAME_MAX_LENGTH} caracteres." 
         ) 
-    if number <= 1 or number > _NUMBER_MAX:
+    if number < 1 or number > _NUMBER_MAX:
         raise InvalidPlayerDataError("El número de camiseta debe ser un entero positivo.")
 
     attributes = [power, agility, control, speed, strength]
