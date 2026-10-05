@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from src.models import Behavior, Match, MatchStatus, Player
+from src.models import Behavior, LineupEntry, Match, MatchStatus, Player
 
 
 def get_players_by_team(session: Session, team_id: int) -> list[Player]:
@@ -24,6 +24,20 @@ def get_behaviors_by_ids(session: Session, behavior_ids: list[int]) -> list[Beha
     
     return list(session.scalars(statement).all())
 
+def get_match_by_id(session: Session, match_id: int) -> Match | None:
+    """El partido con ese id, o None si no existe."""
+    return session.get(Match, match_id)
+
+def get_lineup_entries(session: Session, match_id: int) -> list[LineupEntry]:
+    """Las entradas de alineación de AMBOS equipos del partido, en orden de creación."""
+    statement = (
+        select(LineupEntry)
+        .where(LineupEntry.match_id == match_id)
+        .order_by(LineupEntry.entry_id)
+    )
+
+    return list(session.scalars(statement).all())
+  
 def get_available_matches(
     session: Session,
     status: MatchStatus | None = MatchStatus.PENDING, # por defecto solo partidos disponibles
@@ -49,11 +63,6 @@ def get_available_matches(
     # Se ejecuta la consulta y la convierte en lista
     # Si no hay filas, devuelve []
     return list(session.scalars(match_query).all())
-
-def get_match_by_id(session: Session, match_id: int) -> Match | None:
-    """El partido con ese id, o None si no existe"""
-    return session.get(Match, match_id)
-
 
 def claim_pending_match(session: Session, match_id: int, away_team_id: int) -> bool:
     """Anota al rival y pasa el partido a IN_PROGRESS en un solo UPDATE condicional

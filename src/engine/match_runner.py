@@ -11,22 +11,27 @@ Lo que YA está decidido y por eso vive directamente acá adentro:
   - current_action refleja la intención EJECUTADA por el jugador en el
     tick, no si "ganó" una disputa por la pelota contra otro jugador
     (eso lo decide, puertas adentro, apply_intentions).
+  - Tampoco lo frena un error de apply_intentions, detect_goal o notify:
+    se loguea y el partido sigue (en el peor caso ese tick no aplica
+    movimientos o no se transmite). Un bug en una pieza no debe dejar un
+    partido muerto a la mitad: lo que importa es que llegue a FINISHED y
+    se guarde el resultado.
   - Las intenciones de TODOS los jugadores se recolectan sobre el
     MISMO snapshot antes de aplicar ninguna: nadie tiene ventaja por
     estar antes en el diccionario de jugadores.
+  - La regla de gol es pitch.detect_goal y solo mira la posición de la
+    pelota: run_tick se la pasa como detect_goal(state.ball.position).
   - Al llegar a total_ticks: la fase pasa a FINISHED, se persiste el
     resultado (on_finished) ANTES de liberar el estado de memoria del
     registry (si el orden se invirtiera, se perdería el resultado).
 
 Lo que TODAVÍA no está decidido, y por eso son parámetros inyectados en
-vez de código fijo acá:
+vez de código fijo acá (seguimos esa conversación aparte):
   - execute_behavior: hoy no existe un sandbox real (ticket de
     aislamiento de on_tick); acá se lo llama UNA VEZ POR JUGADOR para
     poder aislar sus excepciones una por una.
   - apply_intentions: qué le hace cada Intention a la pelota y a las
     posiciones -- acá vive el desempate de pateo simultáneo.
-  - detect_goal: la regla exacta de gol. pitch.default_detect_goal es
-    un placeholder razonable, no la decisión final.
   - notify / tick_interval_seconds: el canal WS de partido todavía no
     existe (src/realtime/ws_routes.py está vacío).
 """
@@ -34,18 +39,23 @@ vez de código fijo acá:
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Awaitable, Callable, Optional
 
+from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide
 from src.engine.state import MatchPhase, MatchRegistry, MatchState
 
-# Firmas de las piezas. Nombrarlas acá sirve de documentación de la
+logger = logging.getLogger(__name__)
+
+# Firmas de las piezas que todavía implementan otros tickets (o que
+# siguen en discusión). Nombrarlas acá sirve de documentación de la
 # interfaz que el motor espera, aunque hoy solo existan como stubs/fakes
 # en los tests.
 ExecuteBehavior = Callable[[MatchState, int], Intention]
 ApplyIntentions = Callable[[MatchState, dict[int, Intention]], None]
-DetectGoal = Callable[[MatchState], Optional[TeamSide]]
+DetectGoal = Callable[[Point2D], Optional[TeamSide]]
 NotifyTick = Callable[[MatchState], Awaitable[None]]
 OnFinished = Callable[[MatchState], None]
 
@@ -84,9 +94,24 @@ def run_tick(
     # aplican. Si se aplicaran una por una arriba, el primer jugador
     # del diccionario siempre "ganaría" cualquier disputa por la
     # pelota, sin que nadie lo haya decidido.
-    apply_intentions(state, intentions)
+    try:
+        apply_intentions(state, intentions)
+    except Exception:
+        logger.exception(
+            "apply_intentions falló en el tick %s del partido %s; el tick sigue sin aplicar movimientos.",
+            state.current_tick,
+            state.match_id,
+        )
 
-    scoring_side = detect_goal(state)
+    try:
+        scoring_side = detect_goal(state.ball.position)
+    except Exception:
+        logger.exception(
+            "detect_goal falló en el tick %s del partido %s; se asume que no hubo gol.",
+            state.current_tick,
+            state.match_id,
+        )
+        scoring_side = None
     if scoring_side is TeamSide.HOME:
         state.score.home += 1
     elif scoring_side is TeamSide.AWAY:
@@ -110,12 +135,13 @@ async def run_match(
     Corre el partido hasta FINISHED. Pensado para lanzarse como tarea
     de fondo: `asyncio.create_task(run_match(...))`.
 
-    TODO (no bloquea esto, pero hay que decidirlo): qué pasa si esta
-    función explota por algo que NO es un comportamiento de jugador
-    (un error en apply_intentions, detect_goal o notify). Hoy se
-    propaga hacia quien creó la tarea; el `finally` igual libera el
-    estado del registry, pero nadie más se entera de que el partido
-    murió a mitad de camino.
+    Los errores de apply_intentions, detect_goal y notify se atrapan en
+    cada tick (ver run_tick y abajo). Lo que sí puede subir hacia quien
+    creó la tarea es un error de on_finished (no se pudo guardar el
+    resultado) o algo inesperado: el `finally` igual libera el estado del
+    registry, y launch_match (services/match_start_service.py) se encarga
+    de guardar el resultado parcial para que el partido no quede colgado
+    en IN_PROGRESS.
     """
     registry.add(state)
     try:
@@ -126,7 +152,14 @@ async def run_match(
                 apply_intentions=apply_intentions,
                 detect_goal=detect_goal,
             )
-            await notify(state)
+            try:
+                await notify(state)
+            except Exception:
+                logger.exception(
+                    "notify falló en el tick %s del partido %s; el partido sigue.",
+                    state.current_tick,
+                    state.match_id,
+                )
             await asyncio.sleep(tick_interval_seconds)
 
         state.phase = MatchPhase.FINISHED

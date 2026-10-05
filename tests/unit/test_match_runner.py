@@ -12,6 +12,7 @@ import pytest
 from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.game_types import AttributeType
+from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
 from src.engine.pitch import TeamSide
 from src.engine.player_api import PlayerAPI
 from src.engine.state import (
@@ -60,6 +61,10 @@ def _build_state(total_ticks: int = 3):
 
 
 # --- Fakes de las piezas inyectadas ---
+# Cada fake respeta la firma que run_tick/run_match esperan (ver los tipos
+# en match_runner.py), pero no usa todos sus parámetros: el editor los
+# marca como "is not accessed" y es esperado. Los fakes solo tienen que
+# poder recibir los argumentos con los que el ciclo los llama.
 
 
 def _idle_behavior(state, player_id) -> Intention:
@@ -70,7 +75,7 @@ def _noop_apply(state, intentions) -> None:
     pass
 
 
-def _no_goal(state):
+def _no_goal(ball_position):
     return None
 
 
@@ -109,7 +114,7 @@ def test_deberia_una_excepcion_no_frenar_el_resto_del_ciclo():
     def apply_que_cuenta(state, intentions):
         llamadas["apply"] += 1
 
-    def goal_que_cuenta(state):
+    def goal_que_cuenta(ball_position):
         llamadas["goal"] += 1
         return None
 
@@ -144,7 +149,7 @@ def test_deberia_recolectar_todas_las_intenciones_antes_de_aplicar_ninguna():
 def test_deberia_actualizar_el_marcador_segun_detect_goal(ganador, home_esperado, away_esperado):
     state = _build_state()
 
-    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=lambda s: ganador)
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=lambda ball_position: ganador)
 
     assert state.score.home == home_esperado
     assert state.score.away == away_esperado
@@ -220,3 +225,102 @@ async def test_deberia_run_match_liberar_el_estado_aunque_explote_despues_del_lo
         )
 
     assert registry.get(MATCH_ID) is None
+
+
+@pytest.mark.asyncio
+async def test_deberia_dos_partidos_simultaneos_no_compartir_estado():
+    """Dos run_match corriendo con asyncio.gather no se pisan entre sí."""
+    state_a = _build_state(total_ticks=2)
+    state_b = build_initial_state(
+        2, 5, _setup(team_id=1, side=TeamSide.HOME, base_player_id=100), _setup(team_id=2, side=TeamSide.AWAY, base_player_id=200)
+    )
+    registry = MatchRegistry()
+
+    # La pelota del partido A está dentro del arco de AWAY (gol de HOME en
+    # cada tick); la del B sigue en el centro. Se usa la regla real.
+    state_a.ball.position = Point2D(PITCH_LENGTH, PITCH_WIDTH / 2)
+
+    await asyncio.gather(
+        run_match(
+            state_a,
+            registry,
+            execute_behavior=_idle_behavior,
+            apply_intentions=_noop_apply,
+            detect_goal=detect_goal,
+            notify=_noop_notify,
+            tick_interval_seconds=0,
+        ),
+        run_match(
+            state_b,
+            registry,
+            execute_behavior=_idle_behavior,
+            apply_intentions=_noop_apply,
+            detect_goal=detect_goal,
+            notify=_noop_notify,
+            tick_interval_seconds=0,
+        ),
+    )
+
+    assert state_a.score.home == 2  # un gol por tick, 2 ticks
+    assert state_b.score.home == 0
+    assert state_a.current_tick == 2
+    assert state_b.current_tick == 5
+
+
+# --- Fallas de las piezas que NO son comportamientos ---
+# Un bug en apply_intentions, detect_goal o notify no debe dejar el
+# partido muerto a la mitad: el ciclo lo loguea y sigue. Estos fakes
+# siempre lanzan una excepción y no usan sus parámetros ("is not
+# accessed"): solo simulan una pieza rota que otro ticket implementará.
+
+
+def _apply_que_falla(state, intentions) -> None:
+    raise RuntimeError("bug en apply_intentions")
+
+
+def _detect_goal_que_falla(ball_position):
+    raise RuntimeError("bug en detect_goal")
+
+
+async def _notify_que_falla(state) -> None:
+    raise RuntimeError("bug en notify")
+
+
+def test_deberia_run_tick_seguir_si_apply_intentions_falla():
+    state = _build_state()
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_apply_que_falla, detect_goal=_no_goal)
+
+    assert state.current_tick == 1
+
+
+def test_deberia_run_tick_seguir_sin_gol_si_detect_goal_falla():
+    state = _build_state()
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=_detect_goal_que_falla)
+
+    assert state.current_tick == 1
+    assert (state.score.home, state.score.away) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_deberia_run_match_terminar_aunque_apply_detect_y_notify_fallen_siempre():
+    state = _build_state(total_ticks=4)
+    registry = MatchRegistry()
+    resultados = []
+
+    await run_match(
+        state,
+        registry,
+        execute_behavior=_idle_behavior,
+        apply_intentions=_apply_que_falla,
+        detect_goal=_detect_goal_que_falla,
+        notify=_notify_que_falla,
+        tick_interval_seconds=0,
+        on_finished=resultados.append,
+    )
+
+    assert state.current_tick == 4
+    assert state.phase is MatchPhase.FINISHED
+    assert resultados == [state]  # el resultado igual se guardó
+    assert MATCH_ID not in registry

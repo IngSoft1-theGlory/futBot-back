@@ -23,7 +23,7 @@ from src.engine.geometry_types import Point2D
 
 PITCH_LENGTH = 105.0  # eje x: 0 (línea de fondo de HOME) a 105 (línea de AWAY)
 PITCH_WIDTH = 60.0    # eje y: 0 a 60, centro en 30
-GOAL_WIDTH = 7.32     # ancho del arco, centrado en y = PITCH_WIDTH / 2
+GOAL_WIDTH = 7.32     # ancho del arco (FIFA), centrado en y = PITCH_WIDTH / 2
 
 
 class TeamSide(Enum):
@@ -73,21 +73,20 @@ def opponent_goal_center(side: TeamSide) -> Point2D:
     return goal_center(other)
 
 
-def default_detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
+def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
     """
-    Implementación de referencia de detección de gol (PLACEHOLDER, a
-    confirmar con el equipo -- ver "Decisiones pendientes" del ticket).
-
-    Regla: gol si la pelota cruzó una línea de fondo dentro del ancho
-    del arco. NO contempla:
-      - Qué pasa si la pelota sale por el costado (y fuera de [0, PITCH_WIDTH]).
-      - Rebotes contra el palo o el travesaño.
-      - Reiniciar la posición de la pelota tras el gol (eso es de
-        apply_intentions / del ciclo, no de la detección en sí).
+    Regla de gol: hay gol cuando la pelota llega a una línea de fondo
+    dentro del ancho del arco (entre los dos postes).
 
     Devuelve el lado que CONVIERTE el gol (quien lo mete), no el que lo
     recibe: si la pelota entra en el arco que defiende HOME, el gol es
-    de AWAY.
+    de AWAY. Devuelve None si no hay gol.
+
+    Solo mira la posición de la pelota. Lo que esta regla NO hace:
+      - Mover la pelota ni reiniciarla al centro después de un gol: eso
+        es de apply_intentions. Mientras la pelota siga dentro del arco,
+        esta función va a seguir devolviendo gol en cada tick.
+      - Contemplar la salida por el costado, los rebotes ni los palos.
     """
     if ball_position.x <= HOME_GOAL.line_x and HOME_GOAL.contains_y(ball_position.y):
         return TeamSide.AWAY

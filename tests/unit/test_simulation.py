@@ -12,12 +12,13 @@ from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.match_runner import run_tick
-from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, default_detect_goal
+from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
 from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
-from src.engine.state import LineupPlayer, TeamMatchSetup, build_initial_state
+from src.engine.state import TeamMatchSetup, build_initial_state
 from src.engine.timing import TICK_DURATION_SECONDS
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 # Todos distintos, para detectar cruces entre atributos.
 ATTRIBUTES = {
@@ -41,28 +42,30 @@ SUBSTITUTE_HOME = 103
 
 def _setup(team_id: int, side: TeamSide, base_player_id: int) -> TeamMatchSetup:
     roles = ["DEF_LEFT", "DEF_RIGHT", "FORWARD"]
-    starters = [
-        LineupPlayer(player_id=base_player_id + i, is_starter=True, role=role, behavior_id=1)
-        for i, role in enumerate(roles)
-    ]
-    substitutes = [
-        LineupPlayer(player_id=base_player_id + 3 + i, is_starter=False, role=None, behavior_id=1)
-        for i in range(3)
-    ]
-    return TeamMatchSetup(team_id=team_id, formation_type="2-1", side=side, players=starters + substitutes)
+    lineup = LineupConfig(
+        formation_type="2-1",
+        starting_players=[
+            StartingPlayer(player_id=base_player_id + i, role=role, behavior_id=1)
+            for i, role in enumerate(roles)
+        ],
+        substitute_players=[
+            SubstitutePlayer(player_id=base_player_id + 3 + i, behavior_id=1)
+            for i in range(3)
+        ],
+    )
+    # los 6 jugadores del equipo con los mismos atributos (los de ATTRIBUTES)
+    attributes = {base_player_id + i: dict(ATTRIBUTES) for i in range(6)}
+    return TeamMatchSetup(team_id=team_id, side=side, lineup=lineup, attributes=attributes)
 
 
 def _state():
-    """Estado inicial con atributos cargados a mano (build_initial_state todavía no los carga)."""
-    state = build_initial_state(
+    """Estado inicial; todos los jugadores con los atributos de ATTRIBUTES."""
+    return build_initial_state(
         1,
         240,
         _setup(1, TeamSide.HOME, 100),
         _setup(2, TeamSide.AWAY, 200),
     )
-    for player in state.players.values():
-        player.attributes = dict(ATTRIBUTES)
-    return state
 
 
 def _state_con_pelota_junto_al(player_id: int, distancia: float):
@@ -316,7 +319,7 @@ def test_deberia_pelota_patada_hacia_el_arco_terminar_dentro_y_run_tick_contar_e
         state,
         execute_behavior=_behavior_que_patea(Vector2D(1, 0), 1.0),
         apply_intentions=apply_intentions,
-        detect_goal=lambda s: default_detect_goal(s.ball.position),
+        detect_goal=detect_goal,
     )
 
     assert state.score.home == 1
