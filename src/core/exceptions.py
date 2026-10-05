@@ -74,6 +74,11 @@ class MatchNotFoundError(NotFoundError):
     """ Rama 404 específica de partidos: el partido no existe o no está en ejecucion"""
     error_code = "MATCH_NOT_FOUND"
 
+class MatchNotFinishedError(BadRequestError):
+    """Rama 400 MATCH_NOT_FINISHED: el partido existe pero todavía no terminó,
+    así que su resultado final aún no está disponible."""
+    error_code = "MATCH_NOT_FINISHED"
+
 class MatchUnavailableError(ConflictError):
     """Rama 409 MATCH_UNAVAILABLE: el partido ya empezó o ya tiene rival."""
     error_code = "MATCH_UNAVAILABLE"

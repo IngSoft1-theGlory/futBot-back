@@ -10,6 +10,7 @@ from src.database.base import Base, engine, get_db
 from src.routes.auth import router as auth_router
 from src.routes.players import router as players_router
 from src.routes.friendly import router as friendly_router
+from src.routes.match_result import router as match_result_router
 from src.routes.live_token import router as live_token_router
 from src.routes.match_live_token import router as match_live_token_router
 from src.routes.ws_match import router as ws_match_router
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(auth_router)  # suma las rutas de /api/v1/auth/*
 app.include_router(players_router)  # suma las rutas de /api/v1/players
 app.include_router(friendly_router)  # suma las rutas de /api/v1/friendly
+app.include_router(match_result_router)  # suma la ruta de /api/v1/matches/{match_id}/result
 app.include_router(live_token_router)  # suma las rutas de /api/v1/live-token/*
 app.include_router(match_live_token_router) # suma las rutas de /api/v1/matches/*/live-token
 app.include_router(ws_match_router) # suma las rutas de /ws/v1/matches/*
