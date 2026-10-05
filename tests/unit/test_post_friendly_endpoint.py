@@ -16,6 +16,7 @@ from src.core.security import create_access_token
 from src.database.base import Base, get_db
 from src.main import app
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player, Team, User
+from src.realtime.event_bus import event_bus
 
 URL = "/api/v1/friendly"
 
@@ -217,3 +218,40 @@ def test_deberia_devolver_403_y_no_persistir_si_el_equipo_es_de_otro_usuario(
 
     assert r.status_code == 403
     assert contar(db, Match) == 0
+
+# tests evento de creación de amistoso
+
+def test_deberia_publicar_friendly_created_con_el_payload_del_contrato(
+    client, db, usuario, comportamiento
+):
+    jugadores = crear_jugadores(db, usuario.team)
+    queue = event_bus.subscribe()
+    try:
+        r = client.post(URL, json=armar_body(usuario.team, jugadores, comportamiento), headers=headers(usuario))
+        assert r.status_code == 201
+        eventos = [queue.get_nowait() for _ in range(queue.qsize())]
+    finally:
+        event_bus.unsubscribe(queue)
+
+    assert eventos == [{
+        "event": "FRIENDLY_CREATED",
+        "data": {
+            "match_id": r.json()["match_id"],
+            "team_host_id": usuario.team_id,
+            "match_duration": 5,
+            "status": "PENDING",
+        },
+    }]
+
+
+def test_no_deberia_publicar_eventos_si_la_creacion_falla(
+    client, db, usuario, comportamiento
+):
+    jugadores = crear_jugadores(db, usuario.team)
+    body = armar_body(usuario.team, jugadores, comportamiento, formation_type="9-9")
+    queue = event_bus.subscribe()
+    try:
+        client.post(URL, json=body, headers=headers(usuario))
+        assert queue.qsize() == 0
+    finally:
+        event_bus.unsubscribe(queue)

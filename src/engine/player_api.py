@@ -7,7 +7,7 @@ Las primitivas de acción solo registran una Intention.
 import math
 
 from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D
+from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.constants import reach_distance
 
@@ -93,6 +93,47 @@ class PlayerAPI:
             ActionType.RUN_TO,
             target=target,
             speed_percentage=float(speed_percentage),
+        )
+
+    def kick_ball(self, target_direction: Vector2D, power_percentage: float) -> None:
+        """
+        @brief Registra la intención de patear la pelota en `target_direction`.
+
+        target_direction: Vector2D finito y NO nulo (magnitud > 0). No hace falta
+            que sea unitario: el resolver lo normaliza.
+        power_percentage: float finito entre 0.0 (no le imprime velocidad) y 1.0 (a fondo).
+
+        Solo REGISTRA la intención. Si la pelota está dentro de get_reach_distance()
+        (borde inclusive) o no, lo decide resolve; acá no se mira la distancia.
+
+        Argumentos inválidos: lanza ValueError y deja la intención en IDLE
+        (mismo criterio que run_to: run_tick lo atrapa y el partido sigue).
+        """
+        self._intention = Intention(ActionType.IDLE)
+
+        if not isinstance(target_direction, Vector2D):
+            raise ValueError(f"kick_ball: target_direction debe ser un Vector2D (recibido: {target_direction!r}).")
+        if not (_is_finite_number(target_direction.x) and _is_finite_number(target_direction.y)):
+            raise ValueError(
+                f"kick_ball: target_direction debe tener componentes finitas (recibido: {target_direction!r})."
+            )
+        # PROPUESTA del ticket: dirección de magnitud cero = argumento inválido
+        # (no hay hacia dónde patear). Se chequea después de la finitud.
+        if target_direction.magnitude() == 0:
+            raise ValueError("kick_ball: target_direction no puede ser el vector cero.")
+        if not _is_finite_number(power_percentage):
+            raise ValueError(
+                f"kick_ball: power_percentage debe ser un número finito (recibido: {power_percentage!r})."
+            )
+        if not 0.0 <= power_percentage <= 1.0:
+            raise ValueError(
+                f"kick_ball: power_percentage debe estar entre 0.0 y 1.0 (recibido: {power_percentage!r})."
+            )
+
+        self._intention = Intention(
+            ActionType.KICK_BALL,
+            direction=target_direction,
+            power_percentage=float(power_percentage),
         )
 
     # --- Lectura por parte del motor ---

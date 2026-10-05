@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.core.security import get_current_user
 from src.database.base import get_db
-from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly
+from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly, get_friendly
 from src.models.match import MatchStatus
 from src.realtime.event_bus import event_bus
 from src.schemas.friendly import (
@@ -14,7 +14,8 @@ from src.schemas.friendly import (
     CreateFriendlyResponse,
     JoinFriendlyRequest,
     JoinFriendlyResponse,
-    FriendlyListOut
+    FriendlyListOut,
+    FriendlyLobbyResponse,
 )
 
 # Todas las rutas de este archivo empiezan con /api/v1/friendly
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/api/v1/friendly", tags=["friendly"])
     response_model=CreateFriendlyResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_friendly_endpoint(
+async def create_friendly_endpoint(
     # FastAPI lee el body del pedido y lo valida contra este schema.
     # Si el formato es incorrecto, responde 422 antes de entrar acá.
     payload: CreateFriendlyRequest,
@@ -39,8 +40,20 @@ def create_friendly_endpoint(
 ) -> CreateFriendlyResponse:
     """Crea un amistoso."""
 
-    # valido y guardo el partido con create_friendly. Si falla, lanza un error 
-    match = create_friendly(session, user_id, payload)
+    # valido y guardo el partido con create_friendly. Si falla, lanza un error
+    # y ademas si falla no llega hacer publish del evento, asi que no hay riesgo 
+    # de avisar a los suscriptores de un partido que no se creo.
+    match = await run_in_threadpool(create_friendly, session, user_id, payload)
+
+    # después de hacer commit, aviso a los suscriptores del evento FRIENDLY_CREATED
+    # los payloads siguen el catálogo de eventos del contrato de API
+    # el evento se publica despues del commit para que los suscriptores vean la DB consistente.
+    event_bus.publish("FRIENDLY_CREATED", {
+        "match_id": match.match_id,
+        "team_host_id": match.team_host_id,
+        "match_duration": match.match_duration,
+        "status": match.status.value,
+    })
 
     # armo la respuesta con los datos del partido recien creado y la devuelvo. FastAPI lo convierte a JSON.
     return CreateFriendlyResponse(
@@ -65,6 +78,35 @@ def list_friendly(
 ):
     matches = list_friendly_matches(session, status=status, page=page, limit=limit)
     return {"matches": matches}
+
+# GET /api/v1/friendly/{match_id}
+@router.get(
+    "/{match_id}",
+    response_model=FriendlyLobbyResponse,
+    # solo pide que el usuario esté logueado (o 401); cualquiera puede ver cualquier amistoso
+    dependencies=[Depends(get_current_user)],
+)
+def get_friendly_lobby(
+    match_id: int,
+    session: Session = Depends(get_db),
+) -> FriendlyLobbyResponse:
+    ## devuelve el estado del lobby de un amistoso: estado, duracion y los equipos
+
+    # busco el partido, si no existe, lanza 404 MATCH_NOT_FOUND
+    match = get_friendly(session, match_id)
+
+    # el rival es None mientras nadie se unio al partido (status PENDING)
+    team_away = None
+    if match.away_team is not None:
+        team_away = match.away_team.to_public_dict()
+
+    return FriendlyLobbyResponse(
+        match_id = match.match_id,
+        status = match.status.value,
+        match_duration = match.match_duration,
+        team_host = match.host_team.to_public_dict(),
+        team_away = team_away,
+    )
 
 # POST /api/v1/friendly/{match_id}/teams
 @router.post( ##sto le dice a fastapi que la funcion de abajo va a atender una petición HTTP POST

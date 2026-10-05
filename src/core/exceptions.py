@@ -71,7 +71,7 @@ class PreconditionFailedError(UnprocessableError):
     error_code = "PRECONDITION_FAILED"
 
 class MatchNotFoundError(NotFoundError):
-    """Rama 404 MATCH_NOT_FOUND: el partido no existe o fue cancelado."""
+    """ Rama 404 específica de partidos: el partido no existe o no está en ejecucion"""
     error_code = "MATCH_NOT_FOUND"
 
 class MatchUnavailableError(ConflictError):

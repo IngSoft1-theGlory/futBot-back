@@ -1,5 +1,5 @@
 """
-Tests de PlayerAPI (T1): getters sobre un snapshot e intención idle().
+Tests de PlayerAPI: getters sobre un snapshot, idle(), run_to() y kick_ball().
 Trabajan con snapshots armados a mano: sin base de datos ni motor.
 """
 
@@ -173,3 +173,94 @@ def test_deberia_run_to_invalido_dejar_la_intencion_en_idle():
         api.run_to(Point2D(50, 30), 2.0)
 
     assert api.intention.action == ActionType.IDLE
+
+
+# --- kick_ball ---
+
+def test_deberia_kick_ball_registrar_intencion_con_direction_y_power_percentage():
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.kick_ball(Vector2D(1, 0), 0.75)
+
+    assert api.intention == Intention(ActionType.KICK_BALL, direction=Vector2D(1, 0), power_percentage=0.75)
+
+
+def test_deberia_kick_ball_registrar_la_direccion_sin_normalizar():
+    """Normalizar es trabajo del resolver: la intención guarda lo que pidió el comportamiento."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.kick_ball(Vector2D(30, 40), 1.0)
+
+    assert api.intention.direction == Vector2D(30, 40)
+
+
+def test_deberia_kick_ball_registrar_la_intencion_sin_mirar_la_distancia_a_la_pelota():
+    """La pelota está a ~40 m (fuera de alcance) y igual se registra: decide resolve."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.kick_ball(Vector2D(1, 0), 1.0)
+
+    assert api.intention.action == ActionType.KICK_BALL
+
+
+@pytest.mark.parametrize("power_percentage", [0.0, 0.5, 1.0, 0, 1])
+def test_deberia_kick_ball_aceptar_power_percentage_entre_cero_y_uno(power_percentage):
+    """Los extremos 0.0 y 1.0 son válidos; también los enteros 0 y 1."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    api.kick_ball(Vector2D(1, 0), power_percentage)
+
+    assert api.intention.action == ActionType.KICK_BALL
+    assert api.intention.power_percentage == float(power_percentage)
+
+
+@pytest.mark.parametrize(
+    "direction",
+    [
+        None,
+        (1, 0),                          # tupla, no Vector2D
+        Point2D(1, 0),                   # Point2D tampoco es un Vector2D
+        Vector2D(float("nan"), 0),
+        Vector2D(1, float("inf")),
+        Vector2D(float("-inf"), 1),
+        Vector2D("1", 0),                # componente que no es número
+        Vector2D(0, 0),                  # magnitud cero: no hay hacia dónde patear
+        Vector2D(0.0, -0.0),
+    ],
+)
+def test_deberia_kick_ball_con_direccion_invalida_lanzar_value_error(direction):
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    with pytest.raises(ValueError):
+        api.kick_ball(direction, 1.0)
+
+
+@pytest.mark.parametrize(
+    "power_percentage",
+    [-0.1, 1.1, 100, float("nan"), float("inf"), None, "1.0", True],
+)
+def test_deberia_kick_ball_con_power_percentage_invalido_lanzar_value_error(power_percentage):
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+
+    with pytest.raises(ValueError):
+        api.kick_ball(Vector2D(1, 0), power_percentage)
+
+
+def test_deberia_kick_ball_invalido_dejar_la_intencion_en_idle():
+    """Aunque antes hubiera un kick_ball válido, una llamada inválida deja IDLE."""
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+    api.kick_ball(Vector2D(1, 0), 1.0)
+
+    with pytest.raises(ValueError):
+        api.kick_ball(Vector2D(1, 0), 2.0)
+
+    assert api.intention.action == ActionType.IDLE
+
+
+def test_deberia_kick_ball_y_despues_run_to_ganar_la_ultima_llamada():
+    api = PlayerAPI(_game_state_valido(), ATTRIBUTES)
+    api.kick_ball(Vector2D(1, 0), 1.0)
+
+    api.run_to(Point2D(1, 1), 1.0)
+
+    assert api.intention.action == ActionType.RUN_TO
