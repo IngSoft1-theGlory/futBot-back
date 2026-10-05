@@ -28,7 +28,7 @@ Fuera de alcance:
 
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.pitch import BALL_INITIAL_POSITION, default_detect_goal
+from src.engine.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine.resolve import resolve
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import MatchState
@@ -67,7 +67,7 @@ def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> Non
 
 def _reset_ball_if_goal(state: MatchState) -> None:
     """Si la pelota quedó dentro de un arco (gol del tick anterior), vuelve al centro, quieta."""
-    if default_detect_goal(state.ball.position) is not None:
+    if detect_goal(state.ball.position) is not None:
         state.ball.position = BALL_INITIAL_POSITION
         state.ball.velocity = Vector2D(0.0, 0.0)
 

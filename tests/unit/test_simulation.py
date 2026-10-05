@@ -12,7 +12,7 @@ from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.match_runner import run_tick
-from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, default_detect_goal
+from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
 from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
@@ -316,7 +316,7 @@ def test_deberia_pelota_patada_hacia_el_arco_terminar_dentro_y_run_tick_contar_e
         state,
         execute_behavior=_behavior_que_patea(Vector2D(1, 0), 1.0),
         apply_intentions=apply_intentions,
-        detect_goal=lambda s: default_detect_goal(s.ball.position),
+        detect_goal=detect_goal,
     )
 
     assert state.score.home == 1
