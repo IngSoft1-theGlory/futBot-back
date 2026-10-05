@@ -12,10 +12,11 @@ Para cada jugador reutiliza `resolve` (función pura, por jugador):
         IDLE      -> nada
 
 Orden dentro de un tick: run_tick hace  comportamientos -> apply_intentions
--> detect_goal. Por eso la pelota se reinicia al PRINCIPIO de
-apply_intentions: si se reiniciara al final, detect_goal nunca vería el gol.
-Un gol entonces se detecta en el tick en que la pelota entra al arco y la
-pelota vuelve al centro al comienzo del tick siguiente.
+-> detect_goal. Por eso el reinicio tras un gol (la pelota al centro y TODOS
+los jugadores en cancha a su posición inicial) se hace al PRINCIPIO de
+apply_intentions: si se hiciera al final, detect_goal nunca vería el gol.
+Un gol entonces se detecta en el tick en que la pelota entra al arco y el
+reinicio ocurre al comienzo del tick siguiente.
 Al final de apply_intentions la pelota avanza según su velocidad (_move_ball).
 
 Fuera de alcance:
@@ -37,7 +38,7 @@ from src.engine.timing import TICK_DURATION_SECONDS
 
 def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> None:
     """Aplica las intenciones de un tick al `state` global (lo muta in place)."""
-    _reset_ball_if_goal(state)
+    _reset_after_goal(state)
 
     # Todos los snapshots salen del estado ANTERIOR a aplicar nada: ningún
     # jugador ve el movimiento de otro del mismo tick.
@@ -65,11 +66,21 @@ def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> Non
     _move_ball(state)
 
 
-def _reset_ball_if_goal(state: MatchState) -> None:
-    """Si la pelota quedó dentro de un arco (gol del tick anterior), vuelve al centro, quieta."""
-    if detect_goal(state.ball.position) is not None:
-        state.ball.position = BALL_INITIAL_POSITION
-        state.ball.velocity = Vector2D(0.0, 0.0)
+def _reset_after_goal(state: MatchState) -> None:
+    """
+    Si la pelota quedó dentro de un arco (gol del tick anterior): la pelota vuelve
+    al centro, quieta, y cada jugador en cancha vuelve a su posición inicial.
+    Los suplentes (position=None) siguen en el banco.
+    """
+    if detect_goal(state.ball.position) is None:
+        return
+
+    state.ball.position = BALL_INITIAL_POSITION
+    state.ball.velocity = Vector2D(0.0, 0.0)
+
+    for player in state.players.values():
+        if player.position is not None and player.initial_position is not None:
+            player.position = player.initial_position
 
 
 def _move_ball(state: MatchState) -> None:

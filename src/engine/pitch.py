@@ -83,9 +83,10 @@ def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
     de AWAY. Devuelve None si no hay gol.
 
     Solo mira la posición de la pelota. Lo que esta regla NO hace:
-      - Mover la pelota ni reiniciarla al centro después de un gol: eso
-        es de apply_intentions. Mientras la pelota siga dentro del arco,
-        esta función va a seguir devolviendo gol en cada tick.
+      - Mover la pelota ni reiniciar la cancha después de un gol (pelota al
+        centro y jugadores a su posición inicial): eso es de apply_intentions.
+        Mientras la pelota siga dentro del arco, esta función va a seguir
+        devolviendo gol en cada tick.
       - Contemplar la salida por el costado, los rebotes ni los palos.
     """
     if ball_position.x <= HOME_GOAL.line_x and HOME_GOAL.contains_y(ball_position.y):

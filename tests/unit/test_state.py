@@ -152,6 +152,13 @@ def test_deberia_fallar_si_total_ticks_no_es_positivo(total_ticks):
 # --- atributos de los jugadores ---
 
 
+def test_deberia_guardar_la_posicion_inicial_de_los_titulares():
+    state = build_initial_state(1, 10, _home_setup(), _away_setup())
+
+    titulares = [p for p in state.players.values() if p.is_starter]
+    assert titulares
+    assert all(p.initial_position == p.position for p in titulares)
+
 def test_deberia_cargar_los_atributos_en_titulares_y_suplentes():
     state = build_initial_state(MATCH_ID, TOTAL_TICKS, _home_setup(), _away_setup())
 
