@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, status, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
@@ -7,7 +9,9 @@ from sqlalchemy.orm import Session
 from src.core.security import get_current_user
 from src.database.base import get_db
 from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly, get_friendly
+from src.engine.simulation import apply_intentions
 from src.models.match import MatchStatus
+from src.services.match_start_service import launch_match, make_on_finished
 from src.realtime.event_bus import event_bus
 from src.schemas.friendly import (
     CreateFriendlyRequest,
@@ -108,6 +112,23 @@ def get_friendly_lobby(
         team_away = team_away,
     )
 
+def get_launch_options() -> dict[str, Any]:
+    """
+    Opciones extra que se le pasan a launch_match (on_finished, notify, detect_goal,
+    registry, tick_interval_seconds...), es una dependencia de FastAPI a proposito:
+    asi los tests pueden reemplazarla con app.dependency_overrides
+
+    por defecto solo define on_finished: la funcion que guarda el resultado final
+    del partido en la base, make_on_finished() sin argumentos usa SessionLocal
+    (la base real),los tests la reemplazan por otra que usa su base en memoria
+    y un tick_interval_seconds=0, para no depender de Postgres ni esperar el
+    reloj real (un partido de 5 minutos tardaría 5 minutos)
+
+    Lo que no se define aca, launch_match lo toma de sus valores por defecto
+    """
+    return {"on_finished": make_on_finished()}
+
+
 # POST /api/v1/friendly/{match_id}/teams
 @router.post( ##sto le dice a fastapi que la funcion de abajo va a atender una petición HTTP POST
     "/{match_id}/teams",
@@ -119,16 +140,41 @@ async def join_friendly_endpoint(
     payload: JoinFriendlyRequest, ##este es el body de la peticion HTTP
     user_id = Depends(get_current_user), ##antes de ejecutar esta funcion, ejecuta get_current_user y dame el usuario actual
     session: Session = Depends(get_db),
+    ## FastAPI llama a get_launch_options y me pasa lo que devuelve (ver arriba)
+    launch_options: dict[str, Any] = Depends(get_launch_options),
 ) -> JoinFriendlyResponse:
     ## une un equipo rival a un amistoso en espera y lo pasa a IN_PROGRESS
+    """
+     la ruta es async porque EventBus.publish debe correr en el event loop
+     (sus colas no son thread-safe),el service usa la DB de forma bloqueante,
+     asi que lo mando a un thread para no trabar el loop
+     join_friendly hace todo lo que va antes del commit: guarda al rival y su alineacion,
+     prepara el partido y arma el comportamiento de cada jugador. Devuelve 3 cosas:
+       match: el partido ya confirmado (IN_PROGRESS) para armar la respuesta y los eventos
+       state: el estado inicial del motor (jugadores con sus PACSS, ubicados en cancha)
+       execute_behavior: la funcin que corre el on_tick de cada jugador en cada tick
+     Si algo falla, join_friendly hace rollback y lanza un error (400, 404, 409...)
+     la ejecucion corta aca,no se lanza el motor ni se publica ningun evento
+    """
+    match, state, execute_behavior = await run_in_threadpool(join_friendly, session, user_id, match_id, payload) ##basicamente aca lo que hagp es mandar esta funcion al threadpool y espera su resultado sin bloquear el event loop
+    """
+     con el commit hecho, arranca el motor. launch_match NO espera a que termine el partido
+     crea una tarea de fondo (asyncio) que corre tick a tick y vuelve enseguida, asi la
+     respuesta HTTP sale ya, mientras el partido sigue corriendo
+     necesita el event loop corriendo para crear esa tarea, por eso esta ruta es asincrona
+       - apply_intentions: la regla que aplica lo que decidio cada jugador (mover, patear)
+       - launch_options: on_finished (guardar el resultado) y lo que inyecten los tests
+     Si launch_match falla, la excepción sube y los eventos de abajo NO se publican
+     nadie recibe un MATCH_STARTED de un partido que no arranco
+    """
+    launch_match(
+        state,
+        execute_behavior=execute_behavior,
+        apply_intentions=apply_intentions,
+        **launch_options,
+    )
 
-    # La ruta es async porque EventBus.publish debe correr en el event loop
-    # (sus colas no son thread-safe),el service usa la DB de forma bloqueante,
-    # asi que lo mando a un thread para no trabar el loop
-    match = await run_in_threadpool(join_friendly, session, user_id, match_id, payload) ##basicamente aca lo que hagp es mandar esta funcion al threadpool y espera su resultado sin bloquear el event loop
-
-    # recien con la union confirmada (commit hecho) se avisa a los suscriptores.
-    # Los payloads siguen el catálogo de eventos del contrato de API.
+    ## recien con la union confirmada y el partido lanzado se avisa a los suscriptores, los payloads siguen el catalogo de eventos del contrato de API.
     event_bus.publish("GUEST_JOINED_FRIENDLY", {
         "match_id": match.match_id,
         "team_host_id": match.team_host_id,

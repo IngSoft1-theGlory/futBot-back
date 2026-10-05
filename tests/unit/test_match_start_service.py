@@ -39,7 +39,7 @@ ROLES_1_2 = ["DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"]
 
 @pytest.fixture()
 def comportamiento(session):
-    behavior = Behavior(name="Quieto", description="No hace nada", code="pass", is_default=True)
+    behavior = Behavior(name="Quieto", description="No hace nada", code="def on_tick(api): pass", is_default=True)
     session.add(behavior)
     session.commit()
     return behavior

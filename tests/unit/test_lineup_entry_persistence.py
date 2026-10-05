@@ -48,7 +48,7 @@ def partido(session, local, visitante):
 
 @pytest.fixture()
 def comportamiento(session):
-    behavior = Behavior(name="Patear", description="Patea la pelota", code="pass", is_default=True)
+    behavior = Behavior(name="Patear", description="Patea la pelota", code="def on_tick(api): pass", is_default=True)
     session.add(behavior)
     session.commit()
     return behavior
