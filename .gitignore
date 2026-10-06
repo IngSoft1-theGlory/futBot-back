@@ -1,0 +1,45 @@
+# --- Variables de entorno ---
+.env
+
+# --- Entornos virtuales ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Cache de type-checkers/linters ---
+.mypy_cache/
+.ruff_cache/
+
+# --- Bases de datos locales (si alguien usa sqlite para probar) ---
+*.sqlite3
+*.db
+
+# --- Logs ---
+*.log
+
+# --- Editores / IDEs ---
+.vscode/
+.idea/
+*.swp
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-compose.override.yml
