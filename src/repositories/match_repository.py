@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import selectinload
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player
 
 
@@ -48,7 +48,11 @@ def get_available_matches(
     
     # Consulta de partidos disponibles.
     # El estado va fijo el usuario no puede elegir otro.
-    match_query = select(Match).where(Match.status == status)
+    match_query = (
+        select(Match)
+        .options(selectinload(Match.host_team), selectinload(Match.away_team))
+        .where(Match.status == status)
+    )
 
     match_query = (
         match_query
