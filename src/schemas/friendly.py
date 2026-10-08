@@ -35,6 +35,8 @@ class FriendlyMatchOut(BaseModel):
     team_away_id: int | None  # null mientras el partido no tiene visitante
     status: MatchStatus
     match_duration: int
+    team_host_name: str | None           # NUEVO (team_name es nullable en Team)
+    team_away_name: str | None = None    # NUEVO (null si no hay rival)
 
 # Lo que devuelve el endpoint de listar amistosos (wrapper contenedor de la lista)
 class FriendlyListOut(BaseModel):

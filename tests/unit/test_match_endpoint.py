@@ -67,6 +67,29 @@ def test_debe_devolver_team_away_id_null_cuando_el_partido_no_tiene_visitante(
 
     assert matches[0]["team_away_id"] is None
 
+def test_debe_devolver_nombre_del_anfitrion_y_team_away_name_null_sin_visitante(
+    client, auth_headers, session
+):
+    make_match(session, make_team(session, "host"))
+
+    matches = client.get(URL, headers=auth_headers).json()["matches"]
+
+    assert matches[0]["team_host_name"] == "host"
+    assert matches[0]["team_away_name"] is None
+
+
+def test_debe_devolver_nombre_de_ambos_equipos_cuando_hay_visitante(
+    client, auth_headers, session
+):
+    host = make_team(session, "host")
+    away = make_team(session, "away")
+    make_match(session, host, away, MatchStatus.IN_PROGRESS)
+
+    matches = client.get(f"{URL}?status=IN_PROGRESS", headers=auth_headers).json()["matches"]
+
+    assert matches[0]["team_host_name"] == "host"
+    assert matches[0]["team_away_name"] == "away"
+
 
 def test_debe_devolver_solo_los_campos_del_contrato_en_cada_partido(
     client, auth_headers, session
@@ -76,7 +99,8 @@ def test_debe_devolver_solo_los_campos_del_contrato_en_cada_partido(
     matches = client.get(URL, headers=auth_headers).json()["matches"]
 
     assert set(matches[0]) == {
-        "match_id", "team_host_id", "team_away_id", "status", "match_duration"
+        "match_id", "team_host_id", "team_away_id", "status", "match_duration",
+        "team_host_name", "team_away_name",
     }
 
 
