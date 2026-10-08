@@ -12,5 +12,6 @@ from src.models.behavior import Behavior
 from src.models.player import Player
 from src.models.match import Match, MatchStatus
 from src.models.lineup_entry import LineupEntry
+from src.models.league import League, LeagueStatus
 
-__all__ = ["Team", "User","Behavior","Player", "Match", "MatchStatus", "LineupEntry"]
+__all__ = ["Team", "User","Behavior","Player", "Match", "MatchStatus", "LineupEntry", "League", "LeagueStatus"]

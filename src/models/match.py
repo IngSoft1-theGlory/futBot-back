@@ -43,7 +43,7 @@ class Match(Base):
     # Identificador unico del partido (lo comparten /friendly y /matches)
     match_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    # league_id: aun no existe, cuando haya ligas va a ser una FK nullable a leagues
+    league_id: Mapped[Optional[int]] = mapped_column(ForeignKey("league.league_id"), nullable=True) # index? not sure deberia poner ondelete cascade aca?
 
     # Duracion configurada por el creador del amistoso 
     match_duration: Mapped[int] = mapped_column(Integer, nullable=False)
