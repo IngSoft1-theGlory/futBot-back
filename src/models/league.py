@@ -1,5 +1,12 @@
-""" 
-Modelo de ligas
+"""
+Modelo persistente League.
+
+Una fila por liga. Guarda el nombre, el cupo maximo de equipos,
+el estado, la duracion de los partidos, la contraseña (si es privada) y el equipo anfitrion.
+
+Los equipos inscriptos no tienen tabla propia: un equipo esta inscripto si tiene sus
+filas en lineup_entries con el league_id de la liga. Los partidos de la liga
+son las filas de matches que tienen su league_id.
 """
 
 from src.database.base import Base
@@ -17,13 +24,11 @@ class League(Base):
     __tablename__ = "leagues"
 
     __table_args__ = (
+    
     CheckConstraint("match_duration > 0", name="duration_positive"),
-    CheckConstraint("max_teams BETWEEN 4 AND 12 AND max_teams IN (4, 6, 8, 10, 12)", name="capacity_valid"),
-    )
 
-    CheckConstraint(
-        "(is_starter AND role IS NOT NULL) OR (NOT is_starter AND role IS NULL)", name="only_starter_has_role",
-        ),
+    CheckConstraint("max_teams IN (4, 6, 8, 10, 12)", name="capacity_valid"),    
+    )
 
     league_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 

@@ -1,7 +1,7 @@
 """
 Modelo persistente LineupEntry.
 
-Una fila por jugador de la configuracion tactica de un equipo en un partido
+Una fila por jugador de la configuracion tactica de un equipo en un partido o liga
 """
 
 from typing import Optional
@@ -36,8 +36,9 @@ class LineupEntry(Base):
         CheckConstraint(
             "role IN ('DEF_LEFT', 'DEF_RIGHT', 'FORWARD', 'DEFENDER', 'FORWARD_LEFT', 'FORWARD_RIGHT')",
             name="role_valid"),
-        
-        CheckConstraint("(match_id is NULL and league_id IS NOT NULL) OR (league_id is NULL and match_id is NOT NULL)", name = "either match_id or league_id for lineup")
+
+        # Cada fila es de un partido o de la plantilla de una liga, nunca de los dos
+        CheckConstraint("(match_id is NULL and league_id IS NOT NULL) OR (league_id IS NULL and match_id is NOT NULL)", name = "either_match_id_or_league_id_for_lineup"),
         )
 
     entry_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -48,7 +49,7 @@ class LineupEntry(Base):
     )
 
     # ondelete = cascade si se borra la liga, se borran sus entries: no tienen sentido sin ella
-    league_id: Mapped[Optional[int]] = mapped_column(ForeignKey("league.league_id", ondelete = "CASCADE"), nullable=True) # index? not sure
+    league_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leagues.league_id", ondelete = "CASCADE"), nullable=True)
 
     # Equipo al que pertenece esta configuracion. Si se borra el equipo, se borran sus entries
     team_id: Mapped[int] = mapped_column(

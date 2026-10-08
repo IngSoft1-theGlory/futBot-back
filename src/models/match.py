@@ -1,16 +1,18 @@
 """
 Modelo persistente Match.
 
-Representa un partido. Hoy solo se usa para amistosos; cuando existan las
-ligas se le suma `league_id` (FK nullable a leagues, NULL = amistoso).
-- Contrato de API: POST/GET/DELETE /api/v1/friendly, /api/v1/matches/{id}/...
+Una fila por partido. Si league_id es NULL, es un amistoso. Si tiene valor, es
+un partido de esa liga. 
+El partido guarda el estado, la duracion, los goles y
+los equipos anfitrion y visitante.
+Las alineaciones de cada equipo estan en lineup_entries.
 """
 
-from datetime import datetime
+
 import enum
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, func
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base
@@ -43,7 +45,9 @@ class Match(Base):
     # Identificador unico del partido (lo comparten /friendly y /matches)
     match_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    league_id: Mapped[Optional[int]] = mapped_column(ForeignKey("league.league_id"), nullable=True) # index? not sure deberia poner ondelete cascade aca?
+    # NULL = amistoso, con valor = partido de esa liga
+    league_id: Mapped[Optional[int]] = mapped_column(
+    ForeignKey("leagues.league_id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Duracion configurada por el creador del amistoso 
     match_duration: Mapped[int] = mapped_column(Integer, nullable=False)
