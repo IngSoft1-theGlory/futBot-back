@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
-from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse
-from src.services.league_service import create_league
+from fastapi import APIRouter, Depends, status, Response
+
 from fastapi.concurrency import run_in_threadpool
+
+from sqlalchemy.orm import Session
+
+from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse
+from src.services.league_service import create_league, exit_league
 from src.core.security import get_current_user
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
-from sqlalchemy.orm import Session
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
 router = APIRouter(prefix="/api/v1/leagues", tags=["leagues"])
@@ -58,3 +61,24 @@ async def create_league_endpoint(
        current_teams_count = 1,
        host_team_id = league.host_team_id
     )
+
+# DELETE /api/v1/leagues/{league_id}/teams/{team_id}
+# El path tiene dos parametros, league_id y team_id, 
+# donde FastAPI extrae de la URL y pasa a la funcion
+@router.delete(
+    "/{league_id}/teams/{team_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+
+def leave_league_endpoint(
+    league_id: int,
+    team_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> Response:
+    """Un equipo no anfitrión abandona la liga antes de que inicie."""
+    exit_league(session, user_id, league_id, team_id)
+
+    # responde 204 No Content, op. exitosa pero no hay contenido para devolver
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -24,7 +24,6 @@ class BadRequestError(AppError):
     status_code = 400
     error_code = "APP_ERROR"
 
-
 class UnauthorizedError(AppError):
     """Rama 401: token ausente, inválido, expirado o mal firmado."""
     status_code = 401
@@ -94,6 +93,22 @@ class MatchFinishedError(BadRequestError):
 class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
     error_code = "INVALID_LEAGUE_CAPACITY"
+
+class LeagueNotFoundError(NotFoundError):
+    """Rama 404 LEAGUE_NOT_FOUND: la liga no existe."""
+    error_code = "LEAGUE_NOT_FOUND"
+
+class TeamNotInLeagueError(NotFoundError):
+    """Rama 404 TEAM_NOT_IN_LEAGUE: el equipo no está inscripto en la liga."""
+    error_code = "TEAM_NOT_IN_LEAGUE"
+
+class HostCannotLeaveError(BadRequestError):
+    """Rama 400 HOST_CANNOT_LEAVE: el anfitrión no puede abandonar su liga."""
+    error_code = "HOST_CANNOT_LEAVE"
+
+class LeagueAlreadyStartedError(ConflictError):
+    """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
+    error_code = "LEAGUE_ALREADY_STARTED"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
