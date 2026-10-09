@@ -238,6 +238,7 @@ def test_deberia_publicar_friendly_created_con_el_payload_del_contrato(
         "data": {
             "match_id": r.json()["match_id"],
             "team_host_id": usuario.team_id,
+            "team_host_name": "Local FC",      # NUEVO 
             "match_duration": 5,
             "status": "PENDING",
         },

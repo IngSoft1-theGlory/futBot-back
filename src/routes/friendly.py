@@ -19,6 +19,7 @@ from src.schemas.friendly import (
     JoinFriendlyRequest,
     JoinFriendlyResponse,
     FriendlyListOut,
+    FriendlyMatchOut,
     FriendlyLobbyResponse,
 )
 
@@ -55,6 +56,7 @@ async def create_friendly_endpoint(
     event_bus.publish("FRIENDLY_CREATED", {
         "match_id": match.match_id,
         "team_host_id": match.team_host_id,
+        "team_host_name": match.host_team.team_name,
         "match_duration": match.match_duration,
         "status": match.status.value,
     })
@@ -81,7 +83,20 @@ def list_friendly(
     session: Session = Depends(get_db),
 ):
     matches = list_friendly_matches(session, status=status, page=page, limit=limit)
-    return {"matches": matches}
+    return FriendlyListOut(
+        matches=[
+            FriendlyMatchOut(
+                match_id=match.match_id,
+                team_host_id=match.team_host_id,
+                team_away_id=match.team_away_id,
+                status=match.status,
+                match_duration=match.match_duration,
+                team_host_name=match.host_team.team_name,
+                team_away_name=match.away_team.team_name if match.away_team else None,
+            )
+            for match in matches
+        ]
+    )
 
 # GET /api/v1/friendly/{match_id}
 @router.get(

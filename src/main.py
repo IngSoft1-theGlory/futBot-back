@@ -52,7 +52,6 @@ app.include_router(leagues_router)   # suma las rutas de /api/v1/leagues
 # app_error_handler(request, esa_excepcion) y devolver lo que retorne
 app.add_exception_handler(AppError, app_error_handler)
 
-
 @app.get("/")
 def root():
     return {"message": "FutBot Backend API is running"}
