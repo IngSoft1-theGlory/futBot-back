@@ -9,10 +9,12 @@ from fastapi.concurrency import run_in_threadpool
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
 from sqlalchemy.orm import Session
+from src.realtime.event_bus import event_bus
+from fastapi.concurrency import run_in_threadpool
+
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
 router = APIRouter(prefix="/api/v1/leagues", tags=["leagues"])
-
 
 # POST /api/v1/leagues
 # El path va vacío ("") porque el prefix ya tiene la URL completa.
@@ -73,3 +75,4 @@ def verify_league_password(
         join_token=create_join_token(user_id, league_id),
         expires_in_seconds=300,
     )
+

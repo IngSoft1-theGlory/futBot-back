@@ -21,7 +21,7 @@ class CreateLeagueResponse(BaseModel):
     current_teams_count: int 
     host_team_id: int
     
-
+ 
 class VerifyPasswordRequest(BaseModel):
     password: str
 

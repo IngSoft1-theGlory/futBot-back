@@ -51,6 +51,7 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
 
     return league
 
+  
 def validate_league_capacity(max_teams: int) -> None: 
     if max_teams not in (4, 6, 8, 10, 12):
         raise InvalidLeagueCapacityError ("El cupo máximo de la liga debe ser un número par entre 4 y 12")
