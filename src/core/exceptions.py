@@ -91,6 +91,10 @@ class MatchFinishedError(BadRequestError):
     """Rama 400 MATCH_FINISHED: el partido ya terminó."""
     error_code = "MATCH_FINISHED"
 
+class InvalidLeagueCapacityError(BadRequestError):
+    """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
+    error_code = "INVALID_LEAGUE_CAPACITY"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
