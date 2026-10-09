@@ -102,6 +102,9 @@ class MatchFinishedError(BadRequestError):
 class LeagueNotPrivateError(BadRequestError):
     """Rama 400 LEAGUE_NOT_PRIVATE: la liga no es privada"""
     error_code = "LEAGUE_NOT_PRIVATE"
+class InvalidLeagueCapacityError(BadRequestError):
+    """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
+    error_code = "INVALID_LEAGUE_CAPACITY"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

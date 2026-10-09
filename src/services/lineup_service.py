@@ -31,33 +31,36 @@ FORMATION_ROLES = {
     "1-2": {"DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"},
 }
 
-# Guardar alineación en la DB
-def save_lineup(session: Session, match_id: int, team_id: int, config: LineupConfig) -> None:
-    """Se usa cada vez que un equipo confirma su alineación para un partido:
-    el anfitrión al crear el amistoso, el rival al unirse, y más adelante en las ligas.
-    Antes hay que llamar a validate_lineup, y el partido ya tiene que tener su id (flush).
+# Guardar alineación en la DB (league_id: int | None porque puede ser null, como match_id)
+# Pero el = None es para q python lo tome como None por defecto si no se especifica al llamar a save_lineup (asi no rompo nada de lo que hicimos antes de implementar ligas))
+def save_lineup(session: Session, match_id:int | None, team_id: int, config: LineupConfig, league_id:int | None = None) -> None:
+    """Se usa cada vez que un equipo confirma su alineación para un partido o liga:
+    el anfitrión al crearlos, los rivales al unirse.
+    Antes hay que llamar a validate_lineup, y el partido/liga ya tiene que tener su id (flush).
     No hace commit: lo hace quien la llama, para que todo se guarde (o se deshaga) junto."""       
 
     # 3 titulares con rol
     for starter in config.starting_players:
         session.add(LineupEntry(
-        match_id = match_id,
-        team_id = team_id,
-        player_id = starter.player_id,
-        behavior_id = starter.behavior_id,
-        role = starter.role,
-        is_starter = True,
+            match_id = match_id,
+            league_id = league_id,
+            team_id = team_id,
+            player_id = starter.player_id,
+            behavior_id = starter.behavior_id,
+            role = starter.role,
+            is_starter = True,
         ))
 
     # 3 suplentes sin rol
     for substitute in config.substitute_players:
         session.add(LineupEntry(
-        match_id = match_id,
-        team_id = team_id,
-        player_id = substitute.player_id,
-        behavior_id = substitute.behavior_id,
-        role = None,
-        is_starter = False,
+            match_id = match_id,
+            league_id = league_id,
+            team_id = team_id,
+            player_id = substitute.player_id,
+            behavior_id = substitute.behavior_id,
+            role = None,
+            is_starter = False,
         ))
 
 
