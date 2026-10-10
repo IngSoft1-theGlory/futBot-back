@@ -7,7 +7,7 @@ Sin base de datos: el partido se arma a mano en memoria.
 
 import pytest
 
-from src.engine.behavior_executor import load_on_tick, make_execute_behavior
+from engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
@@ -52,9 +52,6 @@ def _state():
 RUN_TO_OWN_POSITION = "def on_tick(api):\n    api.run_to(api.get_game_state().my_position, 0.5)"
 IDLE = "def on_tick(api):\n    api.idle()"
 BROKEN = "def on_tick(api):\n    raise RuntimeError('falla')"
-
-
-
 
 def test_deberia_ejecutar_el_on_tick_con_el_api_del_jugador_y_devolver_su_intencion():
     state = _state()

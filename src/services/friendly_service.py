@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from src.engine.behavior_executor import make_execute_behavior
+from engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.match_runner import ExecuteBehavior
 from src.engine.state import MatchInitializationError, MatchState
 from src.models import Match, MatchStatus

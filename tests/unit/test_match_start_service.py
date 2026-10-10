@@ -13,7 +13,7 @@ import asyncio
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from src.engine.behavior_executor import make_execute_behavior
+from engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.game_types import AttributeType
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide, starter_position

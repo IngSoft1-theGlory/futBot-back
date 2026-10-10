@@ -10,7 +10,7 @@ import pytest
 from src.engine.game_types import AttributeType, GameState
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.player_api import PlayerAPI
+from engine._03_to_builder.player_api import PlayerAPI
 
 # Todos distintos, para detectar cruces entre atributos.
 ATTRIBUTES = {
