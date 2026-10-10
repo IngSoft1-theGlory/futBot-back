@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
+from src.core.security import get_current_user, create_join_token, get_current_user
+from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status
-from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse
 from src.services.league_service import create_league
 from fastapi.concurrency import run_in_threadpool
-from src.core.security import get_current_user
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
 from sqlalchemy.orm import Session
+from src.realtime.event_bus import event_bus
+from fastapi.concurrency import run_in_threadpool
+
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
 router = APIRouter(prefix="/api/v1/leagues", tags=["leagues"])
-
 
 # POST /api/v1/leagues
 # El path va vacío ("") porque el prefix ya tiene la URL completa.
@@ -58,3 +61,18 @@ async def create_league_endpoint(
        current_teams_count = 1,
        host_team_id = league.host_team_id
     )
+
+
+@router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
+def verify_league_password(
+    league_id: int,
+    payload: VerifyPasswordRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    check_league_password(session, league_id, payload.password)
+    return VerifyPasswordResponse(
+        join_token=create_join_token(user_id, league_id),
+        expires_in_seconds=300,
+    )
+

@@ -20,3 +20,11 @@ class CreateLeagueResponse(BaseModel):
     max_teams: int 
     current_teams_count: int 
     host_team_id: int
+    
+ 
+class VerifyPasswordRequest(BaseModel):
+    password: str
+
+class VerifyPasswordResponse(BaseModel):
+    join_token: str
+    expires_in_seconds: int

@@ -1,10 +1,9 @@
-
 from __future__ import annotations
 from src.schemas.league import CreateLeagueRequest
 from src.models.league import League, LeagueStatus
 from sqlalchemy.orm import Session
-from src.core.exceptions import InvalidLeagueCapacityError
-from src.core.security import hash_password
+from src.core.exceptions import InvalidLeagueCapacityError, LeagueNotPrivateError, PasswordIncorrectError
+from src.core.security import hash_password, verify_password
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -51,7 +50,20 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
         raise
 
     return league
+
+  
 def validate_league_capacity(max_teams: int) -> None: 
     if max_teams not in (4, 6, 8, 10, 12):
         raise InvalidLeagueCapacityError ("El cupo máximo de la liga debe ser un número par entre 4 y 12")
      
+def check_league_password(session: Session, league_id: int, password: str) -> None:
+    league = session.get(League, league_id)
+
+    if league is None: 
+        raise LeagueNotPrivateError("La liga no fue encontrada")
+
+    if league.password_hash is None: 
+        raise LeagueNotPrivateError("La liga que se está intentando verificar no es privada")
+
+    if not(verify_password(password, league.password_hash)):
+        raise PasswordIncorrectError("La contraseña ingresada no es correcta")
