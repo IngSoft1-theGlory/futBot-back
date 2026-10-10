@@ -64,7 +64,6 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
 
     return league
 
-<<<<<<< HEAD
 
 def validate_league_capacity(max_teams: int) -> None: 
     if max_teams not in (4, 6, 8, 10, 12):
@@ -137,7 +136,6 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
         )
         
     return result  
-=======
   
 def validate_league_capacity(max_teams: int) -> None: 
     if max_teams not in (4, 6, 8, 10, 12):
@@ -154,4 +152,3 @@ def check_league_password(session: Session, league_id: int, password: str) -> No
 
     if not(verify_password(password, league.password_hash)):
         raise PasswordIncorrectError("La contraseña ingresada no es correcta")
->>>>>>> origin/develop
