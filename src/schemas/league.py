@@ -39,3 +39,10 @@ class LeagueOut(BaseModel):
 
 class LeagueListOut(BaseModel):
     leagues: list[LeagueOut]
+    
+class VerifyPasswordRequest(BaseModel):
+    password: str
+
+class VerifyPasswordResponse(BaseModel):
+    join_token: str
+    expires_in_seconds: int

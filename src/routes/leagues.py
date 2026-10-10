@@ -4,14 +4,19 @@ Rutas relacionadas con ligas.
 
 from __future__ import annotations
 
+from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
+from src.core.security import get_current_user, create_join_token, get_current_user
+from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut
 from src.services.league_service import create_league, list_leagues
 from fastapi.concurrency import run_in_threadpool
-from src.core.security import get_current_user
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
 from sqlalchemy.orm import Session
+from src.realtime.event_bus import event_bus
+from fastapi.concurrency import run_in_threadpool
+
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
 router = APIRouter(prefix="/api/v1/leagues", tags=["leagues"])
@@ -72,3 +77,17 @@ def list_leagues_endpoint(
     # se llama al service para obtener la lista de ligas, con paginación y filtrado por estado
     leagues = list_leagues(session, status=status, page=page, limit=limit)
     return {"leagues": leagues}
+
+@router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
+def verify_league_password(
+    league_id: int,
+    payload: VerifyPasswordRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    check_league_password(session, league_id, payload.password)
+    return VerifyPasswordResponse(
+        join_token=create_join_token(user_id, league_id),
+        expires_in_seconds=300,
+    )
+
