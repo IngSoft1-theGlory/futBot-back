@@ -33,7 +33,7 @@ class LeagueOut(BaseModel):
     league_id: int
     league_name: str
     max_teams: int
-    teams_current: int
+    current_teams_count: int
     status: LeagueStatus
     is_private: bool
 

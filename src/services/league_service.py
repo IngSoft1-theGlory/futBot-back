@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.schemas.league import CreateLeagueRequest, LeagueOut
 from src.models.league import League, LeagueStatus
-from src.core.exceptions import InvalidLeagueCapacityError, BadRequestError
+from src.core.exceptions import InvalidLeagueCapacityError, InvalidQueryParamsError
 from src.core.security import hash_password
 from src.repositories.league_repository import get_leagues
 from src.services.lineup_service import (
@@ -18,10 +18,6 @@ from src.services.lineup_service import (
     validate_min_players, 
     validate_lineup,
 )
-
-# Es una excepción para parámetros de query que son inválidos
-class InvalidQueryParamsError(BadRequestError):
-    error_code = "INVALID_QUERY_PARAMS"
 
 
 def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) -> League: 
@@ -127,7 +123,7 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
                 league_id=league.league_id,
                 league_name=league.league_name,
                 max_teams=league.max_teams,
-                teams_current=team_count,
+                current_teams_count=team_count,
                 status=league.status,
                 # si tiene password_hash, es privada; si no, es pública. El hash nunca sale del service.
                 is_private=league.password_hash is not None,

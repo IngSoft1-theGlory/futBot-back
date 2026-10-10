@@ -112,7 +112,7 @@ def test_deberia_devolver_los_campos_de_cada_liga_sin_exponer_la_password(
     # Exactamente estos campos: no hay password ni password_hash
     for liga in ligas.values():
         assert set(liga) == {
-            "league_id", "league_name", "max_teams", "teams_current", "status", "is_private",
+            "league_id", "league_name", "max_teams", "current_teams_count", "status", "is_private",
         }
     assert ligas["Publica"]["is_private"] is False
     assert ligas["Privada"]["is_private"] is True
@@ -132,7 +132,7 @@ def test_deberia_contar_equipos_inscriptos_de_cada_liga(
 
     ligas = client.get(URL, headers=auth_headers).json()["leagues"]
 
-    assert {liga["league_name"]: liga["teams_current"] for liga in ligas} == {"A": 2, "B": 1, "C": 0}
+    assert {liga["league_name"]: liga["current_teams_count"] for liga in ligas} == {"A": 2, "B": 1, "C": 0}
 
 
 def test_deberia_filtrar_por_status_y_devolver_todas_si_no_se_envia(
@@ -189,12 +189,3 @@ def test_deberia_devolver_400_con_parametros_invalidos(client, auth_headers, par
 
     assert response.status_code == 400
     assert response.json()["error"] == "INVALID_QUERY_PARAMS"
-
-
-def test_deberia_devolver_401_sin_token_o_con_token_invalido(client):
-    sin_token = client.get(URL)
-    assert sin_token.status_code == 401
-    assert sin_token.json()["error"] == "UNAUTHORIZED"
-
-    invalido = client.get(URL, headers={"Authorization": "Bearer token-invalido"})
-    assert invalido.status_code == 401

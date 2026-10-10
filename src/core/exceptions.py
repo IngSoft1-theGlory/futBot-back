@@ -95,6 +95,9 @@ class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
     error_code = "INVALID_LEAGUE_CAPACITY"
 
+class InvalidQueryParamsError(BadRequestError):
+    error_code = "INVALID_QUERY_PARAMS"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
