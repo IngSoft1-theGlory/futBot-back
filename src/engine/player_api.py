@@ -9,7 +9,7 @@ import math
 from src.engine.game_types import AttributeType, GameState
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.constants import reach_distance
+from src.engine._01_to_world.metrics import reach_distance
 
 
 def _is_finite_number(value) -> bool:
