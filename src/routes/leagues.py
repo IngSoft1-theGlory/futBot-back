@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
+from src.schemas.league import JoinLeagueRequest, JoinLeagueResponse, VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
 from src.core.security import get_current_user, create_join_token, get_current_user
 from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status
-from src.services.league_service import create_league
+from src.services.league_service import create_league, join_league
 from fastapi.concurrency import run_in_threadpool
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
@@ -76,3 +76,18 @@ def verify_league_password(
         expires_in_seconds=300,
     )
 
+
+@router.post(
+    "/{league_id}/teams",
+    response_model=JoinLeagueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def join_league_endpoint(
+    league_id: int,
+    payload: JoinLeagueRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> JoinLeagueResponse:
+    """Inscribe un equipo en una liga disponible con su configuración táctica."""
+    await run_in_threadpool(join_league, session, user_id, league_id, payload)
+    return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)

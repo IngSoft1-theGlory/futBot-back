@@ -1,9 +1,11 @@
 from __future__ import annotations
-from src.schemas.league import CreateLeagueRequest
+from src.schemas.league import CreateLeagueRequest, JoinLeagueRequest
 from src.models.league import League, LeagueStatus
+from src.models.lineup_entry import LineupEntry
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from src.core.exceptions import InvalidLeagueCapacityError, LeagueNotPrivateError, PasswordIncorrectError
-from src.core.security import hash_password, verify_password
+from src.core.exceptions import (AlreadyJoinedError,InvalidConfigurationError,InvalidLeagueCapacityError,InvalidLineupError,JoinTokenRequiredError,LeagueFullError,LeagueNotPrivateError,LeagueUnavailableError,NotFoundError,PasswordIncorrectError,)
+from src.core.security import hash_password, verify_join_token, verify_password
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -67,3 +69,43 @@ def check_league_password(session: Session, league_id: int, password: str) -> No
 
     if not(verify_password(password, league.password_hash)):
         raise PasswordIncorrectError("La contraseña ingresada no es correcta")
+
+
+def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> None:
+    """Inscribe al equipo en la liga y guarda su alineación en una sola transacción."""
+
+    validate_team_belongs_to_user(session, user_id, payload.team_id)
+
+    # with_for_update bloquea la fila de la liga para que dos inscripciones simultáneas no superen el cupo
+    league = session.scalars(select(League).where(League.league_id == league_id).with_for_update()).first()
+    if league is None:
+        raise NotFoundError("La liga no existe")
+    if league.status != LeagueStatus.PENDING:
+        raise LeagueUnavailableError("La liga ya fue iniciada")
+
+    if league.password_hash is not None:
+        if payload.join_token is None:
+            raise JoinTokenRequiredError("La liga es privada, se requiere un token de unión")
+        verify_join_token(payload.join_token, user_id, league_id)
+
+    # un equipo está inscripto si tiene lineup_entries en la liga
+    enrolled_team_ids = set(session.scalars(
+        select(LineupEntry.team_id).where(LineupEntry.league_id == league_id).distinct()
+    ))
+    if payload.team_id in enrolled_team_ids:
+        raise AlreadyJoinedError("El equipo ya está inscripto en la liga")
+    if len(enrolled_team_ids) >= league.max_teams:
+        raise LeagueFullError("La liga alcanzó su cupo máximo de equipos")
+
+    team_players = validate_min_players(session, payload.team_id)
+    try:
+        validate_lineup(session, payload, team_players)
+    except InvalidConfigurationError as error:
+        raise InvalidLineupError(error.message)
+
+    try:
+        save_lineup(session, None, payload.team_id, payload, league_id)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
