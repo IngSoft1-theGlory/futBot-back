@@ -6,9 +6,10 @@ Las primitivas de acción solo registran una Intention.
 
 import math
 
-from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, ActionType, Intention, AttributeType, GameState
+) 
+
 from src.engine.constants import reach_distance
 
 
