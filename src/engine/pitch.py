@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from src.engine.geometry_types import Point2D
+from src.engine._01_to_world.data_types import Point2D
 
 PITCH_LENGTH = 105.0  # eje x: 0 (línea de fondo de HOME) a 105 (línea de AWAY)
 PITCH_WIDTH = 60.0    # eje y: 0 a 60, centro en 30

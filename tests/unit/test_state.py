@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import pytest
 
-from src.engine.game_types import AttributeType
+from src.engine._01_to_world.data_types import AttributeType
 from src.engine.pitch import TeamSide
 from src.engine.state import (
     MatchInitializationError,
