@@ -24,7 +24,6 @@ class BadRequestError(AppError):
     status_code = 400
     error_code = "APP_ERROR"
 
-
 class UnauthorizedError(AppError):
     """Rama 401: token ausente, inválido, expirado o mal firmado."""
     status_code = 401
@@ -102,9 +101,13 @@ class MatchFinishedError(BadRequestError):
 class LeagueNotPrivateError(BadRequestError):
     """Rama 400 LEAGUE_NOT_PRIVATE: la liga no es privada"""
     error_code = "LEAGUE_NOT_PRIVATE"
+
 class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
     error_code = "INVALID_LEAGUE_CAPACITY"
+
+class InvalidQueryParamsError(BadRequestError):
+    error_code = "INVALID_QUERY_PARAMS"
 
 class InvalidLineupError(InvalidConfigurationError):
     """Rama 400 INVALID_LINEUP: la formación o alineación para unirse a una liga no es válida."""
@@ -133,6 +136,7 @@ class JoinTokenExpiredError(ForbiddenError):
 class InvalidJoinTokenError(ForbiddenError):
     """Rama 403 INVALID_JOIN_TOKEN: el join_token es inválido o es de otra liga u otro usuario."""
     error_code = "INVALID_JOIN_TOKEN"
+
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

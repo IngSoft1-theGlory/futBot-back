@@ -37,7 +37,7 @@ def crear_liga(session, usuario, contrasena=None):
     return liga
 
 
-def test_deberia_dar_un_token_de_union_valido_si_la_contrasena_es_correcta(session, usuario):
+def test_deberia_dar_un_token_de_union_valido_si_la_contraseña_es_correcta(session, usuario):
     liga = crear_liga(session, usuario, "clave123")
 
     check_league_password(session, liga.league_id, "clave123")  # no debe lanzar error
@@ -49,7 +49,7 @@ def test_deberia_dar_un_token_de_union_valido_si_la_contrasena_es_correcta(sessi
     assert datos["sub"] == str(usuario.user_id)
 
 
-def test_deberia_dar_401_password_incorrect_si_la_contrasena_es_incorrecta(session, usuario):
+def test_deberia_dar_401_password_incorrect_si_la_contraseña_es_incorrecta(session, usuario):
     liga = crear_liga(session, usuario, "clave123")
 
     with pytest.raises(AppError) as error:
