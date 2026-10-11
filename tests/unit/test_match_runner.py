@@ -14,7 +14,7 @@ from src.engine.intentions import ActionType, Intention
 from src.engine.game_types import AttributeType
 from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
 from src.engine.pitch import TeamSide
-from engine._03_to_builder.player_api import PlayerAPI
+from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine.state import (
     MatchPhase,
     MatchRegistry,

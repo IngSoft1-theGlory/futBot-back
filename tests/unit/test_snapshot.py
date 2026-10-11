@@ -8,8 +8,8 @@ from src.engine.state import MatchPlayerState, MatchState, MatchPhase, Score, Ba
 from src.engine.geometry_types import Vector2D, Point2D
 from src.engine.game_types import AttributeType
 from src.engine.pitch import TeamSide, goal_center, opponent_goal_center
-from src.engine.player_api import PlayerAPI
-from src.engine.snapshot import build_player_snapshot
+from src.engine._03_to_builder.player_api import PlayerAPI
+from src.engine._03_to_builder.snapshot import build_player_snapshot
 
 
 # --- Helpers: arman el escenario de prueba (no son tests, por eso empiezan con _) ---

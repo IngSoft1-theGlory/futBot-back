@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 
 from src.default_behaviors import DEFAULT_BEHAVIORS
-from engine._03_to_builder.behavior_executor import make_execute_behavior
+from src.engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.match_runner import run_tick
