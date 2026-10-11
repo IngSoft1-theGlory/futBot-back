@@ -5,7 +5,7 @@ Definen la forma del JSON que entra (request) y el que sale (response)
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.models.league import LeagueStatus
 from src.schemas.lineup_config import LineupConfig
@@ -46,3 +46,24 @@ class VerifyPasswordRequest(BaseModel):
 class VerifyPasswordResponse(BaseModel):
     join_token: str
     expires_in_seconds: int
+
+
+class LeagueTeamOut(BaseModel):
+    team_id: int
+    team_name: str
+
+
+class LeagueDetailOut(BaseModel):
+    """Respuesta de GET /api/v1/leagues/{leagueId}: sirve para el lobby y para la liga iniciada."""
+    league_id: int
+    league_name: str
+    status: LeagueStatus
+    is_private: bool
+    host_team_id: int
+    max_teams: int
+    current_teams_count: int
+    match_duration: int
+    teams: list[LeagueTeamOut]
+    # por ahora siempre vacios: su contenido lo definen los tickets de tabla y fixture
+    ranking: list = Field(default_factory=list)
+    fixture: list = Field(default_factory=list)

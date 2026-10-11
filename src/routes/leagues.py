@@ -8,8 +8,8 @@ from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, Cr
 from src.core.security import get_current_user, create_join_token, get_current_user
 from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status
-from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut
-from src.services.league_service import create_league, list_leagues
+from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
+from src.services.league_service import create_league, list_leagues, get_league_detail
 from fastapi.concurrency import run_in_threadpool
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
@@ -91,3 +91,12 @@ def verify_league_password(
         expires_in_seconds=300,
     )
 
+
+@router.get("/{league_id}", response_model=LeagueDetailOut)
+def get_league_endpoint(
+    league_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueDetailOut:
+    """Detalle de una liga: lo usa el lobby (PENDING) y la pantalla de la liga iniciada."""
+    return get_league_detail(session, user_id, league_id)
