@@ -18,10 +18,10 @@ from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention
 )
 from src.engine.match_runner import run_tick
+from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
-from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
-from src.engine.snapshot import build_player_snapshot
+from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine.state import TeamMatchSetup, build_initial_state
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
