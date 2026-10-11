@@ -16,7 +16,7 @@ from src.engine.constants import (
 from src.engine.game_types import AttributeType, GameState
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH
+from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
 from src.engine.resolve import max_run_distance_per_tick, resolve
 from src.engine.timing import TICK_DURATION_SECONDS
 

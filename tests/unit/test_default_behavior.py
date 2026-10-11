@@ -17,7 +17,7 @@ from src.engine.behavior_executor import make_execute_behavior
 from src.engine.game_types import AttributeType
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.match_runner import run_tick
-from src.engine.pitch import TeamSide
+from src.engine._01_to_world.pitch import TeamSide
 from src.engine.simulation import apply_intentions
 from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 from src.main import app

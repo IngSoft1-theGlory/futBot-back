@@ -12,8 +12,8 @@ import pytest
 from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.game_types import AttributeType
-from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
-from src.engine.pitch import TeamSide
+from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
+from src.engine._01_to_world.pitch import TeamSide
 from src.engine.player_api import PlayerAPI
 from src.engine.state import (
     MatchPhase,

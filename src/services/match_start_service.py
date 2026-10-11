@@ -41,8 +41,8 @@ from src.engine.match_runner import (
     OnFinished,
     run_match,
 )
-from src.engine import pitch
-from src.engine.pitch import FORMATION_POSITIONS, TeamSide
+from src.engine._01_to_world import pitch
+from src.engine._01_to_world.pitch import FORMATION_POSITIONS, TeamSide
 from src.engine.state import (
     MatchInitializationError,
     MatchPhase,

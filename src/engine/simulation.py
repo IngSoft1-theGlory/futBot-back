@@ -29,7 +29,7 @@ Fuera de alcance:
 
 from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
-from src.engine.pitch import BALL_INITIAL_POSITION, detect_goal
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine.resolve import resolve
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import MatchState
