@@ -42,4 +42,6 @@ htmlcov/
 Thumbs.db
 
 # --- Docker ---
-docker-compose.override.ymlpytest-of-*/
+docker-compose.override.yml
+pytest-of-*/
+
