@@ -7,10 +7,11 @@ Se trabaja con un MatchState armado con build_initial_state, sin base de datos.
 
 import pytest
 
-from src.engine.constants import (
+from src.engine._01_to_world.metrics import (
     MAX_ATTRIBUTE_VALUE,
     MAX_KICK_SPEED_METERS_PER_SECOND,
     MAX_RUN_SPEED_METERS_PER_SECOND,
+    TICK_DURATION_SECONDS,
     reach_distance,
 )
 from src.engine._01_to_world.data_types import (
@@ -22,7 +23,6 @@ from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import TeamMatchSetup, build_initial_state
-from src.engine.timing import TICK_DURATION_SECONDS
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 # Todos distintos, para detectar cruces entre atributos.

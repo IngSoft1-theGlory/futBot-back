@@ -6,12 +6,10 @@ Las primitivas de acción solo registran una Intention.
 
 import math
 
+from src.engine._01_to_world.metrics import reach_distance
 from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, ActionType, Intention, AttributeType, GameState
 ) 
-
-from src.engine.constants import reach_distance
-
 
 def _is_finite_number(value) -> bool:
     """True si `value` es un int o float común (no NaN, no infinito, no bool)."""
