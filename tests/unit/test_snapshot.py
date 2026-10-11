@@ -9,7 +9,6 @@ from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._01_to_world.pitch import TeamSide, goal_center, opponent_goal_center
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType
-from src.engine.player_api import PlayerAPI
 
 
 # --- Helpers: arman el escenario de prueba (no son tests, por eso empiezan con _) ---
