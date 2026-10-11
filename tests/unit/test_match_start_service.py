@@ -18,7 +18,7 @@ from src.engine.game_types import AttributeType
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide, starter_position
 from src.engine.simulation import apply_intentions
-from src.engine.state import MatchInitializationError, MatchRegistry
+from src.engine._02_to_match.state import MatchInitializationError, MatchRegistry
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player, Team
 from src.services.match_start_service import (
     launch_match,

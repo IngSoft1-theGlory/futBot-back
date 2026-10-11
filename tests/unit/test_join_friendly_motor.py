@@ -15,7 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src.database.base import get_db
 from src.engine.pitch import TeamSide
-from src.engine.state import MatchPhase, MatchRegistry
+from src.engine._02_to_match.state import MatchPhase, MatchRegistry
 from src.main import app
 from src.models import Match, MatchStatus
 from src.routes.friendly import get_launch_options

@@ -32,7 +32,7 @@ from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine.resolve import resolve
 from src.engine.snapshot import build_player_snapshot
-from src.engine.state import MatchState
+from src.engine._02_to_match.state import MatchState
 from src.engine.timing import TICK_DURATION_SECONDS
 
 

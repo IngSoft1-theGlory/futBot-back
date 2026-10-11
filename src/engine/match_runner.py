@@ -45,7 +45,7 @@ from typing import Awaitable, Callable, Optional
 from src.engine.geometry_types import Point2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.pitch import TeamSide
-from src.engine.state import MatchPhase, MatchRegistry, MatchState
+from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState
 
 logger = logging.getLogger(__name__)
 

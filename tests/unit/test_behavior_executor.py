@@ -13,7 +13,7 @@ from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.intentions import ActionType, Intention
 from src.engine.match_runner import run_tick
 from src.engine.pitch import TeamSide
-from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
+from src.engine._02_to_match.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 
 
 def _player(player_id, team_id, side, x, starter=True):

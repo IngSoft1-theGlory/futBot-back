@@ -21,7 +21,7 @@ from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
 from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
-from src.engine.state import TeamMatchSetup, build_initial_state
+from src.engine._02_to_match.state import TeamMatchSetup, build_initial_state
 from src.engine.timing import TICK_DURATION_SECONDS
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 

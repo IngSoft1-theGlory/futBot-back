@@ -7,7 +7,7 @@ usa run_tick.
 from src.engine.intentions import Intention
 from src.engine.player_api import PlayerAPI
 from src.engine.snapshot import build_player_snapshot
-from src.engine.state import MatchState
+from src.engine._02_to_match.state import MatchState
 
 
 def make_execute_behavior(codes: dict[int, str]):

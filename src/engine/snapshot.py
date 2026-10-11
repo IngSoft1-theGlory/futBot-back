@@ -1,7 +1,7 @@
 # src/engine/snapshot.py
 
 from src.engine.game_types import GameState, AttributeType
-from src.engine.state import MatchState
+from src.engine._02_to_match.state import MatchState
 from src.engine.pitch import goal_center, opponent_goal_center
 
 def build_player_snapshot(match_state: MatchState, player_id: int) -> tuple[GameState, dict[AttributeType, int]]:

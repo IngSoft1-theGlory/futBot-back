@@ -43,7 +43,7 @@ from src.engine.match_runner import (
 )
 from src.engine import pitch
 from src.engine.pitch import FORMATION_POSITIONS, TeamSide
-from src.engine.state import (
+from src.engine._02_to_match.state import (
     MatchInitializationError,
     MatchPhase,
     MatchRegistry,
