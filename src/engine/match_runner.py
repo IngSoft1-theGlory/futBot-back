@@ -29,10 +29,7 @@ from src.engine._01_to_world.data_types import Point2D, ActionType, Intention
 
 logger = logging.getLogger(__name__)
 
-# Firmas de las piezas que todavía implementan otros tickets (o que
-# siguen en discusión). Nombrarlas acá sirve de documentación de la
-# interfaz que el motor espera, aunque hoy solo existan como stubs/fakes
-# en los tests.
+#Firmas de las piezas que run_match recibe por parámetro.
 ExecuteBehavior = Callable[[MatchState, int], Intention]
 ApplyIntentions = Callable[[MatchState, dict[int, Intention]], None]
 DetectGoal = Callable[[Point2D], Optional[TeamSide]]
