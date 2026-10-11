@@ -1,10 +1,15 @@
+""" 
+Rutas relacionadas con ligas.
+"""
+
 from __future__ import annotations
 
 from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
 from src.core.security import get_current_user, create_join_token, get_current_user
 from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status
-from src.services.league_service import create_league
+from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut
+from src.services.league_service import create_league, list_leagues
 from fastapi.concurrency import run_in_threadpool
 from src.realtime.event_bus import event_bus
 from src.database.base import get_db
@@ -62,6 +67,16 @@ async def create_league_endpoint(
        host_team_id = league.host_team_id
     )
 
+@router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
+def list_leagues_endpoint(
+    page: str | None = None,      
+    limit: str | None = None,    
+    status: str | None = None,  
+    session: Session = Depends(get_db),
+):
+    # se llama al service para obtener la lista de ligas, con paginación y filtrado por estado
+    leagues = list_leagues(session, status=status, page=page, limit=limit)
+    return {"leagues": leagues}
 
 @router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
 def verify_league_password(

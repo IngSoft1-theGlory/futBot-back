@@ -7,9 +7,9 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, AttributeType, ActionType, Intention, GameState
+)
 from src.engine.player_api import PlayerAPI
 
 # Todos distintos, para detectar cruces entre atributos.

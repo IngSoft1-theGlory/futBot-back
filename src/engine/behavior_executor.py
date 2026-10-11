@@ -4,7 +4,7 @@ cada comportamiento en una función on_tick y arma el execute_behavior que
 usa run_tick.
 """
 
-from src.engine.intentions import Intention
+from src.engine._01_to_world.data_types import Intention
 from src.engine.player_api import PlayerAPI
 from src.engine.snapshot import build_player_snapshot
 from src.engine.state import MatchState

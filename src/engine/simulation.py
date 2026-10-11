@@ -26,9 +26,7 @@ Fuera de alcance:
     aplican en orden de player_id ascendente y gana la última patada
     (es determinista, pero no es una decisión de diseño definitiva).
 """
-
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
+from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
 from src.engine.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine.resolve import resolve
 from src.engine.snapshot import build_player_snapshot
