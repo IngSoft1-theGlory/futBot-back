@@ -14,7 +14,7 @@ Forma del payload: exactamente la del evento TICK_UPDATE del contrato
 
 from __future__ import annotations
 
-from src.engine.state import MatchState
+from src.engine._02_to_match.state import MatchState
 from src.realtime.match_connection_manager import match_connections
 
 

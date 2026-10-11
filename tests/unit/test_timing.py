@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.engine.timing import TICK_DURATION_SECONDS, total_ticks_for
+from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS, total_ticks_for
 
 
 def test_deberia_tick_durar_medio_segundo():
