@@ -1,8 +1,10 @@
-# src/engine/snapshot.py
+"""
+Generador de Gamestate + atributos por jugador.
+"""
 
-from src.engine.game_types import GameState, AttributeType
+from src.engine._01_to_world.data_types import GameState, AttributeType
 from src.engine.state import MatchState
-from src.engine.pitch import goal_center, opponent_goal_center
+from src.engine._01_to_world.pitch import goal_center, opponent_goal_center
 
 def build_player_snapshot(match_state: MatchState, player_id: int) -> tuple[GameState, dict[AttributeType, int]]:
     """Construye una instantánea del juego para un jugador específico."""

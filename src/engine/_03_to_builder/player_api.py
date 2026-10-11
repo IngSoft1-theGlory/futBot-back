@@ -4,10 +4,11 @@ Los getters leen de un snapshot ya armado. Las primitivas de acción solo regist
 """
 
 import math
-from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
-from src.engine.constants import reach_distance
+
+from src.engine._01_to_world.metrics import reach_distance
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, ActionType, Intention, AttributeType, GameState
+) 
 
 class PlayerAPI:
     """
