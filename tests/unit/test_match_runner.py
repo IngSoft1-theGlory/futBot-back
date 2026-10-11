@@ -6,26 +6,22 @@ se mockean acá con fakes simples: estos tests prueban EL ORQUESTADOR.
 """
 
 import asyncio
-
 import pytest
 
-from src.engine.geometry_types import Point2D
-from src.engine.intentions import ActionType, Intention
-from src.engine.game_types import AttributeType
-from src.engine.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
-from src.engine.pitch import TeamSide
-from src.engine.player_api import PlayerAPI
+from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
+from src.engine.match_runner import run_match, run_tick
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
+from src.engine._01_to_world.data_types import (
+    Point2D, AttributeType, ActionType, Intention
+)
 from src.engine._02_to_match.state import (
     MatchPhase,
     MatchRegistry,
     TeamMatchSetup,
     build_initial_state,
 )
-from src.engine.match_runner import run_match, run_tick
-from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 MATCH_ID = 1
-
 
 ATTRIBUTES = {
     AttributeType.POWER: 80,

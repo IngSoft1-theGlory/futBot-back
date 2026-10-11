@@ -5,17 +5,12 @@ Logica de negocio para la entidad League.
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from src.core.exceptions import InvalidLeagueCapacityError, LeagueNotPrivateError, PasswordIncorrectError, LeagueNotFoundError, InvalidQueryParamsError
 
 from src.schemas.league import CreateLeagueRequest, LeagueOut
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues
 from src.core.security import hash_password, verify_password
-from src.core.exceptions import (
-    InvalidLeagueCapacityError, 
-    LeagueNotPrivateError, 
-    PasswordIncorrectError,
-    InvalidQueryParamsError
-)
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -145,7 +140,7 @@ def check_league_password(session: Session, league_id: int, password: str) -> No
     league = session.get(League, league_id)
 
     if league is None: 
-        raise LeagueNotPrivateError("La liga no fue encontrada")
+        raise LeagueNotFoundError("La liga no fue encontrada")
 
     if league.password_hash is None: 
         raise LeagueNotPrivateError("La liga que se está intentando verificar no es privada")
