@@ -27,7 +27,7 @@ from src.services.lineup_service import (
     validate_team_belongs_to_user,
     validate_match_duration,
     validate_min_players, 
-    validate_lineup,
+    validate_lineup
 )
 
 
@@ -147,7 +147,7 @@ def check_league_password(session: Session, league_id: int, password: str) -> No
     league = session.get(League, league_id)
 
     if league is None: 
-        raise LeagueNotPrivateError("La liga no fue encontrada")
+        raise LeagueNotFoundError("La liga no fue encontrada")
 
     if league.password_hash is None: 
         raise LeagueNotPrivateError("La liga que se está intentando verificar no es privada")

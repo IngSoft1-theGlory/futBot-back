@@ -8,21 +8,15 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from src.engine.behavior_executor import make_execute_behavior
+from src.engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.match_runner import ExecuteBehavior
-from src.engine.state import MatchInitializationError, MatchState
+from src.engine._02_to_match.state import MatchInitializationError, MatchState
 from src.models import Match, MatchStatus
-from src.core.exceptions import ( InvalidConfigurationError, InvalidSettingsError, MatchNotFoundError,MatchUnavailableError,)
-from src.repositories.match_repository import (claim_pending_match, get_available_matches, get_behaviors_by_ids, get_lineup_entries, get_match_by_id,)
+from src.core.exceptions import InvalidConfigurationError, InvalidSettingsError, MatchNotFoundError,MatchUnavailableError
+from src.repositories.match_repository import claim_pending_match, get_available_matches, get_behaviors_by_ids, get_lineup_entries, get_match_by_id
 from src.schemas.friendly import CreateFriendlyRequest, JoinFriendlyRequest
 from src.services.match_start_service import prepare_match
-from src.services.lineup_service import (
-    save_lineup,
-    validate_team_belongs_to_user,
-    validate_match_duration,
-    validate_min_players, 
-    validate_lineup,
-)
+from src.services.lineup_service import save_lineup, validate_team_belongs_to_user, validate_match_duration, validate_min_players, validate_lineup
 
 # Caso de uso 
 def create_friendly(session: Session, user_id: int, payload: CreateFriendlyRequest) -> Match:

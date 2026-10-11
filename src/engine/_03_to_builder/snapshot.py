@@ -1,8 +1,11 @@
-# src/engine/snapshot.py
+"""
+Generador de Gamestate + atributos por jugador.
+"""
 
-from src.engine.game_types import GameState, AttributeType
-from src.engine.state import MatchState
-from src.engine.pitch import goal_center, opponent_goal_center
+
+from src.engine._02_to_match.state import MatchState
+from src.engine._01_to_world.data_types import GameState, AttributeType
+from src.engine._01_to_world.pitch import goal_center, opponent_goal_center
 
 def build_player_snapshot(match_state: MatchState, player_id: int) -> tuple[GameState, dict[AttributeType, int]]:
     """Construye una instantánea del juego para un jugador específico."""
@@ -27,16 +30,16 @@ def build_player_snapshot(match_state: MatchState, player_id: int) -> tuple[Game
     team_goal = goal_center(player.side) 
     rivals_goal = opponent_goal_center(player.side)
 
-    # armo el GameState, con copias de las listas
+    # armo el GameState
     return GameState(
         ball_position = match_state.ball.position, 
         ball_velocity = match_state.ball.velocity,  
         my_position = player.position,  
-        teammates = list(teammates_positions), # se devuelve una copia para que mutarlos no afecte
-        opponents = list(rivals_positions),      # a otros jugadores ni al estado del motor
+        teammates = list(teammates_positions), 
+        opponents = list(rivals_positions),    
         team_goal = team_goal, 
         opponent_goal = rivals_goal,
-    ), player.attributes.copy() # al igual que arriba, devuelvo una copia asi un comportamiento no puede modificar el estado real del partido 
+    ), player.attributes.copy() # se devuelven copias y listas para que mutar esos campos no afecte a otros jugadores ni al estado del motor
 
 
 
