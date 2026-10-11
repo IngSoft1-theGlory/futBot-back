@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from src.engine.geometry_types import Point2D
+from src.engine._01_to_world.data_types import Point2D
 
 # =============== Medidas de la cancha (en metros) ===============
 

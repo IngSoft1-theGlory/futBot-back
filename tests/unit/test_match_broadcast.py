@@ -5,9 +5,9 @@ Tests de match_broadcast: notify
 
 import pytest
 
-from src.engine.intentions import ActionType
-from src.engine.game_types import AttributeType
+
 from src.engine._01_to_world.pitch import TeamSide
+from src.engine._01_to_world.data_types import AttributeType
 from src.engine.state import TeamMatchSetup, build_initial_state
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 from src.realtime.match_broadcast import build_tick_update_payload, notify

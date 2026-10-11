@@ -7,7 +7,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from src.engine.geometry_types import Point2D, Vector2D
+from src.engine._01_to_world.data_types import Point2D, Vector2D
 
 
 def test_debería_magnitud_de_vector_3_4_ser_5():

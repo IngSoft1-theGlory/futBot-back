@@ -7,18 +7,18 @@ from dataclasses import replace
 
 import pytest
 
-from src.engine.constants import (
+from src.engine._01_to_world.metrics import (
     MAX_ATTRIBUTE_VALUE,
     MAX_KICK_SPEED_METERS_PER_SECOND,
     MAX_RUN_SPEED_METERS_PER_SECOND,
+    TICK_DURATION_SECONDS,
     reach_distance,
 )
-from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
 from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, AttributeType, ActionType, Intention, GameState
+)
 from src.engine.resolve import max_run_distance_per_tick, resolve
-from src.engine.timing import TICK_DURATION_SECONDS
 
 ATTRIBUTES = {
     AttributeType.POWER: 20,

@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from src.core.security import create_access_token
 from src.database.base import get_db
-from src.engine.geometry_types import Point2D, Vector2D
 from src.engine._01_to_world.pitch import TeamSide
+from src.engine._01_to_world.data_types import Point2D, Vector2D
 from src.engine.state import (
     BallState,
     MatchPhase,

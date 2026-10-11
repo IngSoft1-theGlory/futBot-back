@@ -4,18 +4,17 @@ resolve: función pura que aplica una Intention a un GameState.
 
 from dataclasses import replace
 
-from src.engine.constants import (
+from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
+from src.engine._01_to_world.metrics import (
     MAX_ATTRIBUTE_VALUE,
     MAX_RUN_SPEED_METERS_PER_SECOND,
+    TICK_DURATION_SECONDS,
     kick_speed,
     reach_distance,
 )
-from src.engine.game_types import AttributeType, GameState
-from src.engine.geometry_types import Point2D, Vector2D
-from src.engine.intentions import ActionType, Intention
-from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
-from src.engine.timing import TICK_DURATION_SECONDS
-
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, ActionType, Intention, AttributeType, GameState
+) 
 
 def resolve(state: GameState, intention: Intention, attributes: dict[AttributeType, int]) -> GameState:
     """

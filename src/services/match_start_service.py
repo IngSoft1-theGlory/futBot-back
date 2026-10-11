@@ -53,7 +53,9 @@ from src.engine.state import (
     build_initial_state,
     match_registry,
 )
-from src.engine.timing import TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, total_ticks_for
+from src.engine._01_to_world.metrics import (
+    TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, total_ticks_for
+)
 from src.models import LineupEntry, MatchStatus, Player
 from src.realtime.match_broadcast import notify as broadcast_tick
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team

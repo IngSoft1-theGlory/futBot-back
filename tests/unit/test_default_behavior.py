@@ -11,11 +11,11 @@ Uno o dos tests por cada criterio de aceptacion:
 import pytest
 from sqlalchemy import select
 
-
 from src.default_behaviors import DEFAULT_BEHAVIORS
 from src.engine.behavior_executor import make_execute_behavior
-from src.engine.game_types import AttributeType
-from src.engine.geometry_types import Point2D, Vector2D
+from src.engine._01_to_world.data_types import (
+    AttributeType, Point2D, Vector2D
+)
 from src.engine.match_runner import run_tick
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine.simulation import apply_intentions
