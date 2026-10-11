@@ -14,7 +14,7 @@ from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePl
 from src.engine._01_to_world.data_types import (
     Point2D, AttributeType, ActionType, Intention
 )
-from src.engine.state import (
+from src.engine._02_to_match.state import (
     MatchPhase,
     MatchRegistry,
     TeamMatchSetup,

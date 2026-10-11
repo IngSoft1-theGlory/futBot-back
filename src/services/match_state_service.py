@@ -13,7 +13,7 @@ from src.core.exceptions import (
     MatchPendingError,
     UnauthorizedError,
 )
-from src.engine.state import MatchRegistry, match_registry
+from src.engine._02_to_match.state import MatchRegistry, match_registry
 from src.models import MatchStatus, Player
 from src.repositories.match_repository import get_match_by_id, get_players_by_team
 from src.repositories.user_repository import get_user_by_id

@@ -4,10 +4,10 @@ cada comportamiento en una función on_tick y arma el execute_behavior que
 usa run_tick.
 """
 
+from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.data_types import Intention
-from src.engine.state import MatchState
 
 def make_execute_behavior(codes: dict[int, str]):
     """

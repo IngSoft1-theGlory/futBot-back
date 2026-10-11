@@ -9,7 +9,7 @@ import pytest
 
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine._01_to_world.data_types import AttributeType
-from src.engine.state import (
+from src.engine._02_to_match.state import (
     MatchInitializationError,
     MatchPhase,
     MatchRegistry,
