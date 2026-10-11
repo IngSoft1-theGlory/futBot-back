@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType, ActionType
-from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
 from src.schemas.lineup_config import LineupConfig
 
 class MatchPhase(Enum):

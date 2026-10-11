@@ -12,7 +12,7 @@ from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention
 )
 from src.engine.match_runner import run_tick
-from src.engine.pitch import TeamSide
+from src.engine._01_to_world.pitch import TeamSide
 from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 
 

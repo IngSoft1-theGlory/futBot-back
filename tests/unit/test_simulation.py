@@ -18,7 +18,7 @@ from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention
 )
 from src.engine.match_runner import run_tick
-from src.engine.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
 from src.engine.player_api import PlayerAPI
 from src.engine.simulation import apply_intentions
 from src.engine.snapshot import build_player_snapshot
