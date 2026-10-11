@@ -13,9 +13,9 @@ from src.models import League, LeagueStatus, LineupEntry
 
 def get_leagues(
         session: Session, 
-        status: LeagueStatus | None,    # por defecto None, devuelve todas las ligas.
-        page: int = 1,                  # por defecto, la primer pagina
-        limit: int = 20                 # por defecto, 20 ligas por pagina
+        status: LeagueStatus | None = None,  # por defecto None, devuelve todas las ligas.
+        page: int = 1,                       # por defecto, la primer pagina
+        limit: int = 20                      # por defecto, 20 ligas por pagina
 ):
     """ 
     Obtiene un listado de todas las ligas, con paginación y filtrado por estado.

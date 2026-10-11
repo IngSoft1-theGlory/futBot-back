@@ -1,3 +1,7 @@
+""" 
+Rutas relacionadas con ligas.
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status, Response
@@ -6,15 +10,26 @@ from fastapi.concurrency import run_in_threadpool
 
 from sqlalchemy.orm import Session
 
-from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse
-from src.services.league_service import create_league, exit_league
-from src.core.security import get_current_user
-from src.realtime.event_bus import event_bus
 from src.database.base import get_db
+from src.realtime.event_bus import event_bus
+from src.core.security import get_current_user, create_join_token, get_current_user
+from src.services.league_service import (
+    create_league, 
+    list_leagues, 
+    check_league_password, 
+    exit_league
+)
+from src.schemas.league import (
+    VerifyPasswordRequest, 
+    VerifyPasswordResponse, 
+    CreateLeagueRequest, 
+    CreateLeagueResponse,
+    LeagueListOut
+)
+
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
 router = APIRouter(prefix="/api/v1/leagues", tags=["leagues"])
-
 
 # POST /api/v1/leagues
 # El path va vacío ("") porque el prefix ya tiene la URL completa.
@@ -62,16 +77,10 @@ async def create_league_endpoint(
        host_team_id = league.host_team_id
     )
 
-# DELETE /api/v1/leagues/{league_id}/teams/{team_id}
-# El path tiene dos parametros, league_id y team_id, 
-# donde FastAPI extrae de la URL y pasa a la funcion
-@router.delete(
-    "/{league_id}/teams/{team_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-)
 
-def leave_league_endpoint(
+@router.delete("/{league_id}/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+
+def exit_league_endpoint(
     league_id: int,
     team_id: int,
     user_id: int = Depends(get_current_user),
@@ -82,3 +91,30 @@ def leave_league_endpoint(
 
     # responde 204 No Content, op. exitosa pero no hay contenido para devolver
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
+
+def list_leagues_endpoint(
+    page: str | None = None,      
+    limit: str | None = None,    
+    status: str | None = None,  
+    session: Session = Depends(get_db),
+):
+    # se llama al service para obtener la lista de ligas, con paginación y filtrado por estado
+    leagues = list_leagues(session, status=status, page=page, limit=limit)
+    return {"leagues": leagues}
+
+@router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
+
+def verify_league_password(
+    league_id: int,
+    payload: VerifyPasswordRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    check_league_password(session, league_id, payload.password)
+    return VerifyPasswordResponse(
+        join_token=create_join_token(user_id, league_id),
+        expires_in_seconds=300,
+    )
+

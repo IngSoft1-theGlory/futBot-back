@@ -55,6 +55,10 @@ class UnprocessableError(AppError):
     status_code = 422
     error_code = "APP_ERROR"
 
+class PasswordIncorrectError(AppError):
+    status_code = 401
+    error_code = "PASSWORD_INCORRECT"
+
 class InvalidSettingsError(BadRequestError):
     """Rama 400 INVALID_SETTINGS: la configuración del partido es inválida"""
     error_code = "INVALID_SETTINGS"
@@ -70,8 +74,12 @@ class PreconditionFailedError(UnprocessableError):
     error_code = "PRECONDITION_FAILED"
 
 class MatchNotFoundError(NotFoundError):
-    """ Rama 404 específica de partidos: el partido no existe o no está en ejecucion"""
+    """ Rama 404 específica de partidos: el partido no existe"""
     error_code = "MATCH_NOT_FOUND"
+
+class LeagueNotFoundError(NotFoundError):
+    """ Rama 404 específica de ligas: la liga no existe"""
+    error_code = "LEAGUE_NOT_FOUND"   
 
 class MatchNotFinishedError(BadRequestError):
     """Rama 400 MATCH_NOT_FINISHED: el partido existe pero todavía no terminó,
@@ -89,6 +97,10 @@ class MatchPendingError(BadRequestError):
 class MatchFinishedError(BadRequestError):
     """Rama 400 MATCH_FINISHED: el partido ya terminó."""
     error_code = "MATCH_FINISHED"
+
+class LeagueNotPrivateError(BadRequestError):
+    """Rama 400 LEAGUE_NOT_PRIVATE: la liga no es privada"""
+    error_code = "LEAGUE_NOT_PRIVATE"
 
 class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
@@ -109,6 +121,8 @@ class HostCannotLeaveError(BadRequestError):
 class LeagueAlreadyStartedError(ConflictError):
     """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
     error_code = "LEAGUE_ALREADY_STARTED"
+class InvalidQueryParamsError(BadRequestError):
+    error_code = "INVALID_QUERY_PARAMS"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
