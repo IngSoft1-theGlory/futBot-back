@@ -121,6 +121,10 @@ class LeagueAlreadyStartedError(ConflictError):
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
 
+class BehaviorNotFoundError(NotFoundError):
+    """ Rama 404 específica de comportamientos: el comportamiento no existe"""
+    error_code = "BEHAVIOR_NOT_FOUND"
+    
 class InvalidLineupError(InvalidConfigurationError):
     """Rama 400 INVALID_LINEUP: la formación o alineación para unirse a una liga no es válida."""
     error_code = "INVALID_LINEUP"
