@@ -4,7 +4,7 @@ import copy
 from dataclasses import FrozenInstanceError
 
 import pytest
-from src.engine.state import MatchPlayerState, MatchState, MatchPhase, Score, BallState
+from src.engine._02_to_match.state import MatchPlayerState, MatchState, MatchPhase, Score, BallState
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._01_to_world.pitch import TeamSide, goal_center, opponent_goal_center

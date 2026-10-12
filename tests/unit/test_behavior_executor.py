@@ -9,8 +9,8 @@ import pytest
 
 from src.engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.match_runner import run_tick
+from src.engine._02_to_match.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 from src.engine._01_to_world.pitch import TeamSide
-from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention
 )

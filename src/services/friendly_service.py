@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.match_runner import ExecuteBehavior
-from src.engine.state import MatchInitializationError, MatchState
+from src.engine._02_to_match.state import MatchInitializationError, MatchState
 from src.models import Match, MatchStatus
 from src.core.exceptions import InvalidConfigurationError, InvalidSettingsError, MatchNotFoundError,MatchUnavailableError
 from src.repositories.match_repository import claim_pending_match, get_available_matches, get_behaviors_by_ids, get_lineup_entries, get_match_by_id
