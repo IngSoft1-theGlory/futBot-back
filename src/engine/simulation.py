@@ -26,13 +26,13 @@ Fuera de alcance:
     aplican en orden de player_id ascendente y gana la última patada
     (es determinista, pero no es una decisión de diseño definitiva).
 """
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
-from src.engine.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine.resolve import resolve
-from src.engine.snapshot import build_player_snapshot
-from src.engine.state import MatchState
-from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS
 
+from src.engine._02_to_match.state import MatchState
+from src.engine._03_to_builder.snapshot import build_player_snapshot
+from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS
 
 def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> None:
     """Aplica las intenciones de un tick al `state` global (lo muta in place)."""

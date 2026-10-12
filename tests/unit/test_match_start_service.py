@@ -13,11 +13,11 @@ import asyncio
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from src.engine.behavior_executor import make_execute_behavior
+from src.engine._03_to_builder.behavior_executor import make_execute_behavior
+from src.engine._01_to_world.pitch import TeamSide, starter_position
 from src.engine._01_to_world.data_types import AttributeType, ActionType, Intention
-from src.engine.pitch import TeamSide, starter_position
 from src.engine.simulation import apply_intentions
-from src.engine.state import MatchInitializationError, MatchRegistry
+from src.engine._02_to_match.state import MatchInitializationError, MatchRegistry
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player, Team
 from src.services.match_start_service import (
     launch_match,

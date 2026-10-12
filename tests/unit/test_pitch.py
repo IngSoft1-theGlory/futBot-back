@@ -2,8 +2,8 @@
 
 import pytest
 
+from src.engine._01_to_world.pitch import GOAL_WIDTH, PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
 from src.engine._01_to_world.data_types import Point2D
-from src.engine.pitch import GOAL_WIDTH, PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
 
 CENTRO_Y = PITCH_WIDTH / 2
 
