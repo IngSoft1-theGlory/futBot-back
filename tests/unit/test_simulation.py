@@ -20,7 +20,7 @@ from src.engine._01_to_world.data_types import (
 from src.engine.match_runner import run_tick
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.engine._02_to_match.state import TeamMatchSetup, build_initial_state
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer

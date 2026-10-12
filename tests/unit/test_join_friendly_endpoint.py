@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from src.models import LineupEntry, Match, MatchStatus, Player, Team, User
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.realtime.event_bus import event_bus
 from src.routes import friendly as friendly_routes
 
