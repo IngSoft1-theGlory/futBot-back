@@ -68,10 +68,10 @@ def get_behavior(session: Session, *, user_id: int, behavior_id: int) -> Behavio
 
     behavior = get_behavior_by_id(session, behavior_id)
     if behavior is None:
-        raise BehaviorNotFoundError("El comportamiento seleccionado no existe")
+        raise BehaviorNotFoundError("No existe el comportamiento con el ID especificado")
 
     can_view = behavior.user_id == user_id or behavior.is_default
     if not can_view:
-        raise BehaviorNotFoundError("El comportamiento seleccionado no existe")
+        raise BehaviorNotFoundError("No existe el comportamiento con el ID especificado")
 
     return behavior

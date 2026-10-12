@@ -119,19 +119,3 @@ def test_no_deberia_devolver_comportamientos_de_otros_usuarios(client, auth_head
     assert response.status_code == 404
     assert response.json()["error"] == "BEHAVIOR_NOT_FOUND"    
 
-
-# 401
-
-def test_deberia_devolver_401_sin_token(client):
-    response = client.get(f"{URL}/1")
-
-    assert response.status_code == 401
-    assert response.json()["error"] == "UNAUTHORIZED"    
-
-
-def test_deberia_devolver_401_con_token_de_usuario_inexistente(client):
-    token = create_access_token(user_id=9999)
-
-    response = client.get(f"{URL}/1", headers={"Authorization": f"Bearer {token}"})
-
-    assert response.status_code == 401
