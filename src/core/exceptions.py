@@ -77,10 +77,6 @@ class MatchNotFoundError(NotFoundError):
     """ Rama 404 específica de partidos: el partido no existe"""
     error_code = "MATCH_NOT_FOUND"
 
-class LeagueNotFoundError(NotFoundError):
-    """ Rama 404 específica de ligas: la liga no existe"""
-    error_code = "LEAGUE_NOT_FOUND"   
-
 class MatchNotFinishedError(BadRequestError):
     """Rama 400 MATCH_NOT_FINISHED: el partido existe pero todavía no terminó,
     así que su resultado final aún no está disponible."""
