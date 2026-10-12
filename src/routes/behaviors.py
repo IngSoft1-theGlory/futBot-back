@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from src.core.security import get_current_user
 from src.database.base import get_db
 from src.schemas.behavior import BehaviorResponse
-from src.services.behavior_service import list_behaviors
+from src.services.behavior_service import list_behaviors, get_behavior
 
 router = APIRouter(prefix="/api/v1/behaviors", tags=["behaviors"])
 
@@ -31,3 +31,13 @@ def list_behaviors_endpoint(
 ) -> list[BehaviorResponse]:
     behaviors = list_behaviors(session, user_id=user_id, is_default=is_default)
     return [BehaviorResponse.model_validate(behavior) for behavior in behaviors]
+
+
+@router.get("/{behavior_id}", response_model=BehaviorResponse, status_code=status.HTTP_200_OK)
+def detail_behavior_endpoint(
+    behavior_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> BehaviorResponse:
+    behavior = get_behavior(session, user_id=user_id, behavior_id=behavior_id)
+    return BehaviorResponse.model_validate(behavior)

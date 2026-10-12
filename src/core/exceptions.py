@@ -109,6 +109,10 @@ class InvalidLeagueCapacityError(BadRequestError):
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
 
+class BehaviorNotFoundError(NotFoundError):
+    """ Rama 404 específica de comportamientos: el comportamiento no existe"""
+    error_code = "BEHAVIOR_NOT_FOUND"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
