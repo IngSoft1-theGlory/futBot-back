@@ -33,17 +33,9 @@ from functools import partial
 from sqlalchemy.orm import Session
 
 from src.database.base import SessionLocal
-from src.engine.match_runner import (
-    ApplyIntentions,
-    DetectGoal,
-    ExecuteBehavior,
-    NotifyTick,
-    OnFinished,
-    run_match,
-)
-from src.engine import pitch
-from src.engine.pitch import FORMATION_POSITIONS, TeamSide
-from src.engine.state import (
+from src.engine._01_to_world import pitch
+from src.engine._01_to_world.pitch import FORMATION_POSITIONS, TeamSide
+from src.engine._02_to_match.state import (
     MatchInitializationError,
     MatchPhase,
     MatchRegistry,
@@ -52,6 +44,14 @@ from src.engine.state import (
     attributes_of,
     build_initial_state,
     match_registry,
+)
+from src.engine.match_runner import (
+    ApplyIntentions,
+    DetectGoal,
+    ExecuteBehavior,
+    NotifyTick,
+    OnFinished,
+    run_match,
 )
 from src.engine._01_to_world.metrics import (
     TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, total_ticks_for

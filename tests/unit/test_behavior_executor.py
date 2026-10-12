@@ -7,14 +7,13 @@ Sin base de datos: el partido se arma a mano en memoria.
 
 import pytest
 
-from src.engine.behavior_executor import load_on_tick, make_execute_behavior
+from src.engine._03_to_builder.behavior_executor import make_execute_behavior
+from src.engine.match_runner import run_tick
+from src.engine._02_to_match.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
+from src.engine._01_to_world.pitch import TeamSide
 from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention
 )
-from src.engine.match_runner import run_tick
-from src.engine.pitch import TeamSide
-from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
-
 
 def _player(player_id, team_id, side, x, starter=True):
     return MatchPlayerState(
@@ -52,9 +51,6 @@ def _state():
 RUN_TO_OWN_POSITION = "def on_tick(api):\n    api.run_to(api.get_game_state().my_position, 0.5)"
 IDLE = "def on_tick(api):\n    api.idle()"
 BROKEN = "def on_tick(api):\n    raise RuntimeError('falla')"
-
-
-
 
 def test_deberia_ejecutar_el_on_tick_con_el_api_del_jugador_y_devolver_su_intencion():
     state = _state()

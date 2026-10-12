@@ -48,3 +48,21 @@ def get_leagues(
 
     # Devuelve una lista de tuplas (League, team_count)
     return session.execute(query).all()
+
+def get_league_by_id(
+        session: Session, 
+        league_id: int
+) -> League | None:
+    """ Obtiene una liga por su ID, o None si no existe"""
+    return session.get(League, league_id)
+
+
+def is_team_in_league(session: Session, league_id: int, team_id: int) -> bool:
+    """ Verifica si un equipo esta inscripto en una liga """
+    statement = (
+        select(LineupEntry.entry_id)               # selecciona solo el id de la entrada, no toda la fila
+        .where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id) # filtra por liga y equipo
+        .limit(1)                                  # limita a una sola fila
+    )  
+    # Devuelve true si existe al menos una fila, false si no
+    return session.scalar(statement) is not None
