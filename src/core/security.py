@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from src.config.settings import settings
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from src.core.exceptions import UnauthorizedError
+from src.core.exceptions import InvalidJoinTokenError, JoinTokenExpiredError, UnauthorizedError
 
 import jwt
 import bcrypt
@@ -190,3 +190,23 @@ def create_join_token(user_id: int,  league_id: int, expires_delta: timedelta = 
     encode.update({"exp": expires}) 
     
     return jwt.encode(encode, key=settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_join_token(token: str, user_id: int, league_id: int) -> None:
+    """
+    Valida un join_token: firma, vencimiento, tipo y que haya sido emitido
+    para este usuario y esta liga. Lanza JoinTokenExpiredError o InvalidJoinTokenError.
+    """
+    try:
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise JoinTokenExpiredError("El token de unión a la liga venció")
+    except jwt.InvalidTokenError:
+        raise InvalidJoinTokenError("El token de unión a la liga no es válido")
+
+    if (
+        payload.get("type") != JOIN_LEAGUE
+        or payload.get("sub") != str(user_id)
+        or payload.get("league_id") != league_id
+    ):
+        raise InvalidJoinTokenError("El token de unión a la liga no es válido")

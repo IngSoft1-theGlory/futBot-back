@@ -77,6 +77,10 @@ class MatchNotFoundError(NotFoundError):
     """ Rama 404 específica de partidos: el partido no existe"""
     error_code = "MATCH_NOT_FOUND"
 
+class LeagueNotFoundError(NotFoundError):
+    """ Rama 404 específica de ligas: la liga no existe"""
+    error_code = "LEAGUE_NOT_FOUND"   
+
 class MatchNotFinishedError(BadRequestError):
     """Rama 400 MATCH_NOT_FINISHED: el partido existe pero todavía no terminó,
     así que su resultado final aún no está disponible."""
@@ -102,10 +106,6 @@ class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
     error_code = "INVALID_LEAGUE_CAPACITY"
 
-class LeagueNotFoundError(NotFoundError):
-    """Rama 404 LEAGUE_NOT_FOUND: la liga no existe."""
-    error_code = "LEAGUE_NOT_FOUND"
-
 class TeamNotInLeagueError(NotFoundError):
     """Rama 404 TEAM_NOT_IN_LEAGUE: el equipo no está inscripto en la liga."""
     error_code = "TEAM_NOT_IN_LEAGUE"
@@ -117,8 +117,38 @@ class HostCannotLeaveError(BadRequestError):
 class LeagueAlreadyStartedError(ConflictError):
     """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
     error_code = "LEAGUE_ALREADY_STARTED"
+
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
+
+class InvalidLineupError(InvalidConfigurationError):
+    """Rama 400 INVALID_LINEUP: la formación o alineación para unirse a una liga no es válida."""
+    error_code = "INVALID_LINEUP"
+
+class LeagueUnavailableError(BadRequestError):
+    """Rama 400 LEAGUE_UNAVAILABLE: la liga ya fue iniciada o terminó."""
+    error_code = "LEAGUE_UNAVAILABLE"
+
+class LeagueFullError(ConflictError):
+    """Rama 409 LEAGUE_FULL: la liga alcanzó su cupo máximo de equipos."""
+    error_code = "LEAGUE_FULL"
+
+class AlreadyJoinedError(ConflictError):
+    """Rama 409 ALREADY_JOINED: el equipo ya está inscripto en la liga."""
+    error_code = "ALREADY_JOINED"
+
+class JoinTokenRequiredError(ForbiddenError):
+    """Rama 403 JOIN_TOKEN_REQUIRED: la liga es privada y no se envió join_token."""
+    error_code = "JOIN_TOKEN_REQUIRED"
+
+class JoinTokenExpiredError(ForbiddenError):
+    """Rama 403 JOIN_TOKEN_EXPIRED: el join_token venció."""
+    error_code = "JOIN_TOKEN_EXPIRED"
+
+class InvalidJoinTokenError(ForbiddenError):
+    """Rama 403 INVALID_JOIN_TOKEN: el join_token es inválido o es de otra liga u otro usuario."""
+    error_code = "INVALID_JOIN_TOKEN"
+
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

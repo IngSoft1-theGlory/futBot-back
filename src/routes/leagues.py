@@ -12,19 +12,22 @@ from sqlalchemy.orm import Session
 
 from src.database.base import get_db
 from src.realtime.event_bus import event_bus
-from src.core.security import get_current_user, create_join_token, get_current_user
+from src.core.security import get_current_user, create_join_token
 from src.services.league_service import (
     create_league, 
     list_leagues, 
     check_league_password, 
-    exit_league
+    exit_league,
+    join_league
 )
 from src.schemas.league import (
     VerifyPasswordRequest, 
     VerifyPasswordResponse, 
     CreateLeagueRequest, 
     CreateLeagueResponse,
-    LeagueListOut
+    LeagueListOut,
+    JoinLeagueRequest,
+    JoinLeagueResponse
 )
 
 
@@ -77,9 +80,7 @@ async def create_league_endpoint(
        host_team_id = league.host_team_id
     )
 
-
 @router.delete("/{league_id}/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-
 def exit_league_endpoint(
     league_id: int,
     team_id: int,
@@ -93,7 +94,6 @@ def exit_league_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
-
 def list_leagues_endpoint(
     page: str | None = None,      
     limit: str | None = None,    
@@ -105,7 +105,6 @@ def list_leagues_endpoint(
     return {"leagues": leagues}
 
 @router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
-
 def verify_league_password(
     league_id: int,
     payload: VerifyPasswordRequest,
@@ -118,3 +117,18 @@ def verify_league_password(
         expires_in_seconds=300,
     )
 
+
+@router.post(
+    "/{league_id}/teams",
+    response_model=JoinLeagueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def join_league_endpoint(
+    league_id: int,
+    payload: JoinLeagueRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> JoinLeagueResponse:
+    """Inscribe un equipo en una liga disponible con su configuración táctica."""
+    await run_in_threadpool(join_league, session, user_id, league_id, payload)
+    return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
