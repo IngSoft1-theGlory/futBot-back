@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from src.core.security import get_current_user
 from src.database.base import get_db
 from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly, get_friendly
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.models.match import MatchStatus
 from src.services.match_start_service import launch_match, make_on_finished
 from src.realtime.event_bus import event_bus

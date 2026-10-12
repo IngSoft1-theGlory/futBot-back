@@ -1,8 +1,9 @@
 """
-apply_intentions: la pieza que `run_tick` recibe como `apply_intentions`.
+simulation: aplica las intenciones de TODOS los jugadores al MatchState.
 
-Toma las intenciones de TODOS los jugadores (ya recolectadas sobre el
-mismo snapshot) y las aplica al MatchState global, mutándolo in place.
+`apply_intentions` es la pieza que `run_tick` recibe como `apply_intentions`.
+Las intenciones ya fueron recolectadas sobre el mismo snapshot y se aplican
+al MatchState global, mutándolo in place.
 
 Para cada jugador reutiliza `resolve` (función pura, por jugador):
     snapshot (build_player_snapshot) -> resolve -> se escribe en el
@@ -11,12 +12,12 @@ Para cada jugador reutiliza `resolve` (función pura, por jugador):
         KICK_BALL -> la velocidad de la pelota
         IDLE      -> nada
 
-Orden dentro de un tick: run_tick hace  comportamientos -> apply_intentions
+Orden dentro de un tick: run_tick hace comportamientos -> apply_intentions
 -> detect_goal. Por eso el reinicio tras un gol (la pelota al centro y TODOS
 los jugadores en cancha a su posición inicial) se hace al PRINCIPIO de
 apply_intentions: si se hiciera al final, detect_goal nunca vería el gol.
-Un gol entonces se detecta en el tick en que la pelota entra al arco y el
-reinicio ocurre al comienzo del tick siguiente.
+Un gol se detecta en el tick en que la pelota entra al arco y el reinicio
+ocurre al comienzo del tick siguiente.
 Al final de apply_intentions la pelota avanza según su velocidad (_move_ball).
 
 Fuera de alcance:
@@ -26,13 +27,16 @@ Fuera de alcance:
     aplican en orden de player_id ascendente y gana la última patada
     (es determinista, pero no es una decisión de diseño definitiva).
 """
-from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, detect_goal
-from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
-from src.engine.resolve import resolve
 
+from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
+from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, detect_goal
 from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
-from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS
+from src.engine._04_to_physics.resolve import resolve
+
+
+# ====================================== Aplicación de intenciones ==================================
 
 def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> None:
     """Aplica las intenciones de un tick al `state` global (lo muta in place)."""
@@ -63,6 +67,8 @@ def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> Non
     # Corre ANTES de detect_goal (run_tick), así que el gol se ve en este mismo tick.
     _move_ball(state)
 
+
+# ========================================== Auxiliares =============================================
 
 def _reset_after_goal(state: MatchState) -> None:
     """

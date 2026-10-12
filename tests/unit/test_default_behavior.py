@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from src.default_behaviors import DEFAULT_BEHAVIORS
 from src.engine.match_runner import run_tick
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.engine._02_to_match.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 from src.main import app
 from src.models import Behavior
@@ -22,7 +22,7 @@ from src.default_behaviors import DEFAULT_BEHAVIORS
 from src.engine._03_to_builder.behavior_executor import make_execute_behavior
 from src.engine.match_runner import run_tick
 from src.engine._01_to_world.pitch import TeamSide
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.engine._01_to_world.data_types import (
     AttributeType, Point2D, Vector2D
 )
