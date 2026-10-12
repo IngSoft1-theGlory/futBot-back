@@ -77,10 +77,6 @@ class MatchNotFoundError(NotFoundError):
     """ Rama 404 específica de partidos: el partido no existe"""
     error_code = "MATCH_NOT_FOUND"
 
-class LeagueNotFoundError(NotFoundError):
-    """ Rama 404 específica de ligas: la liga no existe"""
-    error_code = "LEAGUE_NOT_FOUND"   
-
 class MatchNotFinishedError(BadRequestError):
     """Rama 400 MATCH_NOT_FINISHED: el partido existe pero todavía no terminó,
     así que su resultado final aún no está disponible."""
@@ -106,6 +102,21 @@ class InvalidLeagueCapacityError(BadRequestError):
     """Rama 400 INVALID_LEAGUE_CAPACITY: la capacidad elegida no es valida"""
     error_code = "INVALID_LEAGUE_CAPACITY"
 
+class LeagueNotFoundError(NotFoundError):
+    """Rama 404 LEAGUE_NOT_FOUND: la liga no existe."""
+    error_code = "LEAGUE_NOT_FOUND"
+
+class TeamNotInLeagueError(NotFoundError):
+    """Rama 404 TEAM_NOT_IN_LEAGUE: el equipo no está inscripto en la liga."""
+    error_code = "TEAM_NOT_IN_LEAGUE"
+
+class HostCannotLeaveError(BadRequestError):
+    """Rama 400 HOST_CANNOT_LEAVE: el anfitrión no puede abandonar su liga."""
+    error_code = "HOST_CANNOT_LEAVE"
+
+class LeagueAlreadyStartedError(ConflictError):
+    """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
+    error_code = "LEAGUE_ALREADY_STARTED"
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
 
