@@ -7,15 +7,33 @@ from __future__ import annotations
 from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
 from src.core.security import get_current_user, create_join_token, get_current_user
 from src.services.league_service import check_league_password
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
+
 from fastapi.concurrency import run_in_threadpool
-from src.realtime.event_bus import event_bus
-from src.database.base import get_db
+
 from sqlalchemy.orm import Session
+
+from src.database.base import get_db
 from src.realtime.event_bus import event_bus
-from fastapi.concurrency import run_in_threadpool
+from src.core.security import get_current_user, create_join_token
+from src.services.league_service import (
+    create_league, 
+    list_leagues, 
+    check_league_password, 
+    exit_league,
+    join_league
+)
+from src.schemas.league import (
+    VerifyPasswordRequest, 
+    VerifyPasswordResponse, 
+    CreateLeagueRequest, 
+    CreateLeagueResponse,
+    LeagueListOut,
+    JoinLeagueRequest,
+    JoinLeagueResponse
+)
 
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
@@ -67,6 +85,19 @@ async def create_league_endpoint(
        host_team_id = league.host_team_id
     )
 
+@router.delete("/{league_id}/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+def exit_league_endpoint(
+    league_id: int,
+    team_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> Response:
+    """Un equipo no anfitrión abandona la liga antes de que inicie."""
+    exit_league(session, user_id, league_id, team_id)
+
+    # responde 204 No Content, op. exitosa pero no hay contenido para devolver
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 @router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
 def list_leagues_endpoint(
     page: str | None = None,      
@@ -100,3 +131,17 @@ def get_league_endpoint(
 ) -> LeagueDetailOut:
     """Detalle de una liga: lo usa el lobby (PENDING) y la pantalla de la liga iniciada."""
     return get_league_detail(session, user_id, league_id)
+@router.post(
+    "/{league_id}/teams",
+    response_model=JoinLeagueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def join_league_endpoint(
+    league_id: int,
+    payload: JoinLeagueRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> JoinLeagueResponse:
+    """Inscribe un equipo en una liga disponible con su configuración táctica."""
+    await run_in_threadpool(join_league, session, user_id, league_id, payload)
+    return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)

@@ -40,3 +40,7 @@ def list_behaviors_for_user(
         .order_by(Behavior.is_default.desc(), Behavior.behavior_id)
     )
     return list(session.scalars(statement).all())
+
+
+def get_behavior_by_id(session: Session, behavior_id: int) -> Behavior | None:
+    return session.get(Behavior, behavior_id)

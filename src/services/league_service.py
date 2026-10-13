@@ -5,21 +5,32 @@ Logica de negocio para la entidad League.
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
-from src.core.exceptions import InvalidLeagueCapacityError, LeagueNotPrivateError, PasswordIncorrectError, LeagueNotFoundError, InvalidQueryParamsError
-
-from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut
-from src.models.league import League, LeagueStatus
-from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams
-from src.repositories.user_repository import get_user_by_id
-from src.core.security import hash_password, verify_password
+from sqlalchemy import delete, select
 from src.core.exceptions import (
-    InvalidLeagueCapacityError, 
-    LeagueNotPrivateError, 
-    PasswordIncorrectError,
+    AlreadyJoinedError,
+    HostCannotLeaveError,
+    InvalidConfigurationError,
+    InvalidLeagueCapacityError,
+    InvalidLineupError,
     InvalidQueryParamsError,
+    JoinTokenRequiredError,
+    LeagueAlreadyStartedError,
+    LeagueFullError,
     LeagueNotFoundError,
     ForbiddenError,
+    LeagueNotPrivateError,
+    LeagueUnavailableError,
+    NotFoundError,
+    PasswordIncorrectError,
+    TeamNotInLeagueError,
 )
+
+from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut, JoinLeagueRequest
+from src.models.league import League, LeagueStatus
+from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
+from src.repositories.user_repository import get_user_by_id
+from src.core.security import hash_password, verify_join_token, verify_password
+from src.models.lineup_entry import LineupEntry
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -140,11 +151,7 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
         )
         
     return result  
-  
-def validate_league_capacity(max_teams: int) -> None: 
-    if max_teams not in (4, 6, 8, 10, 12):
-        raise InvalidLeagueCapacityError ("El cupo máximo de la liga debe ser un número par entre 4 y 12")
-     
+
 def check_league_password(session: Session, league_id: int, password: str) -> None:
     league = session.get(League, league_id)
 
@@ -188,3 +195,87 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         match_duration=league.match_duration,
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
     )
+def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> None:
+    """Inscribe al equipo en la liga y guarda su alineación en una sola transacción."""
+
+    validate_team_belongs_to_user(session, user_id, payload.team_id)
+
+    # with_for_update bloquea la fila de la liga para que dos inscripciones simultáneas no superen el cupo
+    league = session.scalars(select(League).where(League.league_id == league_id).with_for_update()).first()
+    if league is None:
+        raise NotFoundError("La liga no existe")
+    if league.status != LeagueStatus.PENDING:
+        raise LeagueUnavailableError("La liga ya fue iniciada")
+
+    if league.password_hash is not None:
+        if payload.join_token is None:
+            raise JoinTokenRequiredError("La liga es privada, se requiere un token de unión")
+        verify_join_token(payload.join_token, user_id, league_id)
+
+    # un equipo está inscripto si tiene lineup_entries en la liga
+    enrolled_team_ids = set(session.scalars(
+        select(LineupEntry.team_id).where(LineupEntry.league_id == league_id).distinct()
+    ))
+    if payload.team_id in enrolled_team_ids:
+        raise AlreadyJoinedError("El equipo ya está inscripto en la liga")
+    if len(enrolled_team_ids) >= league.max_teams:
+        raise LeagueFullError("La liga alcanzó su cupo máximo de equipos")
+
+    team_players = validate_min_players(session, payload.team_id)
+    try:
+        validate_lineup(session, payload, team_players)
+    except InvalidConfigurationError as error:
+        raise InvalidLineupError(error.message)
+
+    try:
+        save_lineup(session, None, payload.team_id, payload, league_id)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+
+def exit_league(
+        session: Session, 
+        user_id: int, 
+        league_id: int, 
+        team_id: int
+) -> None:
+    """ 
+    Saca al equipo de la liga borrando sus 6 filas de lineup_entries,
+    en un orden de las validaciones.
+    """
+    # Si no existe la liga, lanza LeagueNotFoundError 404
+    league = get_league_by_id(session, league_id)
+    if league is None:
+        raise LeagueNotFoundError("No existe una liga con el ID especificado.")
+
+    # Se valida que el equipo pertenece al usuario, si no, lanza una excepcion
+    validate_team_belongs_to_user(session, user_id, team_id)
+
+    # Se valida que el equipo esta inscripto en la liga, 
+    # si no lanza TeamNotInLeagueError 404
+    if not is_team_in_league(session, league_id, team_id):
+        raise TeamNotInLeagueError("El equipo no está inscripto en la liga.")
+
+    # Si el equipo es el anfitrion de la liga, no puede abandonarla
+    if league.host_team_id == team_id:
+        raise HostCannotLeaveError("El anfitrión no puede abandonar su liga.")
+
+    # Si la liga ya empezó, no se puede abandonar - 409 LEAGUE_ALREADY_STARTED
+    if league.status != LeagueStatus.PENDING:
+        raise LeagueAlreadyStartedError(
+            "La liga ya no está en estado PENDING, no se puede abandonar.")
+
+    # Si sale todo bien, se borran las filas de LineupEntry y se hace commit
+    # si hay un error se hace rollback y se lanza la excepcion
+    try:
+        delete_stmt = delete(LineupEntry).where(
+            LineupEntry.league_id == league_id,
+            LineupEntry.team_id == team_id
+        )
+        session.execute(delete_stmt)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise

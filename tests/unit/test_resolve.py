@@ -18,7 +18,7 @@ from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
 from src.engine._01_to_world.data_types import (
     Point2D, Vector2D, AttributeType, ActionType, Intention, GameState
 )
-from src.engine.resolve import max_run_distance_per_tick, resolve
+from src.engine._04_to_physics.resolve import max_run_distance_per_tick, resolve
 
 ATTRIBUTES = {
     AttributeType.POWER: 20,
