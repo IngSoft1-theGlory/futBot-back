@@ -247,7 +247,7 @@ def test_deberia_dar_403_si_el_equipo_no_pertenece_al_usuario(session, anfitrion
 
     assert error.value.status_code == 403
 
-def test_deberia_publicar_league_team_joined_si_el_equipo_se_une(client, db, comportamiento):
+def test_deberia_publicar_team_joined_league_si_el_equipo_se_une(client, db, comportamiento):
     liga = crear_liga(db, crear_usuario(db, "host"))
     usuario = crear_usuario(db, "rival")
     body = armar_body(usuario, crear_jugadores(db, usuario.team_id))
@@ -264,7 +264,7 @@ def test_deberia_publicar_league_team_joined_si_el_equipo_se_une(client, db, com
         event_bus.unsubscribe(queue)
  
     assert eventos == [{
-        "event": "LEAGUE_TEAM_JOINED",
+        "event": "TEAM_JOINED_LEAGUE",
         "data": {"league_id": liga.league_id, "team_id": usuario.team_id},
     }]
  

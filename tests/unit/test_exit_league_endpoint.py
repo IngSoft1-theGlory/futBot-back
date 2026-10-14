@@ -125,7 +125,7 @@ def test_deberia_devolver_409_league_already_started_si_la_liga_no_esta_pending(
     assert filas(db, liga, inscripto.team_id) == 6          # el equipo sigue con sus 6 filas de inscripción en la liga
 
 
-def test_deberia_publicar_league_team_left_si_el_equipo_abandona(client, liga, inscripto):
+def test_deberia_publicar_leave_lobby_league_si_el_equipo_abandona(client, liga, inscripto):
     queue = event_bus.subscribe()
 
     try:
@@ -139,7 +139,7 @@ def test_deberia_publicar_league_team_left_si_el_equipo_abandona(client, liga, i
         event_bus.unsubscribe(queue)
 
     assert eventos == [{
-        "event": "LEAGUE_TEAM_LEFT",
+        "event": "LEAVE_LOBBY_LEAGUE",
         "data": {"league_id": liga.league_id, "team_id": inscripto.team_id},
     }]
 

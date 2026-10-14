@@ -100,8 +100,8 @@ async def exit_league_endpoint(
     """Un equipo no anfitrión abandona la liga antes de que inicie."""
     await run_in_threadpool(exit_league, session, user_id, league_id, team_id)
 
-    # después de hacer commit, aviso a los suscriptores del evento LEAGUE_TEAM_EXITED
-    event_bus.publish("LEAGUE_TEAM_LEFT", {
+    # después de hacer commit, aviso a los suscriptores del evento LLEAVE_LOBBY_LEAGUE
+    event_bus.publish("LEAVE_LOBBY_LEAGUE", {
         "league_id": league_id,
         "team_id": team_id,
     })
@@ -157,8 +157,8 @@ async def join_league_endpoint(
     """Inscribe un equipo en una liga disponible con su configuración táctica."""
     await run_in_threadpool(join_league, session, user_id, league_id, payload)
 
-    # después de hacer commit, aviso a los suscriptores del evento LEAGUE_TEAM_JOINED
-    event_bus.publish("LEAGUE_TEAM_JOINED", {
+    # después de hacer commit, aviso a los suscriptores del evento TEAM_JOINED_LEAGUE
+    event_bus.publish("TEAM_JOINED_LEAGUE", {
         "league_id": league_id,
         "team_id": payload.team_id,
     })
