@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from src.models import League, LeagueStatus, LineupEntry
+from src.models import League, LeagueStatus, LineupEntry, Team
 
 
 def get_leagues(
@@ -49,13 +49,27 @@ def get_leagues(
     # Devuelve una lista de tuplas (League, team_count)
     return session.execute(query).all()
 
-def get_league_by_id(
-        session: Session, 
-        league_id: int
-) -> League | None:
-    """ Obtiene una liga por su ID, o None si no existe"""
+
+def get_league_by_id(session: Session, league_id: int) -> League | None:
+    """Devuelve la liga con ese id, o None si no existe."""
     return session.get(League, league_id)
 
+
+def get_league_teams(session: Session, league_id: int) -> list[Team]:
+    """
+    Devuelve los equipos inscriptos en la liga (los que tienen filas en
+    lineup_entries con ese league_id), sin duplicados y en orden de inscripcion.
+    Cada equipo tiene 6 filas, por eso se agrupa por equipo y se ordena por su
+    primera fila: el anfitrion queda primero porque su alineacion se guarda al crear la liga.
+    """
+    query = (
+        select(Team)
+        .join(LineupEntry, LineupEntry.team_id == Team.team_id)
+        .where(LineupEntry.league_id == league_id)
+        .group_by(Team.team_id)
+        .order_by(func.min(LineupEntry.entry_id))
+    )
+    return list(session.scalars(query).all())
 
 def is_team_in_league(session: Session, league_id: int, team_id: int) -> bool:
     """ Verifica si un equipo esta inscripto en una liga """
