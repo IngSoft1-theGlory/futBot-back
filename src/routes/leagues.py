@@ -4,7 +4,12 @@ Rutas relacionadas con ligas.
 
 from __future__ import annotations
 
+from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
+from src.core.security import get_current_user, create_join_token, get_current_user
+from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
+from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
+from src.services.league_service import create_league, list_leagues, get_league_detail
 
 from fastapi.concurrency import run_in_threadpool
 
@@ -129,6 +134,14 @@ def verify_league_password(
     )
 
 
+@router.get("/{league_id}", response_model=LeagueDetailOut)
+def get_league_endpoint(
+    league_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueDetailOut:
+    """Detalle de una liga: lo usa el lobby (PENDING) y la pantalla de la liga iniciada."""
+    return get_league_detail(session, user_id, league_id)
 @router.post(
     "/{league_id}/teams",
     response_model=JoinLeagueResponse,

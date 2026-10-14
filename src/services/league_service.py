@@ -17,6 +17,7 @@ from src.core.exceptions import (
     LeagueAlreadyStartedError,
     LeagueFullError,
     LeagueNotFoundError,
+    ForbiddenError,
     LeagueNotPrivateError,
     LeagueUnavailableError,
     NotFoundError,
@@ -24,11 +25,12 @@ from src.core.exceptions import (
     TeamNotInLeagueError,
 )
 
-from src.schemas.league import CreateLeagueRequest, JoinLeagueRequest, LeagueOut
+from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut, JoinLeagueRequest
 from src.models.league import League, LeagueStatus
-from src.models.lineup_entry import LineupEntry
-from src.repositories.league_repository import get_leagues, get_league_by_id, is_team_in_league
+from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
+from src.repositories.user_repository import get_user_by_id
 from src.core.security import hash_password, verify_join_token, verify_password
+from src.models.lineup_entry import LineupEntry
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -163,6 +165,36 @@ def check_league_password(session: Session, league_id: int, password: str) -> No
         raise PasswordIncorrectError("La contraseña ingresada no es correcta")
 
 
+def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueDetailOut:
+    """
+    Devuelve el detalle de una liga en cualquier estado (lobby o liga iniciada).
+    404 LEAGUE_NOT_FOUND si no existe; 403 UNAUTHORIZED_ACTION si es privada
+    y el equipo del usuario no esta inscripto.
+    """
+    league = get_league_by_id(session, league_id)
+    if league is None:
+        raise LeagueNotFoundError("No existe la liga con el ID especificado.")
+
+    teams = get_league_teams(session, league_id)
+    is_private = league.password_hash is not None
+
+    # una liga privada solo la pueden ver los equipos inscriptos
+    if is_private:
+        user = get_user_by_id(session, user_id)
+        if user is None or all(team.team_id != user.team_id for team in teams):
+            raise ForbiddenError("No se permite ver el estado de esta liga")
+
+    return LeagueDetailOut(
+        league_id=league.league_id,
+        league_name=league.league_name,
+        status=league.status,
+        is_private=is_private,
+        host_team_id=league.host_team_id,
+        max_teams=league.max_teams,
+        current_teams_count=len(teams),
+        match_duration=league.match_duration,
+        teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
+    )
 def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> None:
     """Inscribe al equipo en la liga y guarda su alineación en una sola transacción."""
 
