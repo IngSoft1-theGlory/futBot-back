@@ -85,15 +85,26 @@ async def create_league_endpoint(
        host_team_id = league.host_team_id
     )
 
-@router.delete("/{league_id}/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-def exit_league_endpoint(
+@router.delete(
+        "/{league_id}/teams/{team_id}", 
+        status_code=status.HTTP_204_NO_CONTENT, 
+        response_class=Response,
+)
+
+async def exit_league_endpoint(
     league_id: int,
     team_id: int,
     user_id: int = Depends(get_current_user),
     session: Session = Depends(get_db),
 ) -> Response:
     """Un equipo no anfitrión abandona la liga antes de que inicie."""
-    exit_league(session, user_id, league_id, team_id)
+    await run_in_threadpool(exit_league, session, user_id, league_id, team_id)
+
+    # después de hacer commit, aviso a los suscriptores del evento LLEAVE_LOBBY_LEAGUE
+    event_bus.publish("LEAVE_LOBBY_LEAGUE", {
+        "league_id": league_id,
+        "team_id": team_id,
+    })
 
     # responde 204 No Content, op. exitosa pero no hay contenido para devolver
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -136,6 +147,7 @@ def get_league_endpoint(
     response_model=JoinLeagueResponse,
     status_code=status.HTTP_201_CREATED,
 )
+
 async def join_league_endpoint(
     league_id: int,
     payload: JoinLeagueRequest,
@@ -144,4 +156,10 @@ async def join_league_endpoint(
 ) -> JoinLeagueResponse:
     """Inscribe un equipo en una liga disponible con su configuración táctica."""
     await run_in_threadpool(join_league, session, user_id, league_id, payload)
+
+    # después de hacer commit, aviso a los suscriptores del evento TEAM_JOINED_LEAGUE
+    event_bus.publish("TEAM_JOINED_LEAGUE", {
+        "league_id": league_id,
+        "team_id": payload.team_id,
+    })
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)

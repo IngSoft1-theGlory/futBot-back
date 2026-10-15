@@ -8,10 +8,11 @@ import pytest
 from sqlalchemy import func, select
 
 from src.models import League, LeagueStatus, LineupEntry, Team, User
+from src.realtime.event_bus import event_bus
 
 # Reutiliza fixtures (db, client, usuario, comportamiento) y helpers del test de crear amistoso
 from tests.unit.test_post_friendly_endpoint import (  
-    client, comportamiento, crear_jugadores, db, headers, usuario,
+    client, comportamiento, crear_jugadores, db, headers, usuario
 )
 
 
@@ -122,3 +123,23 @@ def test_deberia_devolver_409_league_already_started_si_la_liga_no_esta_pending(
     assert r.status_code == 409
     assert r.json()["error"] == "LEAGUE_ALREADY_STARTED"    # la liga ya no esta en PENDING, no se puede abandonar
     assert filas(db, liga, inscripto.team_id) == 6          # el equipo sigue con sus 6 filas de inscripción en la liga
+
+
+def test_deberia_publicar_leave_lobby_league_si_el_equipo_abandona(client, liga, inscripto):
+    queue = event_bus.subscribe()
+
+    try:
+        # El cliente realiza una peticion DELETE al endpoint para que el equipo abandone la liga
+        # se pasa direccion y headers de atentificacion de usuario inscripto, guardando la respuesta en `r`
+        r = client.delete(url(liga.league_id, inscripto.team_id), headers=headers(inscripto))
+        assert r.status_code == 204
+        # La salida fue exitosa, por lo que debe llegar un único evento.
+        eventos = [queue.get_nowait() for _ in range(queue.qsize())]
+    finally: # aseguro que se desuscriba del bus aunque falle el test, para no afectar otros tests
+        event_bus.unsubscribe(queue)
+
+    assert eventos == [{
+        "event": "LEAVE_LOBBY_LEAGUE",
+        "data": {"league_id": liga.league_id, "team_id": inscripto.team_id},
+    }]
+

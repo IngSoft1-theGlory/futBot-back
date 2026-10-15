@@ -17,7 +17,9 @@ from src.models.league import League
 from src.schemas.league import JoinLeagueRequest
 from src.services.league_service import join_league
 from src.services.user_service import create_user_with_team
+from src.realtime.event_bus import event_bus
 
+from tests.unit.test_post_friendly_endpoint import client, comportamiento, db, headers
 
 def crear_usuario(session, nombre):
     return create_user_with_team(
@@ -244,3 +246,39 @@ def test_deberia_dar_403_si_el_equipo_no_pertenece_al_usuario(session, anfitrion
         join_league(session, usuario.user_id, liga.league_id, body)
 
     assert error.value.status_code == 403
+
+def test_deberia_publicar_team_joined_league_si_el_equipo_se_une(client, db, comportamiento):
+    liga = crear_liga(db, crear_usuario(db, "host"))
+    usuario = crear_usuario(db, "rival")
+    body = armar_body(usuario, crear_jugadores(db, usuario.team_id))
+    # Suscribe el test para capturar los eventos publicados en el bus de eventos
+    queue = event_bus.subscribe()
+    try:
+        # El equipo solicita unirse a la liga mediante el endpoint, guardando la respuesta en `r`
+        r = client.post(f"/api/v1/leagues/{liga.league_id}/teams", json=body.model_dump(), headers=headers(usuario))
+        assert r.status_code == 201
+        # Lee los eventos recibidos y luego se valida su contenido.
+        eventos = [queue.get_nowait() for _ in range(queue.qsize())]
+    finally:
+        # Evita que la suscripción afecte a otros tests.
+        event_bus.unsubscribe(queue)
+ 
+    assert eventos == [{
+        "event": "TEAM_JOINED_LEAGUE",
+        "data": {"league_id": liga.league_id, "team_id": usuario.team_id},
+    }]
+ 
+ 
+def test_no_deberia_publicar_nada_si_la_liga_no_existe(client, db, comportamiento):
+    usuario = crear_usuario(db, "rival")
+    body = armar_body(usuario, crear_jugadores(db, usuario.team_id))
+    # Suscribe el test para comprobar que no se emitan eventos.
+    queue = event_bus.subscribe()
+    try:
+        # Intenta unirse a una liga inexistente.
+        r = client.post("/api/v1/leagues/9999/teams", json=body.model_dump(), headers=headers(usuario))
+        assert r.status_code == 404
+        assert queue.qsize() == 0
+    finally:
+        # Libera la suscripción para no afectar otros tests.
+        event_bus.unsubscribe(queue)
