@@ -27,7 +27,7 @@ def create_friendly(session: Session, user_id: int, payload: CreateFriendlyReque
     validate_team_belongs_to_user(session, user_id, payload.team_id)
     validate_match_duration(payload.match_duration)
     team_players = validate_min_players(session, payload.team_id)
-    validate_lineup(session, payload, team_players)
+    validate_lineup(session, payload, team_players, user_id)
 
     try:
         # el match y los 6 lineup entries se crean aca: si uno falla,
@@ -108,7 +108,7 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
         raise InvalidSettingsError("El equipo no puede unirse a su propio partido.")
 
     team_players = validate_min_players(session, payload.team_id)
-    validate_lineup(session, payload, team_players)
+    validate_lineup(session, payload, team_players, user_id)
 
     try:
         # UPDATE condicional: si otro equipo se unio entre el chequeo de arriba

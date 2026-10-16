@@ -33,7 +33,7 @@ FORMATION_ROLES = {
 
 # Guardar alineación en la DB (league_id: int | None porque puede ser null, como match_id)
 # Pero el = None es para q python lo tome como None por defecto si no se especifica al llamar a save_lineup (asi no rompo nada de lo que hicimos antes de implementar ligas))
-def save_lineup(session: Session, match_id:int | None, team_id: int, config: LineupConfig, league_id:int | None = None) -> None:
+def save_lineup(session: Session, match_id:int | None, team_id: int, config: LineupConfig, league_id: int | None = None) -> None:
     """Se usa cada vez que un equipo confirma su alineación para un partido o liga:
     el anfitrión al crearlos, los rivales al unirse.
     Antes hay que llamar a validate_lineup, y el partido/liga ya tiene que tener su id (flush).
@@ -133,9 +133,8 @@ def _check_players(config: LineupConfig, team_players: list) -> None:
             raise InvalidConfigurationError("Los jugadores seleccionados no pertenecen al equipo del usuario autenticado")
 
 
-def _check_behaviors(session: Session, config: LineupConfig) -> None:
-    """Falla si algún behavior_id no existe o el usuario no puede usarlo.
-    (en un futuro, cuando se puedan crear comportamientos, chequear si es de otro usuario o no es default)"""
+def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> None:
+    """Falla si algún behavior_id no existe o el usuario no puede usarlo."""
     # guardo todos los behavior_id de titulares y suplentes en una lista (pueden venir repetidos)
     behavior_ids = []
     for starter in config.starting_players:
@@ -148,16 +147,17 @@ def _check_behaviors(session: Session, config: LineupConfig) -> None:
     # me quedo solo con los ids que el usuario puede usar
     usable_ids = []
     for behavior in behaviors:
-        if behavior.is_default:
+        if behavior.is_default or behavior.user_id == user_id:
             usable_ids.append(behavior.behavior_id)
+
     # si alguno de los pedidos no está entre los usables (porque no existe o no es default), lo rechazo
     for behavior_id in behavior_ids:
         if behavior_id not in usable_ids:
             raise InvalidConfigurationError("Los comportamientos seleccionados no son válidos para el usuario autenticado")
 
 
-def validate_lineup(session: Session, config: LineupConfig, team_players: list) -> None:
+def validate_lineup(session: Session, config: LineupConfig, team_players: list, user_id: int) -> None:
     """400 INVALID_CONFIGURATION si algo de la alineación está mal."""
     _check_formation_and_roles(config)
     _check_players(config, team_players)
-    _check_behaviors(session, config)
+    _check_behaviors(session, config, user_id)

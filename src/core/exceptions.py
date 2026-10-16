@@ -124,6 +124,10 @@ class InvalidQueryParamsError(BadRequestError):
 class BehaviorNotFoundError(NotFoundError):
     """ Rama 404 específica de comportamientos: el comportamiento no existe"""
     error_code = "BEHAVIOR_NOT_FOUND"
+
+class InvalidData(BadRequestError):
+    """ Rama 400 INVALID_DATA: datos invalidos para crear o actualizar comportamiento """
+    error_code = "INVALID_DATA" 
     
 class InvalidLineupError(InvalidConfigurationError):
     """Rama 400 INVALID_LINEUP: la formación o alineación para unirse a una liga no es válida."""

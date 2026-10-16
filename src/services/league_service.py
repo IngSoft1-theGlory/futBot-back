@@ -47,7 +47,7 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
     validate_match_duration(payload.match_duration)
     validate_league_capacity(payload.max_teams)
     team_players = validate_min_players(session, payload.team_id)
-    validate_lineup(session, payload, team_players)
+    validate_lineup(session, payload, team_players, user_id)
     
     password_hash = hash_password(payload.password) if payload.password else None 
 
@@ -223,7 +223,7 @@ def join_league(session: Session, user_id: int, league_id: int, payload: JoinLea
 
     team_players = validate_min_players(session, payload.team_id)
     try:
-        validate_lineup(session, payload, team_players)
+        validate_lineup(session, payload, team_players, user_id)
     except InvalidConfigurationError as error:
         raise InvalidLineupError(error.message)
 
