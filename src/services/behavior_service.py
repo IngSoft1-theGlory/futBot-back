@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from src.core.exceptions import UnauthorizedError, InvalidQueryParamsError, BehaviorNotFoundError, InvalidData
+from src.core.exceptions import UnauthorizedError, InvalidQueryParamsError, BehaviorNotFoundError, InvalidData, ForbiddenError
 from src.models.behavior import Behavior
 from src.repositories.behavior_repository import list_behaviors_for_user, get_behavior_by_id
 from src.repositories.user_repository import get_user_by_id
@@ -28,6 +28,31 @@ def create_behavior(session: Session, user_id: int, payload: CreateUpdateBehavio
         session.rollback() # hubo un problema, no guardo el behavior
         raise
     return behavior
+
+
+def update_behavior(payload: CreateUpdateBehaviorRequest, user_id: int, behavior_id: int, session: Session) -> Behavior: 
+    behavior = session.get(Behavior, behavior_id) # busco el comportamiento que quiero actualizar en la db
+
+    if behavior is None or (not behavior.is_default and behavior.user_id != user_id): 
+        raise BehaviorNotFoundError("No existe el comportamiento con el ID especificado") # aclaro "not is_default" porque los default nunca tienen user_id
+    
+    if behavior.is_default:
+        raise ForbiddenError("No se puede modificar un comportamiento predeterminado")
+    
+    validate_fields(payload.name, payload.description, payload.code)
+    
+    try:
+        behavior.name = payload.name
+        behavior.description = payload.description
+        behavior.code = payload.code
+        session.commit() # no hago add pq ya existe en la db
+
+    except Exception: 
+        session.rollback() 
+        raise
+
+    return behavior
+
 
 def validate_fields(name: str, description: str, code: str) -> None:
     if not name.strip() or not description.strip() or not code.strip(): 
