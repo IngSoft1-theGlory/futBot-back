@@ -8,6 +8,8 @@ from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.data_types import Intention
+from src.engine._01_to_world.data_types import Point2D, Vector2D
+import math 
 
 def make_execute_behavior(codes: dict[int, str]):
     """
@@ -45,8 +47,12 @@ def load_on_tick(code: str):
     """
     Convierte el texto de un comportamiento en su función on_tick
     """
-    
-    namespace = {}
+    # Funciones que el comportamiento puede usar. Todo lo que no este aca no esta permitido: no se rechaza al guardar, pero falla al intentar ejecutar
+    my_builtins = {"abs": abs, "min": min, "max": max, "len": len, "round": round, "float": float, "int": int, "sum": sum, "bool": bool, "str": str, "list": list, "tuple": tuple, "dict": dict, "any": any, "all": all, "sorted": sorted,} 
+
+    # Nombres disponibles para el código mientras corre. Como no puede hacer import, math, Point2D y Vector2D se le dan ya cargados
+    namespace = {"__builtins__": my_builtins, "math": math, "Point2D": Point2D, "Vector2D": Vector2D}
+
     # exec ejecuta el texto del comportamiento como si fuera código Python.
     exec(code, namespace)  # ese texto contiene `def on_tick(api): ...`, y al ejecutarse queda guardado en namespace
 

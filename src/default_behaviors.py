@@ -42,8 +42,6 @@ def on_tick(api):
 """
 
 DEFENSIVE = """
-from src.engine._01_to_world.data_types import Point2D
-
 GUARD_DISTANCE = 15   # a cuantos metros de mi arco me paro
 DANGER_ZONE = 30      # si la pelota esta mas cerca que esto de mi arco, salgo a buscarla
 
