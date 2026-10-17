@@ -223,7 +223,7 @@ def test_deberia_no_guardar_nada_si_no_se_hace_commit(session, local, partido, c
     config = armar_config(jugadores, comportamiento)
     id_partido = partido.match_id
 
-    save_lineup(session, id_partido, local.team_id, config, 1)
+    save_lineup(session, id_partido, local.team_id, config)
     session.rollback()  # deshago sin haber hecho commit
 
     # si save_lineup hubiera hecho commit, aca habrian 6 entradas

@@ -150,7 +150,7 @@ def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> No
         if behavior.is_default or behavior.user_id == user_id:
             usable_ids.append(behavior.behavior_id)
 
-    # si alguno de los pedidos no está entre los usables (porque no existe o no es default), lo rechazo
+    # si alguno de los pedidos no está entre los usables, lo rechazo
     for behavior_id in behavior_ids:
         if behavior_id not in usable_ids:
             raise InvalidConfigurationError("Los comportamientos seleccionados no son válidos para el usuario autenticado")
