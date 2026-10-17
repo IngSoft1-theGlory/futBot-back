@@ -133,7 +133,7 @@ def test_deberia_aceptar_una_alineacion_valida(session, local, comportamiento):
     jugadores = crear_jugadores(session, local)
     config = armar_config(jugadores, comportamiento)
 
-    validate_lineup(session, config, jugadores)
+    validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_la_formacion_no_existe(session, local, comportamiento):
@@ -142,7 +142,7 @@ def test_deberia_fallar_si_la_formacion_no_existe(session, local, comportamiento
 
     config.formation_type = "9-9"
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_no_hay_3_titulares_y_3_suplentes(session, local, comportamiento):
@@ -151,7 +151,7 @@ def test_deberia_fallar_si_no_hay_3_titulares_y_3_suplentes(session, local, comp
 
     config.substitute_players.pop()  # quedan solo 2 suplentes
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_un_rol_esta_repetido(session, local, comportamiento):
@@ -161,7 +161,7 @@ def test_deberia_fallar_si_un_rol_esta_repetido(session, local, comportamiento):
     # quedan DEF_LEFT, DEF_LEFT y FORWARD: falta DEF_RIGHT
     config.starting_players[1].role = "DEF_LEFT"
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_un_jugador_esta_repetido(session, local, comportamiento):
@@ -171,7 +171,7 @@ def test_deberia_fallar_si_un_jugador_esta_repetido(session, local, comportamien
     # un suplente con el mismo jugador que el primer titular
     config.substitute_players[0].player_id = config.starting_players[0].player_id
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_un_jugador_no_pertenece_al_equipo(session, local, visitante, comportamiento):
@@ -181,7 +181,7 @@ def test_deberia_fallar_si_un_jugador_no_pertenece_al_equipo(session, local, vis
 
     config.starting_players[0].player_id = ajeno.player_id
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_fallar_si_un_comportamiento_no_existe(session, local, comportamiento):
@@ -190,7 +190,7 @@ def test_deberia_fallar_si_un_comportamiento_no_existe(session, local, comportam
 
     config.starting_players[0].behavior_id = 9999
     with pytest.raises(InvalidConfigurationError):
-        validate_lineup(session, config, jugadores)
+        validate_lineup(session, config, jugadores, 1)
 
 
 def test_deberia_guardar_3_titulares_con_rol_y_3_suplentes_sin_rol(session, local, partido, comportamiento):
@@ -223,7 +223,7 @@ def test_deberia_no_guardar_nada_si_no_se_hace_commit(session, local, partido, c
     config = armar_config(jugadores, comportamiento)
     id_partido = partido.match_id
 
-    save_lineup(session, id_partido, local.team_id, config)
+    save_lineup(session, id_partido, local.team_id, config, 1)
     session.rollback()  # deshago sin haber hecho commit
 
     # si save_lineup hubiera hecho commit, aca habrian 6 entradas

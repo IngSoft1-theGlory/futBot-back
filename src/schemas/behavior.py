@@ -23,3 +23,9 @@ class BehaviorResponse(BaseModel):
     description: str
     code: str
     is_default: bool
+
+
+class CreateUpdateBehaviorRequest(BaseModel):
+    name: str 
+    description: str 
+    code: str
