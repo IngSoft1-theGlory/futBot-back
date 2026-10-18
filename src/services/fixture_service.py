@@ -46,10 +46,13 @@ def build_round_robin(team_ids: list[int]) -> list[list[tuple[int, int]]]:
 
 def generate_fixture(session: Session, league: League) -> list[Match]:
     """
-    Crea los partidos de la liga ( N(N-1)/2 Match )
+    Genera todos los partidos de una liga mediante un calendario
+    todos contra todos, asignando los equipos locales y visitantes,
+    la fecha correspondiente y la duración de cada partido.
 
-    Aclaracion : NO hace commit ni cambia el estado de la liga, eso lo hace quien la llama 
-    (ticket Iniciar liga), para que todo sea una sola transacción.
+    Los partidos se agregan a la sesion y se ejecuta un flush para
+    asignar sus IDs, pero no se realiza commit ni se modifica el estado
+    de la liga. 
     """
 
     # se obtiene la lista de equipos inscriptos en la liga y se extraen sus IDs
@@ -81,7 +84,7 @@ def generate_fixture(session: Session, league: League) -> list[Match]:
     # se agregan todos los partidos a la sesión y se hace flush para que se asignen los IDs
     # pero no se hace commit, para que todo sea una sola transacción
     session.add_all(matches)
-    session.flush() 
+    session.flush() # 
 
     # retorna la lista de partidos generados, con sus IDs asignados por la base de datos
     return matches
