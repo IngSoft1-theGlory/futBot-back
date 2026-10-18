@@ -52,6 +52,10 @@ def get_available_matches(
         select(Match)
         .options(selectinload(Match.host_team), selectinload(Match.away_team))
         .where(Match.status == status)
+        # Agregado en el ticket "Generar fixture de la liga", los partidos de liga viven
+        # en esta misma tabla y aparecían en la lista de amistosos. Este filtro le
+        # corresponde al ticket del buscador; si lo implementás, ya está hecho aca.
+        .where(Match.league_id.is_(None))
     )
 
     match_query = (
@@ -85,3 +89,15 @@ def claim_pending_match(session: Session, match_id: int, away_team_id: int) -> b
     )
     result = session.execute(statement)
     return result.rowcount == 1 ##las filas que modifico, si es 0 es porque no cumplio una condicion y es 1 si salio todo bien y se unio al partido
+
+def get_league_fixture(session: Session, league_id: int) -> list[Match]:
+    """ 
+    Devuelve todos los partidos de la liga, ordenados por fecha y match_id.
+    """
+    statement = (   # statement es un objeto que representa la consulta SQL que se va a ejecutar
+        select(Match)   # selecciona todos los partidos
+        .options(selectinload(Match.host_team), selectinload(Match.away_team)) # carga los equipos anfitrion y visitante de cada partido
+        .where(Match.league_id == league_id)    # filtra los partidos de la liga especificada
+        .order_by(Match.round_number, Match.match_id)   # ordena los partidos por numero de fecha y match_id
+    )
+    return list(session.scalars(statement).all())

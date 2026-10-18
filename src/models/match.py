@@ -48,7 +48,11 @@ class Match(Base):
     # NULL = amistoso, con valor = partido de esa liga
     league_id: Mapped[Optional[int]] = mapped_column(
     ForeignKey("leagues.league_id", ondelete="CASCADE"), nullable=True, index=True)
-
+    
+    # Numero de fecha en la que se juega el partido
+    # El numero de fecha es Null en amistoso
+    round_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
     # Duracion configurada por el creador del amistoso 
     match_duration: Mapped[int] = mapped_column(Integer, nullable=False)
 
