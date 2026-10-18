@@ -67,7 +67,7 @@ class LeagueDetailOut(BaseModel):
     # por ahora siempre vacios: su contenido lo definen los tickets de tabla y fixture
     ranking: list = Field(default_factory=list)
     fixture: list = Field(default_factory=list)
-      
+
 class JoinLeagueRequest(LineupConfig):
     team_id: int
     join_token: str | None = None # solo requerido para ligas privadas
@@ -75,3 +75,19 @@ class JoinLeagueRequest(LineupConfig):
 class JoinLeagueResponse(BaseModel):
     league_id: int
     team_id: int
+
+class FixtureTeamOut(BaseModel):
+    team_id: int
+    team_name: str
+
+class FixtureScoreOut(BaseModel):
+    home: int
+    away: int
+
+class FixtureMatchOut(BaseModel):
+    match_id: int
+    round_number: int
+    status: str
+    team_host: FixtureTeamOut
+    team_away: FixtureTeamOut
+    score: FixtureScoreOut 
