@@ -29,3 +29,10 @@ class MatchStateResponse(BaseModel):
     total_ticks: int
     score: ScoreOut
     players: list[MatchPlayerOut]
+
+class ChangeBehaviorRequest(BaseModel): 
+    behavior_id: int 
+
+class ChangeBehaviorResponse(BaseModel): 
+    player_id: int 
+    behavior_id: int
