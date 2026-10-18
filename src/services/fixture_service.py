@@ -84,7 +84,7 @@ def generate_fixture(session: Session, league: League) -> list[Match]:
     # se agregan todos los partidos a la sesión y se hace flush para que se asignen los IDs
     # pero no se hace commit, para que todo sea una sola transacción
     session.add_all(matches)
-    session.flush() # 
+    session.flush()
 
     # retorna la lista de partidos generados, con sus IDs asignados por la base de datos
     return matches
