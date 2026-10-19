@@ -30,7 +30,7 @@ async def get_match_state_endpoint(
 
 
 @router.put("/{match_id}/players/{player_id}/behavior", response_model=ChangeBehaviorResponse)
-def change_behavior_on_match_endpoint(
+async def change_behavior_on_match_endpoint(
     payload: ChangeBehaviorRequest,
     player_id: int,
     match_id: int,
@@ -38,8 +38,12 @@ def change_behavior_on_match_endpoint(
     session: Session = Depends(get_db),
 ) -> ChangeBehaviorResponse:
 
-    team_id, code = team_id, code = validate_behavior_change(session, user_id, match_id, payload.behavior_id)
+    # consulta la base, que es lento. es en un hilo aparte y con await para
+    # no frenar al event loop mientras espera
+    team_id, code = await run_in_threadpool(validate_behavior_change, session, user_id, match_id, payload.behavior_id)
 
+    # cambio en memoria, que es rapido. sin await, asi corre de corrido
+    # y el motor no puede correr un tick a la mitad del cambio
     apply_behavior_change(match_id, team_id, code, player_id, payload.behavior_id)
 
     return ChangeBehaviorResponse(player_id=player_id, behavior_id=payload.behavior_id)
