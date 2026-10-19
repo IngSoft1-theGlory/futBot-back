@@ -29,9 +29,10 @@ from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, 
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
 from src.repositories.user_repository import get_user_by_id
-from src.repositories.match_repository import get_league_fixture
+from src.repositories.match_repository import get_league_fixture, get_finished_league_matches
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
+from src.services.standings_service import build_standings
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -190,7 +191,7 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
     fixture = [
         FixtureMatchOut(
             match_id=partido.match_id,
-            # Se agrega el numero de fecha en la que se juega el partido, si es un amistoso, es None y el estado es PENDING
+            # se agrega el numero de fecha y el estado del partido, que puede ser PENDING, IN_PROGRESS o FINISHED
             round_number=partido.round_number,
             status=partido.status,
             # Se agregan los datos de los equipos y el resultado del partido
@@ -201,6 +202,11 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         )
         for partido in partidos     
     ]
+
+    # Si la liga ya empezó, se calculan los puntos de cada equipo y se ordena por puntos, diferencia de goles y goles a favor
+    ranking = []
+    if league.status != LeagueStatus.PENDING:
+        ranking = build_standings(teams, get_finished_league_matches(session, league_id))
 
     return LeagueDetailOut(
         league_id=league.league_id,
@@ -213,6 +219,7 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         match_duration=league.match_duration,
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
         fixture=fixture,    
+        ranking=ranking
     )
 
 

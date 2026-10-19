@@ -47,34 +47,9 @@ class VerifyPasswordResponse(BaseModel):
     join_token: str
     expires_in_seconds: int
 
-
 class LeagueTeamOut(BaseModel):
     team_id: int
     team_name: str
-
-
-class LeagueDetailOut(BaseModel):
-    """Respuesta de GET /api/v1/leagues/{leagueId}: sirve para el lobby y para la liga iniciada."""
-    league_id: int
-    league_name: str
-    status: LeagueStatus
-    is_private: bool
-    host_team_id: int
-    max_teams: int
-    current_teams_count: int
-    match_duration: int
-    teams: list[LeagueTeamOut]
-    # por ahora siempre vacios: su contenido lo definen los tickets de tabla y fixture
-    ranking: list = Field(default_factory=list)
-    fixture: list = Field(default_factory=list)
-
-class JoinLeagueRequest(LineupConfig):
-    team_id: int
-    join_token: str | None = None # solo requerido para ligas privadas
-
-class JoinLeagueResponse(BaseModel):
-    league_id: int
-    team_id: int
 
 class FixtureTeamOut(BaseModel):
     team_id: int
@@ -91,3 +66,38 @@ class FixtureMatchOut(BaseModel):
     team_host: FixtureTeamOut
     team_away: FixtureTeamOut
     score: FixtureScoreOut 
+
+class StandingRowOut(BaseModel):
+    position: int
+    team_id: int
+    team_name: str
+    matches_played: int # partidos jugados
+    wins: int           # partido ganado
+    draws: int          # partido empatado
+    losses: int         # partido perdido
+    goals_for: int      # goles a favor
+    goals_against: int  # goles en contra
+    goal_diff: int      # diferencia de goles
+    points: int         # puntos
+
+class LeagueDetailOut(BaseModel):
+    """Respuesta de GET /api/v1/leagues/{leagueId}: sirve para el lobby y para la liga iniciada."""
+    league_id: int
+    league_name: str
+    status: LeagueStatus
+    is_private: bool
+    host_team_id: int
+    max_teams: int
+    current_teams_count: int
+    match_duration: int
+    teams: list[LeagueTeamOut]
+    ranking: list[StandingRowOut] = Field(default_factory=list)
+    fixture: list[FixtureMatchOut] = Field(default_factory=list)
+
+class JoinLeagueRequest(LineupConfig):
+    team_id: int
+    join_token: str | None = None # solo requerido para ligas privadas
+
+class JoinLeagueResponse(BaseModel):
+    league_id: int
+    team_id: int

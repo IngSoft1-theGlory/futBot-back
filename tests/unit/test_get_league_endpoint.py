@@ -14,8 +14,9 @@ from fastapi.testclient import TestClient
 from src.core.security import create_access_token
 from src.database.base import get_db
 from src.main import app
-from src.models import Behavior, League, LeagueStatus, LineupEntry, Player, Team, User
+from src.models import Behavior, League, LeagueStatus, LineupEntry, Player, Team, User, Match, MatchStatus
 from src.services.fixture_service import generate_fixture
+
 
 URL = "/api/v1/leagues"
 
@@ -172,8 +173,12 @@ def test_deberia_devolver_una_liga_iniciada_con_el_mismo_formato(
     data = client.get(f"{URL}/{liga.league_id}", headers=auth_headers).json()
 
     assert data["status"] == "IN_PROGRESS"
-    assert data["ranking"] == [] and data["fixture"] == []
-
+    assert data["fixture"] == []
+    # Comprueba que el ranking devuelto coincide con las estadísticas esperadas del 
+    # único partido terminado de la liga
+    assert len(data["ranking"]) == 1
+    assert data["ranking"][0]["team_id"] == usuario_con_equipo.team_id
+    assert data["ranking"][0]["points"] == 0
 
 # Errores
 
@@ -254,3 +259,35 @@ def test_deberia_devolver_el_fixture_ordenado_por_fecha_con_los_datos_de_los_equ
         # La respuesta debe incluir el nombre correcto de cada equipo
         assert partido["team_host"]["team_name"] == nombres[partido["team_host"]["team_id"]]
         assert partido["team_away"]["team_name"] == nombres[partido["team_away"]["team_id"]]
+
+
+def test_deberia_devolver_el_ranking_solo_con_partidos_terminados_de_la_liga(
+    client, session, usuario_con_equipo, otro_usuario, comportamiento, auth_headers
+):
+    uno, dos = usuario_con_equipo.team, otro_usuario.team
+    liga = _crear_liga(session, uno, status=LeagueStatus.IN_PROGRESS)
+    # Inscribir ambos equipos en la liga
+    _inscribir(session, liga, uno, comportamiento)
+    _inscribir(session, liga, dos, comportamiento)
+
+    # Generar los partidos de la liga
+    session.add_all([
+        # el único que debe contar: terminado y de la liga
+        Match(team_host_id=uno.team_id, team_away_id=dos.team_id, home_goals=2, away_goals=1,
+              status=MatchStatus.FINISHED, league_id=liga.league_id, match_duration=5, round_number=1),
+        Match(team_host_id=dos.team_id, team_away_id=uno.team_id, home_goals=0, away_goals=0,
+              status=MatchStatus.PENDING, league_id=liga.league_id, match_duration=5, round_number=2),
+    ])
+    # Confirmar los cambios en la base de datos
+    session.commit()
+
+    # Consulta el endpoint y obtiene el ranking de la respuesta
+    ranking = client.get(f"{URL}/{liga.league_id}", headers=auth_headers).json()["ranking"]
+
+    # Comprueba que el ranking devuelto coincide con las estadísticas esperadas del único partido terminado de la liga
+    assert ranking == [
+        {"position": 1, "team_id": uno.team_id, "team_name": uno.team_name, "matches_played": 1,
+         "wins": 1, "draws": 0, "losses": 0, "goals_for": 2, "goals_against": 1, "goal_diff": 1, "points": 3},
+        {"position": 2, "team_id": dos.team_id, "team_name": dos.team_name, "matches_played": 1,
+         "wins": 0, "draws": 0, "losses": 1, "goals_for": 1, "goals_against": 2, "goal_diff": -1, "points": 0},
+    ]
