@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.exceptions import InvalidConfigurationError, PlayerNotFoundError
+from src.core.exceptions import InvalidData, PlayerNotFoundError
 from src.engine._01_to_world.data_types import Point2D, Vector2D
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine._02_to_match.state import (
@@ -55,7 +55,7 @@ def test_deberia_fallar_si_el_jugador_es_del_equipo_rival():
 def test_deberia_conservar_el_comportamiento_anterior_si_el_codigo_falla():
     partido = armar_partido()
 
-    with pytest.raises(InvalidConfigurationError):
+    with pytest.raises(InvalidData):
         apply_behavior_change(MATCH_ID, MI_EQUIPO, "x = 5", 1, 7)
 
     assert partido.players[1].behavior_id == 5
