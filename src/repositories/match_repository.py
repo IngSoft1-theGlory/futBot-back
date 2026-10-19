@@ -90,6 +90,16 @@ def claim_pending_match(session: Session, match_id: int, away_team_id: int) -> b
     result = session.execute(statement)
     return result.rowcount == 1 ##las filas que modifico, si es 0 es porque no cumplio una condicion y es 1 si salio todo bien y se unio al partido
 
+def get_finished_league_matches(session, league_id) -> list[Match]:
+    """ 
+    Devuelve todos los partidos de la liga que ya terminaron.
+    """
+    statement = ( # statement es un objeto que representa la consulta SQL que se va a ejecutar
+        select(Match) # selecciona todos los partidos
+        .where(Match.league_id == league_id, Match.status == MatchStatus.FINISHED) # filtra los partidos de la liga especificada y que esten finalizados
+    )
+    return list(session.scalars(statement).all()) # se hace la consulta y se devuelve una lista de partidos
+
 def get_league_fixture(session: Session, league_id: int) -> list[Match]:
     """ 
     Devuelve todos los partidos de la liga, ordenados por fecha y match_id.
