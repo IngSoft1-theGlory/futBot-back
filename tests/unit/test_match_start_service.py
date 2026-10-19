@@ -13,7 +13,7 @@ import asyncio
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from src.engine._03_to_builder.behavior_executor import make_execute_behavior
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
 from src.engine._01_to_world.pitch import TeamSide, starter_position
 from src.engine._01_to_world.data_types import AttributeType, ActionType, Intention
 from src.engine._04_to_physics.simulation import apply_intentions
@@ -400,7 +400,9 @@ async def test_deberia_el_motor_real_mover_a_los_jugadores_con_los_atributos_de_
     """Acople completo: base -> prepare_match -> execute_behavior y apply_intentions reales."""
     state = prepare_match(session, partido.match_id)
     posiciones_iniciales = {pid: p.position for pid, p in state.players.items() if p.position is not None}
-    execute_behavior = make_execute_behavior({comportamiento.behavior_id: CODIGO_CORRER_A_LA_PELOTA})
+
+    for jugador in state.players.values():
+        assign_behavior(jugador, comportamiento.behavior_id, CODIGO_CORRER_A_LA_PELOTA)
 
     task = launch_match(
         state,

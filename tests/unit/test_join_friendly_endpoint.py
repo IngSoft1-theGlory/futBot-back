@@ -253,7 +253,7 @@ def test_deberia_hacer_rollback_y_devolver_error_de_negocio_si_el_comportamiento
     client, db, usuario, rival, comportamiento, partido, motor_lanzado, codigo
 ):
     body = body_rival(rival, db, comportamiento)
-    comportamiento.code = codigo  # sin on_tick o con sintaxis rota: make_execute_behavior falla
+    comportamiento.code = codigo  # sin on_tick o con sintaxis rota: falla
     db.commit()
 
     r = client.post(url(partido.match_id), json=body, headers=headers(rival))

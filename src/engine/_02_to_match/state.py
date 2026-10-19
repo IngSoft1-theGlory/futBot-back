@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Optional, Callable
 
 from src.schemas.lineup_config import LineupConfig
 from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
@@ -64,6 +64,7 @@ class MatchPlayerState:
     current_action: ActionType = ActionType.IDLE
     attributes: dict[AttributeType, int] = field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
     initial_position: Optional[Point2D] = None  # Donde el jugador arrancó el partido, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
+    on_tick: Optional[Callable] = None # para que cada jugador guarde su propia funcion
 
 
 @dataclass
