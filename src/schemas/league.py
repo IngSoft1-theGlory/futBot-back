@@ -91,7 +91,6 @@ class LeagueDetailOut(BaseModel):
     current_teams_count: int
     match_duration: int
     teams: list[LeagueTeamOut]
-    # por ahora siempre vacios: su contenido lo definen los tickets de tabla y fixture
     ranking: list[StandingRowOut] = Field(default_factory=list)
     fixture: list[FixtureMatchOut] = Field(default_factory=list)
 
