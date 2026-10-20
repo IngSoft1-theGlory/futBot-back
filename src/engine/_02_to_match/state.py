@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Optional, Callable
 
 from src.schemas.lineup_config import LineupConfig
+from src.engine._01_to_world.metrics import PauseType
 from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType, ActionType
 from src.schemas.lineup_config import LineupConfig
@@ -24,13 +25,14 @@ from src.schemas.lineup_config import LineupConfig
 
 class MatchPhase(Enum):
     """
-    Fase del partido dentro del motor, en memoria: IN_PROGRESS o FINISHED.
+    Fase del partido dentro del motor, en memoria: IN_PROGRESS, PAUSED o FINISHED.
 
     No es MatchStatus (src.models.match), que es el estado guardado en la
     base. Primero el motor pone MatchPhase.FINISHED y después se guarda
     MatchStatus.FINISHED.
     """
     IN_PROGRESS = "IN_PROGRESS"
+    PAUSED = "PAUSED"
     FINISHED = "FINISHED"
 
 
@@ -68,6 +70,18 @@ class MatchPlayerState:
 
 
 @dataclass
+class PauseState:
+    """
+    La pausa en curso. Se crea una nueva en cada pausa y vuelve a None al terminar,
+    así substituted_team_ids (equipos que ya hicieron su cambio) arranca vacío solo.
+    """
+    type: PauseType # Cooling Break o Half-Time
+    number: int     # 1, 2 o 3
+    ends_at: float  # instante de fin, medido con time.monotonic(, pues es un reloj que solo avanza y no se ve afectado por cambios de la hora del sistema.
+    substituted_team_ids: set[int] = field(default_factory=set) # IDs de los equipos que ya hicieron su cambio en esta pausa. Se vacía al terminar la pausa.
+
+
+@dataclass
 class MatchState:
     """
     Estado global de un partido en curso.
@@ -82,6 +96,9 @@ class MatchState:
 
     # field(default_factory=dict) y no '= {}': asi cada partido tiene su propio dict de jugadores
     players: dict[int, MatchPlayerState] = field(default_factory=dict)
+
+    # La pausa en curso, o None si el partido no está en pausa.
+    pause: Optional[PauseState] = None
 
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
