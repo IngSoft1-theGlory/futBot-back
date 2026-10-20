@@ -25,12 +25,14 @@ from src.core.exceptions import (
     TeamNotInLeagueError,
 )
 
-from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut, JoinLeagueRequest
+from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut, JoinLeagueRequest, FixtureMatchOut, FixtureTeamOut, FixtureScoreOut
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
 from src.repositories.user_repository import get_user_by_id
+from src.repositories.match_repository import get_league_fixture, get_finished_league_matches
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
+from src.services.standings_service import build_standings
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -184,6 +186,28 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         if user is None or all(team.team_id != user.team_id for team in teams):
             raise ForbiddenError("No se permite ver el estado de esta liga")
 
+    # Se obtiene el fixture de la liga, ordenado por fecha, con los datos de los equipos y el resultado de cada partido
+    partidos = get_league_fixture(session, league_id)
+    fixture = [
+        FixtureMatchOut(
+            match_id=partido.match_id,
+            # se agrega el numero de fecha y el estado del partido, que puede ser PENDING, IN_PROGRESS o FINISHED
+            round_number=partido.round_number,
+            status=partido.status,
+            # Se agregan los datos de los equipos y el resultado del partido
+            team_host=FixtureTeamOut(team_id=partido.host_team.team_id, team_name=partido.host_team.team_name),
+            team_away=FixtureTeamOut(team_id=partido.away_team.team_id, team_name=partido.away_team.team_name),
+            # Se agregan los goles de cada equipo, si el partido no se jugó, los goles son 0
+            score=FixtureScoreOut(home=partido.home_goals, away=partido.away_goals),
+        )
+        for partido in partidos     
+    ]
+
+    # Si la liga ya empezó, se calculan los puntos de cada equipo y se ordena por puntos, diferencia de goles y goles a favor
+    ranking = []
+    if league.status != LeagueStatus.PENDING:
+        ranking = build_standings(teams, get_finished_league_matches(session, league_id))
+
     return LeagueDetailOut(
         league_id=league.league_id,
         league_name=league.league_name,
@@ -194,7 +218,11 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         current_teams_count=len(teams),
         match_duration=league.match_duration,
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
+        fixture=fixture,    
+        ranking=ranking
     )
+
+
 def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> None:
     """Inscribe al equipo en la liga y guarda su alineación en una sola transacción."""
 
