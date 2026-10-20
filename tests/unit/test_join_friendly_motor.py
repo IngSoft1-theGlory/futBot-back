@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 
 from src.database.base import get_db
+from src.engine._01_to_world.metrics import PauseType
 from src.engine._02_to_match.state import MatchPhase, MatchRegistry
 from src.engine._01_to_world.pitch import TeamSide
 from src.main import app
@@ -70,6 +71,7 @@ def app_con_motor_aislado(db):
         "detect_goal": detect_goal,
         "registry": observado["registry"],
         "tick_interval_seconds": 0,
+        "pause_durations": dict.fromkeys(PauseType, 0),  # sin esperar las pausas de los partidos de 240/600 ticks
     }
     observado["posiciones"] = posiciones
     yield observado
