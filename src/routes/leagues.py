@@ -10,6 +10,7 @@ from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
+from src.models import League, LeagueStatus
 
 from fastapi.concurrency import run_in_threadpool
 
@@ -23,7 +24,8 @@ from src.services.league_service import (
     list_leagues, 
     check_league_password, 
     exit_league,
-    join_league
+    join_league,
+    start_league
 )
 from src.schemas.league import (
     VerifyPasswordRequest, 
@@ -32,7 +34,10 @@ from src.schemas.league import (
     CreateLeagueResponse,
     LeagueListOut,
     JoinLeagueRequest,
-    JoinLeagueResponse
+    JoinLeagueResponse,
+    LeagueDetailOut,
+    StartLeagueRequest,
+    StartLeagueResponse
 )
 
 
@@ -142,6 +147,7 @@ def get_league_endpoint(
 ) -> LeagueDetailOut:
     """Detalle de una liga: lo usa el lobby (PENDING) y la pantalla de la liga iniciada."""
     return get_league_detail(session, user_id, league_id)
+
 @router.post(
     "/{league_id}/teams",
     response_model=JoinLeagueResponse,
@@ -155,11 +161,52 @@ async def join_league_endpoint(
     session: Session = Depends(get_db),
 ) -> JoinLeagueResponse:
     """Inscribe un equipo en una liga disponible con su configuración táctica."""
-    await run_in_threadpool(join_league, session, user_id, league_id, payload)
+    league = await run_in_threadpool(join_league, session, user_id, league_id, payload)
 
     # después de hacer commit, aviso a los suscriptores del evento TEAM_JOINED_LEAGUE
     event_bus.publish("TEAM_JOINED_LEAGUE", {
         "league_id": league_id,
         "team_id": payload.team_id,
     })
+
+    # si al unirse se completo el cupo, join_league ya dejo la liga en IN_PROGRESS
+    if league.status == LeagueStatus.IN_PROGRESS:
+        _publish_league_initiated(league)
+
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
+
+def _publish_league_initiated(league: League) -> None:
+    """ Publica el evento LEAGUE_INITIATED cuando una liga es iniciada. """
+    event_bus.publish("LEAGUE_INITIATED", {
+        "league_id": league.league_id,
+        "league_name": league.league_name,
+        "max_teams": league.max_teams,
+        "status": league.status.value,
+    })
+
+@router.put("/{league_id}", response_model=StartLeagueResponse)
+async def start_league_endpoint(
+    league_id: int,
+    payload: StartLeagueRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> StartLeagueResponse:
+    """ Inicia con 4 o mas equipos y cantidad par de equipos aunque no este completa"""
+    
+    # run_in_threadpool corre start_league en otro hilo, porque usa la base de
+    # forma bloqueante y trabaría el servidor. El await espera su resultado sin
+    # frenar el resto de los pedidos
+    league = await run_in_threadpool(start_league, session, user_id, league_id)
+
+    # despues de hacer commit, aviso a los suscriptores del evento LEAGUE_INITIATED
+    _publish_league_initiated(league)
+
+    # aca se deberia engancha "Arrancar una fecha (jornada)" 
+    # ...
+
+    # devuelve el estado de la liga recien iniciada
+    return StartLeagueResponse(
+        league_id=league.league_id,
+        league_name=league.league_name,
+        status=league.status.value,
+    )
