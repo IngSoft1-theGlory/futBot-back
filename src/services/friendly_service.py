@@ -138,5 +138,4 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
         session.rollback()
         raise
 
-    session.refresh(match)  ## el commit expira el objeto: lo recargo con el estado nuevo
     return JoinedMatch(match, state, execute_behavior)
