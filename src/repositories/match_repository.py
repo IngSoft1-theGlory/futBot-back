@@ -28,13 +28,32 @@ def get_match_by_id(session: Session, match_id: int) -> Match | None:
     """El partido con ese id, o None si no existe."""
     return session.get(Match, match_id)
 
-def get_lineup_entries(session: Session, match_id: int) -> list[LineupEntry]:
-    """Las entradas de alineación de AMBOS equipos del partido, en orden de creación."""
+def get_lineup_entries(session: Session, match_id: int | None = None, league_id: int | None = None, team_id: int | None = None) -> list[LineupEntry]:
+    """Las entradas de alineación de ambos equipos del partido amistoso, o de un solo equipo en el caso de ligas, en orden de creación.
+    
+    Para los partidos amistosos se devuelve la informacion de ambos equipos, asi que no se debe pasar team_id"""
+
+    if (match_id is None and league_id is None) or (match_id is not None and league_id is not None):
+        raise ValueError("Solo match_id o league_id es requerido") 
+    
     statement = (
-        select(LineupEntry)
-        .where(LineupEntry.match_id == match_id)
-        .order_by(LineupEntry.entry_id)
-    )
+            select(LineupEntry)
+        )
+    
+    if match_id is not None: 
+        statement = (
+            statement.where(LineupEntry.match_id == match_id)
+        ) 
+    if league_id is not None: 
+        statement = (
+            statement.where(LineupEntry.league_id == league_id)
+        )
+    if team_id is not None:
+        statement = (
+            statement.where(LineupEntry.team_id == team_id)
+        )
+
+    statement = statement.order_by(LineupEntry.entry_id)
 
     return list(session.scalars(statement).all())
   
@@ -89,6 +108,26 @@ def claim_pending_match(session: Session, match_id: int, away_team_id: int) -> b
     )
     result = session.execute(statement)
     return result.rowcount == 1 ##las filas que modifico, si es 0 es porque no cumplio una condicion y es 1 si salio todo bien y se unio al partido
+
+def claim_pending_league_match(session: Session, match_id: int) -> bool:
+    """Pasa el partido de liga a IN_PROGRESS en un solo UPDATE condicional
+    solo lo logra quien lo encuentre todavia PENDING: si dos pedidos intentan arrancar
+    el mismo partido, la base deja pasar a uno solo. Devuelve False si no lo logró
+
+    No hace commit, y no actualiza el objeto Match que ya esta en memoria:
+    quien la llama debe hacer session.refresh(match)
+    """
+    statement = (
+        update(Match) 
+        .where( 
+            Match.match_id == match_id,
+            Match.status == MatchStatus.PENDING,
+        )
+        .values(status=MatchStatus.IN_PROGRESS)
+    )
+    result = session.execute(statement) # execute manda el update a la base. no hace commit, asi que se puede deshacer con rollback 
+
+    return result.rowcount == 1 # las filas que modifico, si es 0 es porque no cumplio una condicion y si es 1 es porque salio todo bien. result es la respuesta de la base
 
 def get_finished_league_matches(session, league_id) -> list[Match]:
     """ 
