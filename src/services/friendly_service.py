@@ -8,15 +8,14 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
 from src.engine.match_runner import ExecuteBehavior
-from src.engine._02_to_match.state import MatchInitializationError, MatchState
+from src.engine._02_to_match.state import MatchState
 from src.models import Match, MatchStatus
-from src.core.exceptions import InvalidConfigurationError, InvalidSettingsError, MatchNotFoundError,MatchUnavailableError
-from src.repositories.match_repository import claim_pending_match, get_available_matches, get_behaviors_by_ids, get_lineup_entries, get_match_by_id
+from src.core.exceptions import InvalidSettingsError, MatchNotFoundError,MatchUnavailableError
+from src.repositories.match_repository import claim_pending_match, get_available_matches, get_match_by_id
 from src.schemas.friendly import CreateFriendlyRequest, JoinFriendlyRequest
-from src.services.match_start_service import prepare_match
 from src.services.lineup_service import save_lineup, validate_team_belongs_to_user, validate_match_duration, validate_min_players, validate_lineup
+from src.services.match_start_service import prepare_engine
 
 # Caso de uso 
 def create_friendly(session: Session, user_id: int, payload: CreateFriendlyRequest) -> Match:
@@ -131,7 +130,7 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
          except de abajo hace rollback y el partido vuelve a quedar PENDING y sin
          rival (no queda un partido IN_PROGRESS que nadie va a correr)
         """
-        state, execute_behavior = _prepare_engine(session, match_id)
+        state, execute_behavior = prepare_engine(session, match_id)
 
         session.commit()
 
@@ -141,45 +140,3 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
 
     session.refresh(match)  ## el commit expira el objeto: lo recargo con el estado nuevo
     return JoinedMatch(match, state, execute_behavior)
-
-
-def _prepare_engine(session: Session, match_id: int) -> tuple[MatchState, ExecuteBehavior]:
-    """
-    Arma lo que necesita el motor para arrancar, sin lanzarlo:
-      - el MatchState inicial: prepare_match lee de la base las alineaciones de los
-        dos equipos y los atributos PACSS de cada jugador (tabla players) y ubica
-        a los titulares en la cancha
-      - los comportamientos: a cada jugador se le asigna su propia función on_tick
-
-    Cualquier falla se traduce a un error de negocio (400), nunca a un 500
-    """
-    try:
-        state = prepare_match(session, match_id)
-        ## los comportamientos de AMBAS alineaciones (host y rival), sin repetir ids: varios jugadores pueden usar el mismo comportamiento
-        behavior_ids = {entry.behavior_id for entry in get_lineup_entries(session, match_id)}
-
-        ## {behavior_id: codigo} sirve para buscar el codigo de cada jugador segun su behavior_id
-        codes = {b.behavior_id: b.code for b in get_behaviors_by_ids(session, list(behavior_ids))} ## get_behaviors_by_ids devuelve solo los que existen
-        
-        ## si falta algun behavior_id, lo detecto acá y no recién en pleno partido
-        faltantes = behavior_ids - codes.keys()
-        if faltantes:
-            raise MatchInitializationError(f"No existen los comportamientos {sorted(faltantes)}.")
-        
-        ## a cada jugador (titulares y suplentes) le asigno su comportamiento: assign_behavior compila su codigo y se lo guarda.
-        ## un codigo sin on_tick (ValueError) o con errores de sintaxis/ejecución falla aca
-
-        for player in state.players.values(): # values me permite acceder al valor del dict en vez de la key
-            assign_behavior(player, player.behavior_id, codes[player.behavior_id]) # codes es un diccionario, le paso el behavior_id del jugador como clave para que retorne el codigo (str)
-
-    except Exception as exc:
-        """
-         Atrapo Exception (no solo MatchInitializationError) porque assign_behavior
-         ejecuta código escrito por usuarios (exec): puede tirar ValueError (sin on_tick),
-         SyntaxError, NameError, etc. Todos son "el partido no se puede preparar",
-         un error del usuario y no un bug del servidor: se devuelve como 400
-         "from exc" conserva el error original para los logs
-        """
-        raise InvalidConfigurationError(f"No se pudo preparar el partido: {exc}") from exc
-
-    return state, execute_behavior
