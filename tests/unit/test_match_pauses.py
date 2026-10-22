@@ -42,7 +42,7 @@ class PartidoJugado:
     comportamientos_ejecutados: int
 
 
-async def _jugar_partido(monkeypatch, total_ticks: int = 240) -> PartidoJugado:
+async def _jugar_partido(monkeypatch, total_ticks: int = 240, notify_pause=None) -> PartidoJugado:
     """Juega un partido entero con piezas falsas y anota lo que pasa en cada pausa."""
     state = _build_state(total_ticks)
     pausas = []
@@ -84,6 +84,7 @@ async def _jugar_partido(monkeypatch, total_ticks: int = 240) -> PartidoJugado:
         notify=notify,
         tick_interval_seconds=0,
         on_finished=resultados_guardados.append,
+        notify_pause=notify_pause,
     )
 
     # Devolvemos lo ocurrido en el partido, para que los tests puedan hacer sus aserciones.
@@ -158,3 +159,45 @@ async def test_deberia_terminar_en_finished_y_guardar_el_resultado_tras_las_3_pa
     assert len(partido.pausas) == 3
     assert partido.state.phase is MatchPhase.FINISHED
     assert partido.resultados_guardados == [partido.state]
+
+# --- test de Eventos de pausa ---
+
+@pytest.mark.asyncio
+async def test_deberia_avisar_el_inicio_y_el_fin_de_cada_pausa_en_orden(monkeypatch):
+    avisos = []
+
+    async def notify_pause(state, tipo, duracion, started):
+        # Guarda el estado del partido en cada aviso para comprobar
+        # que la pausa ya esté activa al comenzar y ya haya terminado al finalizar
+        avisos.append((tipo, duracion, started, state.phase, state.pause is not None))
+
+    await _jugar_partido(monkeypatch, notify_pause=notify_pause)
+
+    # Se usan nombres cortos para que la secuencia esperada sea más fácil de leer
+    CB, HT = PauseType.COOLING_BREAK, PauseType.HALF_TIME
+    EN_PAUSA, SIN_PAUSA = MatchPhase.PAUSED, MatchPhase.IN_PROGRESS
+    # Cada pausa debe generar dos avisos: uno al comenzar y otro al terminar.
+    # El orden esperado es Cooling Break, Half-Time y Cooling Break
+    assert avisos == [ # tipo, duracion, started, fase, pause_activa
+        (CB, 10, True, EN_PAUSA, True), (CB, 10, False, SIN_PAUSA, False),
+        (HT, 20, True, EN_PAUSA, True), (HT, 20, False, SIN_PAUSA, False),
+        (CB, 10, True, EN_PAUSA, True), (CB, 10, False, SIN_PAUSA, False),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_deberia_continuar_el_partido_si_falla_notify_pause(monkeypatch):
+    llamadas = []  
+
+    async def notify_pause_roto(state, tipo, duracion, started):
+        llamadas.append(started)
+        raise RuntimeError("falló el envío")
+
+    # si falla el aviso, el motor debe completar las pausas y terminar el partido.
+    partido = await _jugar_partido(monkeypatch, notify_pause=notify_pause_roto)
+
+    assert len(llamadas) == 6 # se intentó avisar 2 veces por pausa (inicio y fin) y el partido siguió igual
+    assert len(partido.pausas) == 3 # y las pausas se ejecutaron todas
+    assert partido.ticks_notificados == list(range(1, 241)) # todos los ticks
+    assert partido.state.phase is MatchPhase.FINISHED # y terminó el partido
+    assert partido.resultados_guardados == [partido.state] # y guardó el resultado final
