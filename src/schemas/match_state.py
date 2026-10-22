@@ -21,6 +21,10 @@ class MatchPlayerOut(BaseModel):
     attributes: PlayerAttributesOut
     behavior_id: int | None   # sin default a propósito: hay que pasarlo siempre
 
+class PauseOut(BaseModel):
+    type: str
+    remaining_seconds: float
+
 # Respuesta del endpoint GET /matches/{match_id}/state.
 # Incluye el marcador y los jugadores con sus atributos.
 class MatchStateResponse(BaseModel):
@@ -29,3 +33,5 @@ class MatchStateResponse(BaseModel):
     total_ticks: int
     score: ScoreOut
     players: list[MatchPlayerOut]
+    phase: str
+    pause: PauseOut | None

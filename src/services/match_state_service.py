@@ -22,7 +22,10 @@ from src.schemas.match_state import (
     MatchStateResponse,
     PlayerAttributesOut,
     ScoreOut,
+    PauseOut,
 )
+
+import time # para calcular remaining_seconds de la pausa
 
 @dataclass(frozen=True)
 class MatchStateContext:
@@ -128,10 +131,23 @@ def build_match_state_response(
     # se ordena la lista de jugadores por team_id y luego por player_id
     players.sort(key=lambda p: (p.team_id, p.player_id))
 
+    # Se lee state.pause una sola vez. time.monotonic() 
+    # es el mismo reloj con el que se guardó ends_at.
+    pause = state.pause
+    pause_out = None
+    if pause is not None:
+        pause_out = PauseOut(
+            type=pause.type.value,
+            remaining_seconds=max(0.0, pause.ends_at - time.monotonic()),
+        )
+
     return MatchStateResponse(
         match_id=context.match_id,
         current_tick=state.current_tick,
         total_ticks=state.total_ticks,
         score=ScoreOut(home=state.score.home, away=state.score.away),
         players=players,
+        phase=state.phase.value,
+        pause=pause_out,
+
     )
