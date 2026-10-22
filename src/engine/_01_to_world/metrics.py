@@ -2,6 +2,9 @@
 MACROS, Medidas, Valores Fijos
 """
 
+from dataclasses import dataclass
+from enum import Enum
+
 # ==================================== Valores máximos ========================================
 
 MAX_RUN_SPEED_METERS_PER_SECOND = 8.0       # Máximo recorrido por parte de un jugador en m/s.
@@ -40,3 +43,62 @@ def total_ticks_for(match_duration_minutes: int) -> int:
     5 minutos -> 600 ticks
     """
     return int(match_duration_minutes * 60 / TICK_DURATION_SECONDS)
+
+
+# ======================================== Pausas ==============================================
+
+class PauseType(Enum):
+    """Tipo de pausa del partido."""
+    COOLING_BREAK = "COOLING_BREAK"
+    HALF_TIME = "HALF_TIME"
+
+# Duración en segundos de cada tipo de pausa.
+PAUSE_DURATION_SECONDS = {
+    PauseType.COOLING_BREAK: 10,
+    PauseType.HALF_TIME: 20,
+}
+
+# Calendario: (porcentaje de total_ticks, tipo), en orden.
+PAUSE_PLAN = (
+    (25, PauseType.COOLING_BREAK),
+    (50, PauseType.HALF_TIME),
+    (75, PauseType.COOLING_BREAK),
+)
+
+@dataclass(frozen=True)
+class PauseSlot:
+    """Una pausa del calendario: su número (desde 1), el tick en que ocurre y su tipo."""
+    number: int
+    tick: int
+    type: PauseType
+
+def pause_schedule_for(total_ticks: int) -> list[PauseSlot]:
+    """
+    Calendario de pausas de un partido, en orden.
+
+    240 ticks -> pausas en 60 (Cooling Break), 120 (Half-Time) y 180 (Cooling Break)
+    600 ticks -> pausas en 150 (Cooling Break), 300 (Half-Time) y 450 (Cooling Break)
+
+    Para cualquier otro total_ticks devuelve [] (sin pausas): solo existen
+    partidos de 240 o 600 ticks.
+    """
+    valid_totals = {total_ticks_for(minutes) for minutes in VALID_MATCH_DURATIONS_MINUTES}
+    if total_ticks not in valid_totals:
+        return []
+
+    # Se calcula proporcionalmente al total_ticks, y se redondea hacia abajo con //
+    # mediante división entera.
+    pause_slots = []
+
+    for number, (percentage, pause_type) in enumerate(PAUSE_PLAN, start=1):
+        tick = total_ticks * percentage // 100
+
+        pause_slots.append(
+            PauseSlot(
+                number=number,
+                tick=tick,
+                type=pause_type,
+            )
+        )
+
+    return pause_slots
