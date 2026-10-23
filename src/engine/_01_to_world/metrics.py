@@ -86,9 +86,19 @@ def pause_schedule_for(total_ticks: int) -> list[PauseSlot]:
     if total_ticks not in valid_totals:
         return []
 
-    return [
-        # Se calcula proporcionalmente al total_ticks, y se redondea hacia abajo con //
-        # mediante división entera.
-        PauseSlot(number=number, tick=total_ticks * percentage // 100, type=pause_type)
-        for number, (percentage, pause_type) in enumerate(PAUSE_PLAN, start=1)
-    ]
+    # Se calcula proporcionalmente al total_ticks, y se redondea hacia abajo con //
+    # mediante división entera.
+    pause_slots = []
+
+    for number, (percentage, pause_type) in enumerate(PAUSE_PLAN, start=1):
+        tick = total_ticks * percentage // 100
+
+        pause_slots.append(
+            PauseSlot(
+                number=number,
+                tick=tick,
+                type=pause_type,
+            )
+        )
+
+    return pause_slots
