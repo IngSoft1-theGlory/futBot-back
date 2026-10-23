@@ -160,8 +160,6 @@ async def test_deberia_terminar_en_finished_y_guardar_el_resultado_tras_las_3_pa
     assert partido.state.phase is MatchPhase.FINISHED
     assert partido.resultados_guardados == [partido.state]
 
-# --- test de Eventos de pausa ---
-
 @pytest.mark.asyncio
 async def test_deberia_avisar_el_inicio_y_el_fin_de_cada_pausa_en_orden(monkeypatch):
     avisos = []
