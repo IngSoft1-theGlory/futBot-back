@@ -44,6 +44,7 @@ ApplyIntentions = Callable[[MatchState, dict[int, Intention]], None]
 DetectGoal = Callable[[Point2D], Optional[TeamSide]]
 NotifyTick = Callable[[MatchState], Awaitable[None]]
 OnFinished = Callable[[MatchState], None]
+NotifyPause = Callable[[MatchState, PauseType, float, bool], Awaitable[None]]
 
 
 def run_tick(
@@ -103,7 +104,34 @@ def run_tick(
     state.current_tick += 1
 
 
-async def _run_pause(state: MatchState, slot: PauseSlot, duration_seconds: float) -> None:
+async def _notify_pause_safely(
+        notify_pause: Optional[NotifyPause], 
+        state: MatchState, 
+        pause_type: PauseType, 
+        duration_seconds: float,
+        started: bool,
+) -> None:
+    """ Avisa el inicio o el fin de una pausa,
+    donde : el inicio (started=True) o el fin (started=False) """
+    if notify_pause is None:
+        return
+    try: # si falla el notify_pause, no se interrumpe el partido: sigue corriendo aunque no se avise a los clientes
+        await notify_pause(state, pause_type, duration_seconds, started)
+    except Exception:
+        logger.exception(
+            "notify_pause falló al %s la pausa %s del partido %s; el partido sigue.",
+            "iniciar" if started else "terminar",     
+            pause_type.value,
+            state.match_id,
+        )
+
+
+async def _run_pause(
+        state: MatchState, 
+        slot: PauseSlot, 
+        duration_seconds: float, 
+        notify_pause: Optional[NotifyPause] = None
+) -> None:
     """
     Detiene el partido durante una pausa: pone PAUSED, crea state.pause, espera
     y vuelve a IN_PROGRESS. No toca current_tick ni ejecuta comportamientos.
@@ -115,10 +143,18 @@ async def _run_pause(state: MatchState, slot: PauseSlot, duration_seconds: float
         ends_at=time.monotonic() + duration_seconds,
     )
 
+    # avisa a los clientes que empezó la pausa (Cooling Break o Half-Time)
+    await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=True)
+
+    # espera el tiempo de la pausa (Cooling Break o Half-Time)
     await asyncio.sleep(duration_seconds)
 
+    # termina la pausa: vuelve a IN_PROGRESS y borra state.pause
     state.pause = None
     state.phase = MatchPhase.IN_PROGRESS
+
+    # avisa a los clientes que terminó la pausa (Cooling Break o Half-Time)
+    await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=False)
 
 
 async def run_match(
@@ -132,6 +168,7 @@ async def run_match(
     tick_interval_seconds: float,
     on_finished: Optional[OnFinished] = None,
     pause_durations: dict[PauseType, float] = PAUSE_DURATION_SECONDS,
+    notify_pause: Optional[NotifyPause] = None,
 ) -> None:
     """ 
     Corre el partido completo, tick a tick, hasta que pasa a FINISHED.
@@ -148,7 +185,7 @@ async def run_match(
             # Si toca pausa, el reloj se detiene: current_tick queda igual y no hay ticks ni notify
             if next_pause < len(pause_schedule) and state.current_tick == pause_schedule[next_pause].tick:
                 slot = pause_schedule[next_pause]
-                await _run_pause(state, slot, pause_durations[slot.type])
+                await _run_pause(state, slot, pause_durations[slot.type], notify_pause)
                 next_pause += 1
 
             run_tick(

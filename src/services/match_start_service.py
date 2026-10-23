@@ -52,12 +52,13 @@ from src.engine.match_runner import (
     NotifyTick,
     OnFinished,
     run_match,
+    NotifyPause,
 )
 from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
 from src.models import LineupEntry, MatchStatus, Player
-from src.realtime.match_broadcast import notify as broadcast_tick
+from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
@@ -257,6 +258,7 @@ def launch_match(
     # que pasan por launch_match (ver test_join_friendly_motor) 
     # no podrían poner las pausas en 0.
     pause_durations: dict[PauseType, float] = PAUSE_DURATION_SECONDS,
+    notify_pause: NotifyPause | None = broadcast_pause,
 ) -> asyncio.Task:
     """
     Lanza run_match como tarea de fondo y devuelve la tarea. Requiere el
@@ -287,6 +289,7 @@ def launch_match(
             tick_interval_seconds=tick_interval_seconds,
             on_finished=on_finished,
             pause_durations=pause_durations,
+            notify_pause=notify_pause,
         ),
         name=f"match-{state.match_id}",
     )
