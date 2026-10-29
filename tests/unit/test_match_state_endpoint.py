@@ -173,6 +173,37 @@ def test_deberia_dejar_intacto_el_behavior_id_del_estado_en_memoria(client, part
     assert despues == antes   # el filtro se aplica en la respuesta, no en el estado
 
 
+# --- substitutes - suplentes del propio equipo ---
+
+def test_deberia_devolver_en_substitutes_los_suplentes_del_equipo_del_usuario(client, partido):
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+
+    suplentes_host = {j.player_id for j in partido["jugadores_host"][3:]}
+    assert {p["player_id"] for p in body["substitutes"]} == suplentes_host
+
+
+def test_deberia_no_incluir_los_suplentes_del_rival(client, partido):
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+
+    suplentes_rival = {j.player_id for j in partido["jugadores_away"][3:]}
+    assert suplentes_rival.isdisjoint({p["player_id"] for p in body["substitutes"]})
+
+
+def test_deberia_pasar_al_que_salio_a_substitutes_y_al_que_entro_a_players(client, partido):
+    state = partido["state"]
+    sale, entra = partido["jugadores_host"][0], partido["jugadores_host"][3]
+    # sustitucion hecha a mano: el que entra toma la posicion del que sale
+    state.players[entra.player_id].position = state.players[sale.player_id].position
+    state.players[sale.player_id].position = None
+
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+
+    en_cancha = {p["player_id"] for p in body["players"]}
+    suplentes = {p["player_id"] for p in body["substitutes"]}
+    assert entra.player_id in en_cancha and entra.player_id not in suplentes
+    assert sale.player_id in suplentes and sale.player_id not in en_cancha
+
+
 # --- Errores ---
 
 def test_deberia_devolver_401_sin_token_valido(client, partido):
