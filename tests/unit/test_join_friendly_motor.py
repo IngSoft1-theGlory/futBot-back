@@ -38,19 +38,29 @@ def on_tick(api):
 
 @pytest.fixture()
 def db(tmp_path):
-    """
-    Base propia de este archivo (pisa el db de test_post_friendly_endpoint).
-    SQLite en ARCHIVO, sin StaticPool: cada sesión tiene su propia conexión.
-    """
-    engine = create_engine(f"sqlite:///{tmp_path / 'test.db'}", connect_args={"check_same_thread": False})
+    """Base SQLite temporal y exclusiva para este test.
+    Se usa un archivo para permitir varias conexiones independientes."""
 
+    # Crea la base SQLite temporal para este test.
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'test.db'}",
+        connect_args={"check_same_thread": False},
+    )
+
+    # Activa la validación de claves foráneas en SQLite.
     @event.listens_for(engine, "connect")
     def _foreign_keys_on(conn, _):
         conn.execute("PRAGMA foreign_keys=ON")
 
+    # Crea las tablas definidas por los modelos.
     Base.metadata.create_all(engine)
+
+    # Crea la sesión que usará el test para leer y guardar datos.
     session = sessionmaker(bind=engine, autoflush=False)()
+
+    # Entrega la sesión al test.
     yield session
+
     session.close()
     engine.dispose()
 
