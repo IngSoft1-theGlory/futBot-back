@@ -79,6 +79,35 @@ def load_match_state_context(session: Session, user_id: int, match_id: int) -> M
     )
 
 
+def build_player_out(context: MatchStateContext, player_id: int, player_state) -> MatchPlayerOut:
+    """
+    Arma un jugador de la respuesta (en cancha o suplente) con los datos de la base.
+    El behavior_id real solo se muestra si el jugador es del equipo de quien consulta.
+    """
+    player = context.players.get(player_id)
+    if player is None:
+        raise RuntimeError(
+            f"El jugador {player_id} está en el estado del partido {context.match_id} "
+            "pero no existe en la base de datos."
+        )
+
+    es_propio = player_state.team_id == context.user_team_id
+    return MatchPlayerOut(
+        player_id=player.player_id,
+        team_id=player_state.team_id,
+        name=player.name,
+        number=player.number,
+        attributes=PlayerAttributesOut(
+            power=player.power,
+            agility=player.agility,
+            control=player.control,
+            speed=player.speed,
+            strength=player.strength,
+        ),
+        behavior_id=player_state.behavior_id if es_propio else None,
+    )
+
+
     """
     PASO 2 (sin DB y sin await): se arma de corrido, sin cederle el loop al motor.
     Solo LEE el estado en memoria; el filtro de behavior_id se aplica acá, en la
@@ -98,35 +127,19 @@ def build_match_state_response(
     if state is None:
         raise MatchNotFoundError("El partido solicitado no existe o no se encuentra en ejecución.")
 
-    # se construye la lista de jugadores con sus atributos y behavior_id, solo si es del equipo del usuario
-    players: list[MatchPlayerOut] = []
-    for player_id in state.on_pitch_player_ids():
-        player_state = state.players[player_id]  
-        player = context.players.get(player_id)  
-        if player is None:
-            raise RuntimeError(
-                f"El jugador {player_id} está en el estado del partido {context.match_id} "
-                "pero no existe en la base de datos."
-            )
+    # se construye la lista de jugadores en cancha con sus atributos y behavior_id
+    players = [
+        build_player_out(context, player_id, state.players[player_id])
+        for player_id in state.on_pitch_player_ids()
+    ]
 
-        # behavior_id real solo si el jugador es del equipo de quien consulta
-        es_propio = player_state.team_id == context.user_team_id
-        players.append(
-            MatchPlayerOut(
-                player_id=player.player_id,
-                team_id=player_state.team_id,
-                name=player.name,
-                number=player.number,
-                attributes=PlayerAttributesOut(
-                    power=player.power,
-                    agility=player.agility,
-                    control=player.control,
-                    speed=player.speed,
-                    strength=player.strength,
-                ),
-                behavior_id=player_state.behavior_id if es_propio else None,
-            )
-        )
+    # suplentes (sin posición en cancha), solo del equipo del usuario: el banco del rival no se muestra
+    substitutes = [
+        build_player_out(context, player_id, player_state)
+        for player_id, player_state in state.players.items()
+        if player_state.team_id == context.user_team_id and player_state.position is None
+    ]
+    substitutes.sort(key=lambda p: p.player_id)
 
     # se ordena la lista de jugadores por team_id y luego por player_id
     players.sort(key=lambda p: (p.team_id, p.player_id))
@@ -147,6 +160,7 @@ def build_match_state_response(
         total_ticks=state.total_ticks,
         score=ScoreOut(home=state.score.home, away=state.score.away),
         players=players,
+        substitutes=substitutes,
         phase=state.phase.value,
         pause=pause_out,
 

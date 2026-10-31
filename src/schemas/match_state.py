@@ -33,5 +33,6 @@ class MatchStateResponse(BaseModel):
     total_ticks: int
     score: ScoreOut
     players: list[MatchPlayerOut]
+    substitutes: list[MatchPlayerOut]   # suplentes, solo del equipo de quien consulta
     phase: str
     pause: PauseOut | None
