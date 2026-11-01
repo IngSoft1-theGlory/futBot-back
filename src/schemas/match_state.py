@@ -36,13 +36,12 @@ class MatchStateResponse(BaseModel):
     substitutes: list[MatchPlayerOut]   # suplentes, solo del equipo de quien consulta
     phase: str
     pause: PauseOut | None
-
-# Peticion de cambiar comportamiento durante el partido
+      
+# Peticion para cambiar comportamiento durante un partido
 class ChangeBehaviorRequest(BaseModel): 
     behavior_id: int 
 
-# Respuesta de cambiar comportamiento durante el partido
+# Respuesta para cambiar comportamiento durante un partido
 class ChangeBehaviorResponse(BaseModel): 
     player_id: int 
     behavior_id: int
-
