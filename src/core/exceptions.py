@@ -160,6 +160,14 @@ class InvalidJoinTokenError(ForbiddenError):
 class PlayerNotFoundError(NotFoundError): 
     """Rama 404 PLAYER_NOT_FOUND: el jugador no existe o es del equipo rival"""
     error_code = "PLAYER_NOT_FOUND"
+    
+class InsufficientTeamsError(BadRequestError):
+    """Rama 400 INSUFFICIENT_TEAMS: no hay suficientes equipos para iniciar la liga."""
+    error_code = "INSUFFICIENT_TEAMS"
+
+class OddTeamsCountError(BadRequestError):
+    """Rama 400 ODD_TEAMS_COUNT: hay un numero impar de equipos en la liga."""
+    error_code = "ODD_TEAMS_COUNT"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
