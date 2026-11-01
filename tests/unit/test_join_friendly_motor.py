@@ -11,9 +11,13 @@ import asyncio
 
 import httpx
 import pytest
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
+from src.database.base import Base, get_db
+
 from src.database.base import get_db
+from src.engine._01_to_world.metrics import PauseType
 from src.engine._02_to_match.state import MatchPhase, MatchRegistry
 from src.engine._01_to_world.pitch import TeamSide
 from src.main import app
@@ -22,9 +26,9 @@ from src.routes.friendly import get_launch_options
 from src.services import match_start_service
 from src.services.match_start_service import make_on_finished
 
-from tests.unit.test_join_friendly_endpoint import body_rival, partido, rival  # noqa: F401
-from tests.unit.test_post_friendly_endpoint import (  # noqa: F401
-    comportamiento, db, headers, usuario,
+from tests.unit.test_join_friendly_endpoint import body_rival, partido, rival  
+from tests.unit.test_post_friendly_endpoint import (
+    comportamiento, headers, usuario,
 )
 
 CORRER_A_LA_PELOTA = """
@@ -32,6 +36,33 @@ def on_tick(api):
     api.run_to(api.get_game_state().ball_position, 1.0)
 """
 
+@pytest.fixture()
+def db(tmp_path):
+    """Base SQLite temporal y exclusiva para este test.
+    Se usa un archivo para permitir varias conexiones independientes."""
+
+    # Crea la base SQLite temporal para este test.
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'test.db'}",
+        connect_args={"check_same_thread": False},
+    )
+
+    # Activa la validación de claves foráneas en SQLite.
+    @event.listens_for(engine, "connect")
+    def _foreign_keys_on(conn, _):
+        conn.execute("PRAGMA foreign_keys=ON")
+
+    # Crea las tablas definidas por los modelos.
+    Base.metadata.create_all(engine)
+
+    # Crea la sesión que usará el test para leer y guardar datos.
+    session = sessionmaker(bind=engine, autoflush=False)()
+
+    # Entrega la sesión al test.
+    yield session
+
+    session.close()
+    engine.dispose()
 
 @pytest.fixture()
 def app_con_motor_aislado(db):
@@ -70,6 +101,7 @@ def app_con_motor_aislado(db):
         "detect_goal": detect_goal,
         "registry": observado["registry"],
         "tick_interval_seconds": 0,
+        "pause_durations": dict.fromkeys(PauseType, 0),  # sin esperar las pausas de los partidos de 240/600 ticks
     }
     observado["posiciones"] = posiciones
     yield observado

@@ -50,9 +50,10 @@ def get_leagues(
     return session.execute(query).all()
 
 
-def get_league_by_id(session: Session, league_id: int) -> League | None:
-    """Devuelve la liga con ese id, o None si no existe."""
-    return session.get(League, league_id)
+def get_league_by_id(session: Session, league_id: int, for_update: bool = False) -> League | None:
+    """ Devuelve la liga con ese id, o None si no existe 
+    y bloquea la fila para update si for_update es True. """
+    return session.get(League, league_id, with_for_update=for_update)
 
 
 def get_league_teams(session: Session, league_id: int) -> list[Team]:

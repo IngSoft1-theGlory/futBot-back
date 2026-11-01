@@ -23,9 +23,21 @@ from src.core.exceptions import (
     NotFoundError,
     PasswordIncorrectError,
     TeamNotInLeagueError,
+    InsufficientTeamsError,
+    OddTeamsCountError,
 )
 
-from src.schemas.league import CreateLeagueRequest, LeagueOut, LeagueDetailOut, LeagueTeamOut, JoinLeagueRequest, FixtureMatchOut, FixtureTeamOut, FixtureScoreOut
+from src.schemas.league import (
+    CreateLeagueRequest, 
+    LeagueOut, 
+    LeagueDetailOut, 
+    LeagueTeamOut, 
+    JoinLeagueRequest, 
+    FixtureMatchOut, 
+    FixtureTeamOut, 
+    FixtureScoreOut
+)
+
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
 from src.repositories.user_repository import get_user_by_id
@@ -33,6 +45,7 @@ from src.repositories.match_repository import get_league_fixture, get_finished_l
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
 from src.services.standings_service import build_standings
+from src.services.fixture_service import generate_fixture
 from src.services.lineup_service import (
     save_lineup,
     validate_team_belongs_to_user,
@@ -41,6 +54,7 @@ from src.services.lineup_service import (
     validate_lineup,
 )
 
+MIN_TEAMS_TO_START = 4  # cantidad mínima de equipos para iniciar una liga
 
 def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) -> League: 
     """llama a las validaciones y, si todas pasan, guarda la League y las 6 LineupEntry en una sola transaccion"""
@@ -223,7 +237,7 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
     )
 
 
-def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> None:
+def join_league(session: Session, user_id: int, league_id: int, payload: JoinLeagueRequest) -> League:
     """Inscribe al equipo en la liga y guarda su alineación en una sola transacción."""
 
     validate_team_belongs_to_user(session, user_id, payload.team_id)
@@ -257,11 +271,18 @@ def join_league(session: Session, user_id: int, league_id: int, payload: JoinLea
 
     try:
         save_lineup(session, None, payload.team_id, payload, league_id)
+        # envía temporalmente los cambios a la BD, el commit los confirma despues
+        session.flush() 
+        # enrolled_team_ids son los equipos inscriptos, sin contar el actual que se esta agregando
+        if len(enrolled_team_ids) + 1 == league.max_teams:
+            # si el equipo que se acaba de inscribir completa el cupo, se inicia la liga
+            _start_league(session, league)
         session.commit()
     except Exception:
         session.rollback()
         raise
 
+    return league
 
 def exit_league(
         session: Session, 
@@ -273,8 +294,9 @@ def exit_league(
     Saca al equipo de la liga borrando sus 6 filas de lineup_entries,
     en un orden de las validaciones.
     """
+    # Se obtiene la liga con el id y se bloquea la fila para update,
     # Si no existe la liga, lanza LeagueNotFoundError 404
-    league = get_league_by_id(session, league_id)
+    league = get_league_by_id(session, league_id, for_update=True)
     if league is None:
         raise LeagueNotFoundError("No existe una liga con el ID especificado.")
 
@@ -307,3 +329,68 @@ def exit_league(
     except Exception:
         session.rollback()
         raise
+
+def _start_league(session: Session, league: League) -> None:
+    """
+    Inicia una liga pendiente y genera sus partidos,
+    esta funcion se utiliza tanto cuando el anfitrion inicia la liga
+    manualmente como cuando se inicia de forma automática,
+    no se guardan (commit) los cambios en la base de datos.
+    """
+    
+    # si la liga no está en estado PENDING, significa que ya ha sido iniciada y no se puede iniciar de nuevo, 
+    # por lo tanto, se lanza una excepción LeagueAlreadyStartedError con un mensaje adecuado.
+    if league.status != LeagueStatus.PENDING:
+        raise LeagueAlreadyStartedError("La liga ya fue iniciada y no se puede iniciar de nuevo.")
+    
+    # la lista de equipos insccriptos
+    teams = get_league_teams(session, league.league_id)
+
+    # si la cantidad de equipos es menor a la cantidad mínima o 
+    # si la cantidad es impar, se lanza una excepción.
+    if len(teams) < MIN_TEAMS_TO_START :
+        raise InsufficientTeamsError(
+            f"La liga necesita al menos {MIN_TEAMS_TO_START} equipos para iniciarse"
+        )
+        
+    if len(teams) % 2 != 0:
+        raise OddTeamsCountError("La liga tiene un numero impar de equipos, no se puede iniciar.")
+
+    # se cambia el estado de la liga a IN_PROGRESS
+    league.status = LeagueStatus.IN_PROGRESS
+ 
+    # se genera el fixture de la liga, que crea los partidos y los guarda en la base de datos
+    generate_fixture(session, league)
+
+
+def start_league(session: Session, user_id: int, league_id: int) -> League:
+    """  
+    Inicia una liga pendiente,
+    verifica que la liga exista, que el usuario sea el anfitrión y que cumpla los 
+    requisitos para arrancar. Si todo esta bien se genera el fixture 
+    y se guarda la liga con estado IN_PROGRESS.
+    """
+
+    # se obtiene la liga con el id  y se bloquea operacion, si no existe se lanza 
+    # LeagueNotFoundError (En for_update bloquea la fila mientras la operacion esta abierta,
+    #  para que no se pueda iniciar la liga dos veces al mismo tiempo)
+    league = get_league_by_id(session, league_id, for_update=True)
+    if league is None:
+        raise LeagueNotFoundError("No existe una liga con el ID especificado.")
+    
+    # Se obtiene el usuario con el id especificado y se valida que sea el anfitrión de la liga
+    user = get_user_by_id(session, user_id)
+    if user is None or user.team_id != league.host_team_id:
+        raise ForbiddenError("El usuario no es el anfitrión de la liga y no puede iniciarla")
+    
+    # Se intenta iniciar la liga y generar los partidos, 
+    # si hay un error se hace rollback y se lanza la excepción
+    try: 
+        _start_league(session, league)
+         # si sale bien la creacion de partido se guarda la liga con el estado IN_PROGRESS
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    return league
