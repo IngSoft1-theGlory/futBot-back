@@ -157,6 +157,10 @@ class InvalidJoinTokenError(ForbiddenError):
     """Rama 403 INVALID_JOIN_TOKEN: el join_token es inválido o es de otra liga u otro usuario."""
     error_code = "INVALID_JOIN_TOKEN"
 
+class PlayerNotFoundError(NotFoundError): 
+    """Rama 404 PLAYER_NOT_FOUND: el jugador no existe o es del equipo rival"""
+    error_code = "PLAYER_NOT_FOUND"
+    
 class InsufficientTeamsError(BadRequestError):
     """Rama 400 INSUFFICIENT_TEAMS: no hay suficientes equipos para iniciar la liga."""
     error_code = "INSUFFICIENT_TEAMS"
