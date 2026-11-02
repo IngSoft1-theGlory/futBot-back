@@ -3,7 +3,7 @@ Tests de league_run_service: arrancar un partido de liga.
 
 - begin_league_match: la parte de la base (hasta el commit), sin motor.
 - start_league_match: solo se prueba el camino en que el partido no se puede preparar (0-0), que no
-  llega a lanzar el motor. Lanzar el motor y publicar MATCH_STARTED se verifica a mano (ver el ticket).
+  llega a lanzar el motor. Lanzar el motor y publicar MATCH_STARTED se verifica a mano.
 
 Cada test de error parte de un caso VÁLIDO y cambia UNA sola cosa.
 """
