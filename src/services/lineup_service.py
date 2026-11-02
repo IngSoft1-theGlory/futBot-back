@@ -17,8 +17,9 @@ from sqlalchemy.orm import Session
 from src.models.lineup_entry import LineupEntry
 from src.schemas.lineup_config import LineupConfig
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
-from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team
+from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team, get_lineup_entries
 from src.repositories.user_repository import get_user_by_id
+from src.models.match import Match 
 
 STARTERS_COUNT = 3      # titulares por equipo
 SUBSTITUTES_COUNT = 3   # suplentes por equipo
@@ -63,8 +64,26 @@ def save_lineup(session: Session, match_id:int | None, team_id: int, config: Lin
             is_starter = False,
         ))
 
+def copy_league_lineup_to_match(session: Session, match: Match) -> None:
+    """Copia al partido la alineación vigente que cada equipo tiene en la liga.
+    No hace commit ni flush: lo hace quien la llama"""
 
-# Validaciones para partidos amistosos y de liga
+    # busco la alineacion de cada equipo que va a jugar el match (hasta ahora, esta guardada asociada solo a su league_id)
+    filas_local = get_lineup_entries(session, league_id = match.league_id, team_id = match.team_host_id)
+    filas_visitante = get_lineup_entries(session, league_id=match.league_id, team_id=match.team_away_id)
+
+    # recorro cada una de las 12 filas de la alineacion
+    for entry in filas_local + filas_visitante:
+        session.add(LineupEntry( # y para cada fila guardo una copia (una nueva lineup entry) en la sesion
+            match_id=match.match_id,    # lo asocio a su match_id
+            team_id=entry.team_id,
+            player_id=entry.player_id,
+            behavior_id=entry.behavior_id,
+            role=entry.role,
+            is_starter=entry.is_starter,
+        ))
+
+# -------- Validaciones para partidos amistosos y de liga --------
 def validate_team_belongs_to_user(session: Session, user_id: int, team_id: int) -> None:
     """403 si team_id no es el equipo del usuario autenticado."""
     user = get_user_by_id(session, user_id)

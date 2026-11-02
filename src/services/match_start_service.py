@@ -2,25 +2,7 @@
 Puesta en marcha de un partido: leer su configuración de la base, armar el
 estado inicial y lanzar el motor.
 
-Lo que NO hace:
-  - Construir y validar el estado inicial: engine.state.build_initial_state.
-  - Ejecutar el ciclo tick a tick y registrar/liberar el estado:
-    engine.match_runner.run_match.
-  - Validar la alineación al guardarla: lineup_service.
-
-Lo que SÍ hace:
-  - prepare_match: base -> MatchState. Síncrona, sin efectos (no lanza
-    nada). Pensada para llamarse ANTES del commit que pasa el partido a
-    IN_PROGRESS: si lanza MatchInitializationError, el service que hace el
-    join revierte la unión y el visitante recibe el error (el partido no
-    queda IN_PROGRESS sin motor).
-  - launch_match: lanza run_match como tarea de fondo. Va DESPUÉS del
-    commit. Tiene que llamarse con el event loop corriendo (un endpoint
-    `async def`, o una tarea async de BackgroundTasks): desde un endpoint
-    `def` común, que FastAPI corre en un hilo, no hay loop y falla.
-  - start_match: prepare_match + launch_match, para quien no necesita
-    separar los dos pasos.
-  - save_match_result / make_on_finished: persistir el marcador final.
+ prepare_match y prepare_engine van antes del commit y launch_match despues, con el event loop corriendo.
 """
 
 from __future__ import annotations
@@ -58,12 +40,14 @@ from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
 from src.models import LineupEntry, MatchStatus, Player
+from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team, get_behaviors_by_ids
 from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause
-from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
 from src.models.match import MatchStatus
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
+from src.core.exceptions import InvalidConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +161,52 @@ def prepare_match(session: Session, match_id: int) -> MatchState:
     return build_initial_state(match_id, total_ticks_for(match.match_duration), home, away)
 
 
+
+def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, ExecuteBehavior]:
+    """
+    Arma lo que necesita el motor para arrancar, sin lanzarlo:
+      - el MatchState inicial: prepare_match lee de la base las alineaciones de los
+        dos equipos y los atributos PACSS de cada jugador (tabla players) y ubica
+        a los titulares en la cancha
+      - los comportamientos: a cada jugador se le asigna su propia función on_tick
+
+    Cualquier falla se traduce a un error de negocio (400), nunca a un 500
+    """
+    try:
+        state = prepare_match(session, match_id)
+        ## los comportamientos de AMBAS alineaciones (host y rival), sin repetir ids: varios jugadores pueden usar el mismo comportamiento
+        behavior_ids = {entry.behavior_id for entry in get_lineup_entries(session, match_id)}
+
+        ## {behavior_id: codigo} sirve para buscar el codigo de cada jugador segun su behavior_id
+        codes = {b.behavior_id: b.code for b in get_behaviors_by_ids(session, list(behavior_ids))} ## get_behaviors_by_ids devuelve solo los que existen
+        
+        ## si falta algun behavior_id, lo detecto acá y no recién en pleno partido
+        faltantes = behavior_ids - codes.keys()
+        if faltantes:
+            raise MatchInitializationError(f"No existen los comportamientos {sorted(faltantes)}.")
+        
+        ## a cada jugador (titulares y suplentes) le asigno su comportamiento: assign_behavior compila su codigo y se lo guarda.
+        ## un codigo sin on_tick (ValueError) o con errores de sintaxis/ejecución falla aca
+
+        for player in state.players.values(): # values me permite acceder al valor del dict en vez de la key
+            assign_behavior(player, player.behavior_id, codes[player.behavior_id]) # codes es un diccionario, le paso el behavior_id del jugador como clave para que retorne el codigo (str)
+
+    except Exception as exc:
+        """
+         Atrapo Exception (no solo MatchInitializationError) porque assign_behavior
+         ejecuta código escrito por usuarios (exec): puede tirar ValueError (sin on_tick),
+         SyntaxError, NameError, etc. Todos son "el partido no se puede preparar",
+         un error del usuario y no un bug del servidor: se devuelve como 400
+         "from exc" conserva el error original para los logs
+        """
+        raise InvalidConfigurationError(f"No se pudo preparar el partido: {exc}") from exc
+
+    return state, execute_behavior
+
+
+
+
+
 # --- resultado final --------------------------------------------------------
 
 
@@ -264,9 +294,6 @@ def launch_match(
     Lanza run_match como tarea de fondo y devuelve la tarea. Requiere el
     event loop corriendo (si no, RuntimeError). Si el motor muere con un
     error inesperado, se guarda el resultado parcial (ver _on_task_done).
-    execute_behavior y
-    apply_intentions se reciben porque las piezas reales las aportan los
-    tickets del sandbox de on_tick y de kick_ball.
     """
     loop = asyncio.get_running_loop()
 
