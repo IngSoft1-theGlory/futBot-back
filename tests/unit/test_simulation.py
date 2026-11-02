@@ -19,7 +19,9 @@ from src.engine._01_to_world.data_types import (
 )
 from src.engine.match_runner import run_tick
 from src.engine._03_to_builder.player_api import PlayerAPI
-from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, detect_goal
+from src.default_behaviors import OFENSIVE
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, KICKOFF_OFFSET, TeamSide, detect_goal
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
 from src.engine._04_to_physics.simulation import apply_intentions
 from src.engine._02_to_match.state import TeamMatchSetup, build_initial_state
 from src.engine._03_to_builder.snapshot import build_player_snapshot
@@ -332,23 +334,28 @@ def test_deberia_pelota_patada_hacia_el_arco_terminar_dentro_y_run_tick_contar_e
 
 # --- Reinicio de la pelota tras un gol ---
 
+# La pelota vuelve a la línea central, corrida KICKOFF_OFFSET hacia el arco del que RECIBIÓ el gol.
+SAQUE_DE_HOME = Point2D(BALL_INITIAL_POSITION.x - KICKOFF_OFFSET, BALL_INITIAL_POSITION.y)  # HOME defiende x=0
+SAQUE_DE_AWAY = Point2D(BALL_INITIAL_POSITION.x + KICKOFF_OFFSET, BALL_INITIAL_POSITION.y)  # AWAY defiende x=105
+
+
 @pytest.mark.parametrize(
-    "posicion",
+    "posicion, saque_esperado",
     [
-        Point2D(0.0, 30.0),    # dentro del arco de HOME
-        Point2D(-1.0, 30.0),   # pasó la línea de fondo de HOME
-        Point2D(105.0, 30.0),  # dentro del arco de AWAY
-        Point2D(106.0, 28.0),  # pasó la línea de fondo de AWAY
+        (Point2D(0.0, 30.0), SAQUE_DE_HOME),     # dentro del arco de HOME: HOME recibió el gol
+        (Point2D(-1.0, 30.0), SAQUE_DE_HOME),    # pasó la línea de fondo de HOME
+        (Point2D(105.0, 30.0), SAQUE_DE_AWAY),   # dentro del arco de AWAY: AWAY recibió el gol
+        (Point2D(106.0, 28.0), SAQUE_DE_AWAY),   # pasó la línea de fondo de AWAY
     ],
 )
-def test_deberia_pelota_en_un_arco_volver_al_centro_y_quedar_quieta(posicion):
+def test_deberia_pelota_en_un_arco_volver_a_la_linea_central_corrida_hacia_el_que_recibio_el_gol(posicion, saque_esperado):
     state = _state()
     state.ball.position = posicion
     state.ball.velocity = Vector2D(5.0, 5.0)
 
     apply_intentions(state, {})
 
-    assert state.ball.position == BALL_INITIAL_POSITION
+    assert state.ball.position == saque_esperado
     assert state.ball.velocity == Vector2D(0.0, 0.0)
 
 
@@ -375,17 +382,17 @@ def test_deberia_pelota_fuera_de_un_arco_no_reiniciarse(posicion):
 
 def test_deberia_reiniciar_la_pelota_antes_de_resolver_las_patadas():
     """
-    Pelota en el arco; el jugador arranca el partido junto al centro: tras el
-    reinicio la pelota queda a su alcance y la patada del mismo tick se aplica.
+    Pelota en el arco de HOME; el jugador arranca el partido junto al lugar del saque:
+    tras el reinicio la pelota queda a su alcance y la patada del mismo tick se aplica.
     """
     state = _state()
     state.ball.position = Point2D(0.0, 30.0)
-    state.players[FORWARD_HOME].initial_position = Point2D(BALL_INITIAL_POSITION.x - 1.0, BALL_INITIAL_POSITION.y)
+    state.players[FORWARD_HOME].initial_position = Point2D(SAQUE_DE_HOME.x - 1.0, SAQUE_DE_HOME.y)
 
     apply_intentions(state, {FORWARD_HOME: _kick(Vector2D(1, 0))})
 
-    # reiniciada al centro y luego pateada: avanza desde el centro, no desde el arco
-    assert state.ball.position.x == pytest.approx(BALL_INITIAL_POSITION.x + MAX_KICK_SPEED * TICK_DURATION_SECONDS)
+    # reiniciada en el lugar del saque y luego pateada: avanza desde ahí, no desde el arco
+    assert state.ball.position.x == pytest.approx(SAQUE_DE_HOME.x + MAX_KICK_SPEED * TICK_DURATION_SECONDS)
     assert state.ball.velocity.x == pytest.approx(MAX_KICK_SPEED)
 
 
@@ -430,6 +437,30 @@ def test_deberia_el_jugador_correr_desde_su_posicion_inicial_en_el_tick_del_rein
 
     paso = state.players[FORWARD_HOME].position.distance_to(inicial)
     assert 0.0 < paso <= MAX_RUN_SPEED_METERS_PER_SECOND * TICK_DURATION_SECONDS + 1e-9
+
+@pytest.mark.parametrize(
+    "arco_donde_entra, lado_que_recibe",
+    [
+        (Point2D(0.0, 30.0), TeamSide.HOME),
+        (Point2D(105.0, 30.0), TeamSide.AWAY),
+    ],
+)
+def test_deberia_tocar_primero_el_equipo_que_recibio_el_gol(arco_donde_entra, lado_que_recibe):
+    """Con el comportamiento Ofensivo, la primera patada tras el reinicio es del equipo que recibió el gol."""
+    state = _state()
+    for jugador in state.players.values():
+        assign_behavior(jugador, 1, OFENSIVE)
+    state.ball.position = arco_donde_entra  # gol del tick anterior
+
+    # el que patea hacia el arco rival manda la pelota hacia x creciente (HOME) o decreciente (AWAY)
+    for _ in range(40):
+        run_tick(state, execute_behavior=execute_behavior, apply_intentions=apply_intentions, detect_goal=detect_goal)
+        if state.ball.velocity != Vector2D(0.0, 0.0):
+            break
+
+    pateo_home = state.ball.velocity.x > 0
+    assert pateo_home == (lado_que_recibe is TeamSide.HOME)
+
 
 # --- Jugadores en el banco ---
 
