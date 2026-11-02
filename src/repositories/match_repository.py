@@ -150,3 +150,19 @@ def get_league_fixture(session: Session, league_id: int) -> list[Match]:
         .order_by(Match.round_number, Match.match_id)   # ordena los partidos por numero de fecha y match_id
     )
     return list(session.scalars(statement).all())
+
+def get_pending_round_matches(session: Session, league_id: int, round_number: int) -> list[Match]:
+    """
+    devuelve los partidos de una fecha de la liga que todavia no arrancaron
+    los que ya arrancaron o terminaron no vienen, por eso arrancar dos veces la misma fecha no los relanza
+    """
+    statement = (
+        select(Match)
+        .where(
+            Match.league_id == league_id,          # solo los de esta liga
+            Match.round_number == round_number,    # solo los de esta fecha
+            Match.status == MatchStatus.PENDING,   # solo los que no arrancaron
+        )
+        .order_by(Match.match_id)
+    )
+    return list(session.scalars(statement).all())
