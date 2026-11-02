@@ -100,6 +100,9 @@ class MatchState:
     # La pausa en curso, o None si el partido no está en pausa.
     pause: Optional[PauseState] = None
 
+    # agrego modo penales para partidos de liga. por defecto es false
+    penalties_enabled: bool = False
+
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
         return [p for p in self.players.values() if p.team_id == team_id]
@@ -185,6 +188,7 @@ def build_initial_state(
     total_ticks: int,
     home: TeamMatchSetup,
     away: TeamMatchSetup,
+    penalties_enabled: bool = False,
 ) -> MatchState:
     """
     Arma el MatchState inicial: tick = 0, marcador 0-0, pelota en
@@ -209,6 +213,7 @@ def build_initial_state(
         score=Score(home=0, away=0),
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
+        penalties_enabled=penalties_enabled,
     )
 
 
