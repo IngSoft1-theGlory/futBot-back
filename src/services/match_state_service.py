@@ -163,7 +163,7 @@ def build_match_state_response(
         match_id=context.match_id,
         current_tick=state.current_tick,
         total_ticks=state.total_ticks,
-        score=ScoreOut(home=state.score.home, away=state.score.away),
+        score=ScoreOut(home=state.score.home, away=state.score.away, phome=state.score.phome, paway=state.score.paway),
         players=players,
         substitutes=substitutes,
         phase=state.phase.value,
