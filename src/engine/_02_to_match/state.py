@@ -41,6 +41,9 @@ class Score:
     """Goles convertidos por cada equipo (home = anfitrión, away = visitante)."""
     home: int = 0
     away: int = 0
+    # añado goles de penales. por defecto es None por si es un amistoso o liga sin penales 
+    phome: Optional[int] = None
+    paway: Optional[int] = None
 
 
 @dataclass

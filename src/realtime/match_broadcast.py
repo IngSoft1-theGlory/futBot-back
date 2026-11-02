@@ -28,7 +28,8 @@ def build_tick_update_payload(state: MatchState) -> dict:
         "match_id": state.match_id,
         "current_tick": state.current_tick,
         "total_ticks": state.total_ticks,
-        "score": {"home": state.score.home, "away": state.score.away},
+        "score": {"home": state.score.home, "away": state.score.away, 
+                  "phome": state.score.phome, "paway": state.score.paway},
         "ball": {"x": state.ball.position.x, "y": state.ball.position.y},
         "players": [
             {
