@@ -6,6 +6,7 @@ Definen la forma del JSON que entra (request) y el que sale (response)
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
+from typing import Literal # Literal permite definir un tipo que solo puede tomar ciertos val, ej Literal["IN_PROGRESS"]   
 
 from src.models.league import LeagueStatus
 from src.schemas.lineup_config import LineupConfig
@@ -101,3 +102,11 @@ class JoinLeagueRequest(LineupConfig):
 class JoinLeagueResponse(BaseModel):
     league_id: int
     team_id: int
+
+class StartLeagueRequest(BaseModel):
+    status : Literal["IN_PROGRESS"]
+
+class StartLeagueResponse(BaseModel):
+    league_id : int
+    league_name : str
+    status : LeagueStatus

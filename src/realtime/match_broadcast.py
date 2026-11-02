@@ -14,6 +14,7 @@ Forma del payload: exactamente la del evento TICK_UPDATE del contrato
 
 from __future__ import annotations
 
+from src.engine._01_to_world.metrics import PauseType
 from src.engine._02_to_match.state import MatchState
 from src.realtime.match_connection_manager import match_connections
 
@@ -48,3 +49,50 @@ async def notify(state: MatchState) -> None:
     y no pasa nada (no es un error: el motor no debe depender de que
     haya espectadores)."""
     await match_connections.broadcast(state.match_id, build_tick_update_payload(state))
+
+
+def build_pause_started_payload(
+        match_id: int, 
+        pause_type: PauseType, 
+        duration_seconds: float, 
+        current_tick: int
+) -> dict:
+    """ Arma el dict del evento PAUSE_STARTED (Cooling Break o Half-Time) """
+    return {
+        "event": "PAUSE_STARTED",
+        "match_id": match_id,
+        "type": pause_type.value,
+        "duration_seconds": duration_seconds,
+        "current_tick": current_tick,
+    }
+
+
+def build_pause_finished_payload(match_id: int, pause_type: PauseType) -> dict:
+    """ Arma el dict del evento PAUSE_FINISHED (Cooling Break o Half-Time) """
+    return {
+        "event": "PAUSE_FINISHED",
+        "match_id": match_id,
+        "type": pause_type.value,
+    }
+
+
+async def notify_pause(
+        state: MatchState, 
+        pause_type: PauseType, 
+        duration_seconds: float, 
+        started: bool
+) -> None:
+    """ Notifica a los clientes conectados al partido que empezó o 
+    terminó la pausa (en Cooling Break o Half-Time) """
+   
+    # si la pausa empezo, se prepara la info (payload) para  los clientes,
+    # y si no se cierra la pausa, se prepara el payload para avisar que terminó la pausa.
+    if started:
+        payload = build_pause_started_payload(
+            state.match_id, pause_type, duration_seconds, state.current_tick)
+    else:
+        payload = build_pause_finished_payload(state.match_id, pause_type)
+  
+    # se transmite el info (payload) a todos los clientes conectados 
+    # al partido, avisando que la pausa empezó o terminó.
+    await match_connections.broadcast(state.match_id, payload)

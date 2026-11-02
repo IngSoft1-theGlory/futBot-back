@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 
 from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
+from src.engine._01_to_world.metrics import PauseType
 from src.engine._01_to_world.pitch import TeamSide, starter_position
 from src.engine._01_to_world.data_types import AttributeType, ActionType, Intention
 from src.engine._04_to_physics.simulation import apply_intentions
@@ -28,6 +29,9 @@ from src.services.match_start_service import (
 )
 
 from src.realtime.event_bus import event_bus
+
+# Los partidos de 240 y 600 ticks tienen pausas: estos tests no esperan su duración real.
+PAUSAS_SIN_ESPERA = dict.fromkeys(PauseType, 0)
 
 ROLES_2_1 = ["DEF_LEFT", "DEF_RIGHT", "FORWARD"]
 ROLES_1_2 = ["DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"]
@@ -324,6 +328,7 @@ async def test_deberia_start_match_publicar_match_finished_una_sola_vez_al_termi
         registry=MatchRegistry(),
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -376,6 +381,7 @@ async def test_deberia_start_match_correr_el_partido_y_persistir_el_resultado(se
         registry=registry,
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -412,6 +418,7 @@ async def test_deberia_el_motor_real_mover_a_los_jugadores_con_los_atributos_de_
         registry=MatchRegistry(),
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -522,6 +529,7 @@ async def test_deberia_no_reintentar_si_lo_que_falla_es_guardar_el_resultado(ses
         registry=registry,
         on_finished=on_finished_que_falla,
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     with pytest.raises(RuntimeError):
         await task
