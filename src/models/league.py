@@ -58,6 +58,8 @@ class League(Base):
     host_team_id: Mapped[int] = mapped_column(
         ForeignKey("teams.team_id", ondelete="CASCADE"), nullable=False, index=True
     )
+
+    penalties_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false") # el server_default es para que las ligas que ya existen queden sin penales al migrar
     
     # para que imprima los datos claramente si un test falla, en vez de <League object at 0x...> 
     def __repr__(self) -> str:
