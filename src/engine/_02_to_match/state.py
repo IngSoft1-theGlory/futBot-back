@@ -17,7 +17,13 @@ from typing import Optional, Callable
 
 from src.schemas.lineup_config import LineupConfig
 from src.engine._01_to_world.metrics import PauseType
-from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
+from src.engine._01_to_world.pitch import (
+    BALL_INITIAL_POSITION,
+    TeamSide,
+    mirror_position,
+    opposite_side,
+    starter_position,
+)
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType, ActionType
 from src.schemas.lineup_config import LineupConfig
 
@@ -99,6 +105,10 @@ class MatchState:
 
     # La pausa en curso, o None si el partido no está en pausa.
     pause: Optional[PauseState] = None
+
+    # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
+    # que el marcador siga al equipo y no al lado.
+    host_side: TeamSide = TeamSide.HOME
 
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
@@ -209,7 +219,26 @@ def build_initial_state(
         score=Score(home=0, away=0),
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
+        host_side=home.side,
     )
+
+
+def swap_sides(state: MatchState) -> None:
+    """
+    Intercambia los lados de los equipos (Half-Time): cada equipo pasa a
+    defender el arco contrario. Los jugadores en cancha vuelven a su posición
+    inicial espejada y la pelota al centro, quieta.
+    """
+    state.host_side = opposite_side(state.host_side)
+
+    for player in state.players.values():
+        player.side = opposite_side(player.side)  # también los suplentes
+        if player.position is not None and player.initial_position is not None:
+            player.initial_position = mirror_position(player.initial_position)
+            player.position = player.initial_position
+
+    state.ball.position = BALL_INITIAL_POSITION
+    state.ball.velocity = Vector2D(0.0, 0.0)
 
 
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:

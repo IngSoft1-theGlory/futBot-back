@@ -102,6 +102,16 @@ FORMATION_POSITIONS: dict[str, dict[str, Point2D]] = {
 BALL_INITIAL_POSITION = Point2D(PITCH_LENGTH / 2, PITCH_WIDTH / 2)  # centro de la cancha
 
 
+def mirror_position(position: Point2D) -> Point2D:
+    """Gira una posición 180° respecto del centro de la cancha."""
+    return Point2D(PITCH_LENGTH - position.x, PITCH_WIDTH - position.y)
+
+
+def opposite_side(side: TeamSide) -> TeamSide:
+    """El lado contrario a `side`."""
+    return TeamSide.AWAY if side is TeamSide.HOME else TeamSide.HOME
+
+
 def starter_position(formation_type: str, role: str, side: TeamSide) -> Point2D:
     """
     Posición inicial de un titular según su formación, rol y lado.
@@ -111,4 +121,4 @@ def starter_position(formation_type: str, role: str, side: TeamSide) -> Point2D:
         return base
     # AWAY se gira la posición 180° respecto del centro de la cancha.
     # Así cada rol mantiene su lado respecto de su propio equipo.
-    return Point2D(PITCH_LENGTH - base.x, PITCH_WIDTH - base.y)
+    return mirror_position(base)
