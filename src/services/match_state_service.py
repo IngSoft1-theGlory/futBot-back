@@ -23,6 +23,7 @@ from src.schemas.match_state import (
     PlayerAttributesOut,
     ScoreOut,
     PauseOut,
+    PointOut,
 )
 
 import time # para calcular remaining_seconds de la pausa
@@ -92,6 +93,7 @@ def build_player_out(context: MatchStateContext, player_id: int, player_state) -
         )
 
     es_propio = player_state.team_id == context.user_team_id
+    position = player_state.position
     return MatchPlayerOut(
         player_id=player.player_id,
         team_id=player_state.team_id,
@@ -105,6 +107,9 @@ def build_player_out(context: MatchStateContext, player_id: int, player_state) -
             strength=player.strength,
         ),
         behavior_id=player_state.behavior_id if es_propio else None,
+        position=PointOut(x=position.x, y=position.y) if position is not None else None,
+        current_action=player_state.current_action.value if position is not None else None,
+ 
     )
 
 
@@ -163,5 +168,6 @@ def build_match_state_response(
         substitutes=substitutes,
         phase=state.phase.value,
         pause=pause_out,
+        ball=PointOut(x=state.ball.position.x, y=state.ball.position.y),    
 
     )

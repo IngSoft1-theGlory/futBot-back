@@ -13,6 +13,10 @@ class PlayerAttributesOut(BaseModel):
     speed: int
     strength: int
 
+class PointOut(BaseModel):
+    x: float
+    y: float
+
 class MatchPlayerOut(BaseModel):
     player_id: int
     team_id: int
@@ -20,6 +24,8 @@ class MatchPlayerOut(BaseModel):
     number: int
     attributes: PlayerAttributesOut
     behavior_id: int | None   # sin default a propósito: hay que pasarlo siempre
+    position: PointOut | None
+    current_action: str | None
 
 class PauseOut(BaseModel):
     type: str
@@ -36,6 +42,7 @@ class MatchStateResponse(BaseModel):
     substitutes: list[MatchPlayerOut]   # suplentes, solo del equipo de quien consulta
     phase: str
     pause: PauseOut | None
+    ball: PointOut
       
 # Peticion para cambiar comportamiento durante un partido
 class ChangeBehaviorRequest(BaseModel): 
