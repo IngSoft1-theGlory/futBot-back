@@ -2,8 +2,6 @@
 Tests de la opción de penales al crear una liga
 """
 
-import pytest
-
 from src.models import League
 from src.services.league_service import create_league
 from src.services.match_start_service import prepare_match
