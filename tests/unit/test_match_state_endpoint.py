@@ -123,7 +123,10 @@ def test_deberia_devolver_200_con_el_estado_y_solo_los_6_jugadores_en_cancha(cli
     state = partido["state"]
     state.current_tick = 7
     state.score.home = 2
-    state.score.away = 1
+    state.score.away = 2
+    state.score.phome = 1
+    state.score.paway = 1
+
 
     response = client.get(url(partido["match"].match_id), headers=auth(partido["host"]))
 
@@ -132,7 +135,7 @@ def test_deberia_devolver_200_con_el_estado_y_solo_los_6_jugadores_en_cancha(cli
     assert body["match_id"] == partido["match"].match_id
     assert body["current_tick"] == 7
     assert body["total_ticks"] == 240
-    assert body["score"] == {"home": 2, "away": 1}
+    assert body["score"] == {"home": 2, "away": 2, "phome": 1, "paway": 1}
     # 3 titulares por equipo: los suplentes (position=None) no aparecen
     en_cancha = {j.player_id for j in partido["jugadores_host"][:3] + partido["jugadores_away"][:3]}
     assert {p["player_id"] for p in body["players"]} == en_cancha
