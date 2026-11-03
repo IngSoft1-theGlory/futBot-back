@@ -5,6 +5,8 @@ from pydantic import BaseModel
 class ScoreOut(BaseModel):
     home: int
     away: int
+    phome: int | None = None
+    paway: int | None = None
 
 class PlayerAttributesOut(BaseModel):
     power: int

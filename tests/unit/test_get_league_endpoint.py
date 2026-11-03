@@ -126,6 +126,7 @@ def test_deberia_devolver_el_detalle_completo_de_una_liga_publica(
         "teams": [{"team_id": usuario_con_equipo.team_id, "team_name": "Sacachispas FC"}],
         "ranking": [],
         "fixture": [],
+        "penalties_enabled": False,
     }
 
 

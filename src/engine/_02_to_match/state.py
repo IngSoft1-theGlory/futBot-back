@@ -47,6 +47,9 @@ class Score:
     """Goles convertidos por cada equipo (home = anfitrión, away = visitante)."""
     home: int = 0
     away: int = 0
+    # añado goles de penales. por defecto es None por si es un amistoso o liga sin penales 
+    phome: Optional[int] = None
+    paway: Optional[int] = None
 
 
 @dataclass
@@ -109,6 +112,9 @@ class MatchState:
     # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
     # que el marcador siga al equipo y no al lado.
     host_side: TeamSide = TeamSide.HOME
+    
+    # agrego modo penales para partidos de liga. por defecto es false
+    penalties_enabled: bool = False
 
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
@@ -195,6 +201,7 @@ def build_initial_state(
     total_ticks: int,
     home: TeamMatchSetup,
     away: TeamMatchSetup,
+    penalties_enabled: bool = False,
 ) -> MatchState:
     """
     Arma el MatchState inicial: tick = 0, marcador 0-0, pelota en
@@ -220,6 +227,7 @@ def build_initial_state(
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
         host_side=home.side,
+        penalties_enabled=penalties_enabled,
     )
 
 

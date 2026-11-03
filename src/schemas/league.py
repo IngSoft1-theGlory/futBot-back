@@ -17,7 +17,8 @@ class CreateLeagueRequest(LineupConfig):
     match_duration: int 
     max_teams: int 
     password: str | None = None # si no viene, es None 
-    team_id: int 
+    team_id: int
+    penalties_enabled: bool = False # si no viene, la liga no tiene penales 
     # hereda formation_type, starting_players y substitute_players de LineupConfig 
 
 class CreateLeagueResponse(BaseModel): 
@@ -29,6 +30,7 @@ class CreateLeagueResponse(BaseModel):
     max_teams: int 
     current_teams_count: int 
     host_team_id: int
+    penalties_enabled: bool 
 
 class LeagueOut(BaseModel):
     league_id: int
@@ -94,6 +96,7 @@ class LeagueDetailOut(BaseModel):
     teams: list[LeagueTeamOut]
     ranking: list[StandingRowOut] = Field(default_factory=list)
     fixture: list[FixtureMatchOut] = Field(default_factory=list)
+    penalties_enabled: bool
 
 class JoinLeagueRequest(LineupConfig):
     team_id: int

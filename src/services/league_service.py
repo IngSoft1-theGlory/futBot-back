@@ -79,6 +79,7 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
             host_team_id=payload.team_id,
             match_duration=payload.match_duration,
             status=LeagueStatus.PENDING,
+            penalties_enabled=payload.penalties_enabled
         )
 
         session.add(league)
@@ -233,7 +234,8 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         match_duration=league.match_duration,
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
         fixture=fixture,    
-        ranking=ranking
+        ranking=ranking,
+        penalties_enabled=league.penalties_enabled
     )
 
 

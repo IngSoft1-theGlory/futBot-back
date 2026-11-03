@@ -87,7 +87,8 @@ async def create_league_endpoint(
        match_duration = league.match_duration,
        max_teams = league.max_teams, 
        current_teams_count = 1,
-       host_team_id = league.host_team_id
+       host_team_id = league.host_team_id,
+       penalties_enabled= league.penalties_enabled
     )
 
 @router.delete(

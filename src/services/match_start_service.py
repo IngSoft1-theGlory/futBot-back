@@ -14,6 +14,7 @@ from functools import partial
 
 from sqlalchemy.orm import Session
 
+from src.repositories.league_repository import get_league_by_id
 from src.database.base import SessionLocal
 from src.engine._01_to_world import pitch
 from src.engine._01_to_world.pitch import FORMATION_POSITIONS, TeamSide
@@ -158,8 +159,17 @@ def prepare_match(session: Session, match_id: int) -> MatchState:
         get_players_by_team(session, match.team_away_id),
     )
 
-    return build_initial_state(match_id, total_ticks_for(match.match_duration), home, away)
+    if match.league_id is not None:
+        league = get_league_by_id(session, match.league_id)
+        if league.penalties_enabled is not None:
+            penalties_e = league.penalties_enabled 
+        else:
+            penalties_e = False
+    else: 
+        penalties_e = False
 
+
+    return build_initial_state(match_id, total_ticks_for(match.match_duration), home, away, penalties_e)
 
 
 def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, ExecuteBehavior]:
