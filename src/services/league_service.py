@@ -213,7 +213,7 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
             team_host=FixtureTeamOut(team_id=partido.host_team.team_id, team_name=partido.host_team.team_name),
             team_away=FixtureTeamOut(team_id=partido.away_team.team_id, team_name=partido.away_team.team_name),
             # Se agregan los goles de cada equipo, si el partido no se jugó, los goles son 0
-            score=FixtureScoreOut(home=partido.home_goals, away=partido.away_goals),
+            score=FixtureScoreOut(home=partido.home_goals, away=partido.away_goals, phome=partido.home_penalty_goals, paway=partido.away_penalty_goals),
         )
         for partido in partidos     
     ]
