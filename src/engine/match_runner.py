@@ -6,7 +6,8 @@ Ciclo del partido, tick a tick.
 - run_match: repite run_tick hasta el final del partido. Después de
   cada tick avisa a los clientes (notify) y espera. Cuando llega a un
   tick de pausa (Cooling Break o Half-Time) el reloj se detiene y el
-  partido espera en PAUSED antes de seguir.
+  partido espera en PAUSED antes de seguir. Tras el Half-Time, los equipos 
+  cambian de lado.
 
 Las piezas que vienen de otros módulos (comportamientos, física, regla
 de gol, aviso y guardado del resultado) se reciben por parámetro: así

@@ -71,7 +71,7 @@ class MatchPlayerState:
     position: Optional[Point2D] = None
     current_action: ActionType = ActionType.IDLE
     attributes: dict[AttributeType, int] = field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
-    initial_position: Optional[Point2D] = None  # Donde el jugador arrancó el partido, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
+    initial_position: Optional[Point2D] = None  # Donde el jugador arranca en el lado actual, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
     on_tick: Optional[Callable] = None # para que cada jugador guarde su propia funcion
 
 
