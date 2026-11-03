@@ -6,7 +6,7 @@ por eso aca el service y el event_bus estan reemplazados por mocks.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 from fastapi.testclient import TestClient
@@ -59,6 +59,14 @@ def bus(monkeypatch):
     return mock
 
 
+@pytest.fixture()
+def arrancar_fecha(monkeypatch):
+    """start_league_round falso: anota si la ruta lo llamo, sin arrancar partidos"""
+    mock = AsyncMock()
+    monkeypatch.setattr("src.routes.leagues.start_league_round", mock)
+    return mock
+
+
 def liga_falsa(status):
     return League(league_id=7, league_name="Liga test", max_teams=4, status=status)
 
@@ -89,7 +97,7 @@ def unirse_a_la_liga(client):
     return client.post(f"{URL}/teams", json=BODY_UNIRSE)
 
 
-def test_deberia_responder_200_y_publicar_league_initiated_una_sola_vez(client, bus, start_league_falso):
+def test_deberia_responder_200_y_publicar_league_initiated_una_sola_vez(client, bus, start_league_falso, arrancar_fecha):
     respuesta = iniciar_liga(client)
 
     assert respuesta.status_code == 200
@@ -98,13 +106,25 @@ def test_deberia_responder_200_y_publicar_league_initiated_una_sola_vez(client, 
     assert bus.publish.call_args_list == [EVENTO_INICIADA]
 
 
+def test_deberia_arrancar_la_fecha_1_al_iniciar_la_liga(client, bus, start_league_falso, arrancar_fecha):
+    iniciar_liga(client)
+
+    arrancar_fecha.assert_awaited_once_with(None, 7, 1)  # None es la sesion falsa del fixture client
+
+
 def test_deberia_publicar_team_joined_y_luego_league_initiated_si_se_completa_el_cupo(
-    client, bus, join_que_completa_el_cupo
+    client, bus, join_que_completa_el_cupo, arrancar_fecha
 ):
     respuesta = unirse_a_la_liga(client)
 
     assert respuesta.status_code == 201
     assert bus.publish.call_args_list == [EVENTO_UNIDO, EVENTO_INICIADA]  # en ese orden
+
+
+def test_deberia_arrancar_la_fecha_1_si_se_completa_el_cupo(client, bus, join_que_completa_el_cupo, arrancar_fecha):
+    unirse_a_la_liga(client)
+
+    arrancar_fecha.assert_awaited_once_with(None, 7, 1)
 
 
 def test_deberia_publicar_solo_team_joined_si_no_se_completa_el_cupo(

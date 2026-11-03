@@ -27,6 +27,7 @@ from src.services.league_service import (
     join_league,
     start_league
 )
+from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
     VerifyPasswordRequest, 
     VerifyPasswordResponse, 
@@ -173,6 +174,8 @@ async def join_league_endpoint(
     # si al unirse se completo el cupo, join_league ya dejo la liga en IN_PROGRESS
     if league.status == LeagueStatus.IN_PROGRESS:
         _publish_league_initiated(league)
+        # con la liga confirmada y el evento publicado, arranca la primera fecha
+        await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
 
@@ -202,12 +205,16 @@ async def start_league_endpoint(
     # despues de hacer commit, aviso a los suscriptores del evento LEAGUE_INITIATED
     _publish_league_initiated(league)
 
-    # aca se deberia engancha "Arrancar una fecha (jornada)" 
-    # ...
-
-    # devuelve el estado de la liga recien iniciada
-    return StartLeagueResponse(
+    # armo la respuesta antes de arrancar la fecha: asi, si falla algun partido,
+    # el PUT igual responde los datos de la liga recien iniciada
+    response = StartLeagueResponse(
         league_id=league.league_id,
         league_name=league.league_name,
         status=league.status.value,
     )
+
+    # con la liga confirmada y el evento publicado, arranca la primera fecha
+    await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
+
+    # devuelve el estado de la liga recien iniciada
+    return response
