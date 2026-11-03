@@ -204,8 +204,8 @@ async def start_league_endpoint(
     # despues de hacer commit, aviso a los suscriptores del evento LEAGUE_INITIATED
     _publish_league_initiated(league)
 
-    # la respuesta se arma antes de arrancar la fecha: si un partido falla hay un rollback,
-    # que vacia el objeto league. Asi un error en la fecha no puede cambiar lo que responde el PUT
+    # armo la respuesta antes de arrancar la fecha: asi, si falla algun partido,
+    # el PUT igual responde los datos de la liga recien iniciada
     response = StartLeagueResponse(
         league_id=league.league_id,
         league_name=league.league_name,

@@ -36,13 +36,14 @@ async def start_league_round(session: Session, league_id: int, round_number: int
     """
     try:
         pending_matches = await run_in_threadpool(get_pending_round_matches, session, league_id, round_number)
-        # guardo los ids porque un rollback vacia los objetos Match, y leerlos de nuevo iria a la base
+        # guardo solo los ids: son numeros simples y un rollback no los afecta
         match_ids = [match.match_id for match in pending_matches]
     except Exception:
         logger.exception("No se pudieron buscar los partidos de la fecha %s de la liga %s.", round_number, league_id)
         return
 
-    # los arranco de a uno porque comparten la sesion, y una sesion no se puede usar en dos lugares a la vez, igual juegan en paralelo, start_league_match lanza el motor como tarea de fondo y no espera a que termine
+    # se arrancan de a uno porque todos usan la misma sesion de la base,
+    # pero juegan a la vez: start_league_match lanza el motor y no espera a que termine
     for match_id in match_ids:
         try:
             await start_league_match(session, match_id)

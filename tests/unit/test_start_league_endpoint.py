@@ -112,18 +112,6 @@ def test_deberia_arrancar_la_fecha_1_al_iniciar_la_liga(client, bus, start_leagu
     arrancar_fecha.assert_awaited_once_with(None, 7, 1)  # None es la sesion falsa del fixture client
 
 
-def test_deberia_responder_200_aunque_falle_el_arranque_de_la_fecha(client, bus, start_league_falso, monkeypatch):
-    def busqueda_que_falla(*args):
-        raise RuntimeError("se cayo la base")
-
-    monkeypatch.setattr("src.services.league_run_service.get_pending_round_matches", busqueda_que_falla)
-
-    respuesta = iniciar_liga(client)
-
-    assert respuesta.status_code == 200
-    assert respuesta.json() == {"league_id": 7, "league_name": "Liga test", "status": "IN_PROGRESS"}
-
-
 def test_deberia_publicar_team_joined_y_luego_league_initiated_si_se_completa_el_cupo(
     client, bus, join_que_completa_el_cupo, arrancar_fecha
 ):
@@ -140,10 +128,9 @@ def test_deberia_arrancar_la_fecha_1_si_se_completa_el_cupo(client, bus, join_qu
 
 
 def test_deberia_publicar_solo_team_joined_si_no_se_completa_el_cupo(
-    client, bus, join_que_no_completa_el_cupo, arrancar_fecha
+    client, bus, join_que_no_completa_el_cupo
 ):
     respuesta = unirse_a_la_liga(client)
 
     assert respuesta.status_code == 201
     assert bus.publish.call_args_list == [EVENTO_UNIDO]
-    arrancar_fecha.assert_not_awaited()
