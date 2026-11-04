@@ -97,3 +97,25 @@ async def notify_pause(
     # se transmite el info (payload) a todos los clientes conectados 
     # al partido, avisando que la pausa empezó o terminó.
     await match_connections.broadcast(state.match_id, payload)
+
+
+def build_penalties_started_payload(match_id: int) -> dict:
+    """ Arma el dict del evento PENALTIES_STARTED """
+    return {"event": "PENALTIES_STARTED", "match_id": match_id}
+
+
+def build_penalties_finished_payload(match_id: int) -> dict:
+    """ Arma el dict del evento PENALTIES_FINISHED """
+    return {"event": "PENALTIES_FINISHED", "match_id": match_id}
+
+
+async def notify_penalties(state: MatchState, started: bool) -> None:
+    """ Notifica a los clientes conectados al partido que empezó (started=True)
+    o terminó (started=False) la tanda de penales """
+    if started:
+        payload = build_penalties_started_payload(state.match_id)
+    else:
+        payload = build_penalties_finished_payload(state.match_id)
+
+    # se transmite el payload a todos los clientes conectados al partido
+    await match_connections.broadcast(state.match_id, payload)

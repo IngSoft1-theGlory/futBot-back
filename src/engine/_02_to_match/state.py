@@ -83,6 +83,18 @@ class PauseState:
     ends_at: float  # instante de fin, medido con time.monotonic(, pues es un reloj que solo avanza y no se ve afectado por cambios de la hora del sistema.
     substituted_team_ids: set[int] = field(default_factory=set) # IDs de los equipos que ya hicieron su cambio en esta pausa. Se vacía al terminar la pausa.
 
+@dataclass
+class PenaltyShootout:
+    """
+    Estado de la tanda de penales: para cada equipo, el orden en que patean
+    y el orden en que atajan sus titulares.
+    """
+    # kicker_order y keeper_order son dicts, con el fin de buscar por team_id y que devuelva la lista
+    # de jugadores que participan en la tanda.
+    # field(default_factory=dict) y no '= {}': así cada tanda tiene sus propios dicts
+    kicker_order: dict[int, list[int]] = field(default_factory=dict)  # team_id -> player_ids, en orden de pateo
+    keeper_order: dict[int, list[int]] = field(default_factory=dict)  # team_id -> player_ids, en orden de atajada
+    prepared: bool = False                                            # True cuando el orden ya fue sorteado
 
 @dataclass
 class MatchState:
@@ -105,6 +117,9 @@ class MatchState:
 
     # agrego modo penales para partidos de liga. por defecto es false
     penalties_enabled: bool = False
+
+    # La tanda de penales, o None si todavía no se preparó.
+    penalty_shootout: Optional[PenaltyShootout] = None
 
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
