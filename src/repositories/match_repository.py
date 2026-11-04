@@ -5,7 +5,7 @@ Sólo lectura: la escritura vive en src/services/friendly_service.py.
 
 from __future__ import annotations
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import selectinload
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player
@@ -166,3 +166,29 @@ def get_pending_round_matches(session: Session, league_id: int, round_number: in
         .order_by(Match.match_id)
     )
     return list(session.scalars(statement).all())
+
+def count_unfinished_round_matches(session: Session, league_id: int, round_number: int) -> int:
+    """
+    Devuelve la cantidad de partidos de la fecha todavia no terminaron (PENDING o IN_PROGRESS),
+    donde 0 significa que la fecha termino
+    """
+    statement = (
+        select(func.count()) 
+        .select_from(Match) 
+        .where(
+            Match.league_id == league_id,
+            Match.round_number == round_number,
+            Match.status != MatchStatus.FINISHED,
+        )
+    )
+
+    return session.scalar(statement)
+
+def get_last_round_number(session: Session, league_id: int) -> int | None:
+    """
+    Devuelve el numero de la ultima fecha existente de la liga, el round_number 
+    mas alto de sus partidos, o None si la liga no tiene partidos
+    """
+    statement = (select(func.max(Match.round_number)).where(Match.league_id == league_id))
+
+    return session.scalar(statement)

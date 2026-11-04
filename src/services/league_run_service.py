@@ -5,17 +5,33 @@ Logica de ejecucion de ligas
 from __future__ import annotations 
 
 import logging
+import asyncio
+from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 
 from fastapi.concurrency import run_in_threadpool
 
-from src.repositories.match_repository import get_match_by_id
+from src.database.base import SessionLocal
+
+from src.repositories.league_repository import get_league_by_id
+from src.repositories.match_repository import (
+    get_match_by_id, 
+    count_unfinished_round_matches, 
+    get_last_round_number, 
+    claim_pending_league_match, 
+    get_pending_round_matches,
+)
 from src.core.exceptions import MatchNotFoundError, MatchUnavailableError, InvalidConfigurationError
 from src.models.match import MatchStatus, Match
-from src.repositories.match_repository import claim_pending_league_match, get_pending_round_matches
 from src.services.lineup_service import copy_league_lineup_to_match
-from src.services.match_start_service import prepare_engine, save_match_result, launch_match
+from src.services.match_start_service import (
+    prepare_engine,
+    save_match_result,
+    launch_match,
+    make_on_finished,
+    LeagueMatchHook,
+)
 from src.engine._02_to_match.state import MatchState 
 from src.engine.match_runner import ExecuteBehavior
 from src.engine._04_to_physics.simulation import apply_intentions
@@ -67,10 +83,18 @@ async def start_league_match(session: Session, match_id: int) -> None:
         # el resultado del partido es 0-0
         logger.exception("El partido %s no se pudo preparar: se cierra 0-0.", match_id)
         save_match_result(session, match_id, 0, 0)
+
+        match = get_match_by_id(session, match_id) # recargo el partido para tener el league_id y round_number
+        resolve_league_round(session, SessionLocal, match.league_id, match.round_number) # si el partido no se pudo preparar, se intenta arrancar la siguiente fecha de la liga en segundo plano
         return
 
     # lanzo el motor
-    launch_match(state, execute_behavior=execute_behavior, apply_intentions=apply_intentions)
+    launch_match(
+        state, 
+        execute_behavior=execute_behavior, 
+        apply_intentions=apply_intentions,
+        on_finished=make_on_finished(after_league_match=make_league_match_hook()),
+    )
 
     # publico match_started con el league_id 
     event_bus.publish("MATCH_STARTED", {
@@ -118,3 +142,90 @@ def begin_league_match(session: Session, match_id: int) -> tuple[Match, MatchSta
     return (match, state, execute_behavior)
 
 
+_round_start_tasks: set[asyncio.Task] = set()
+
+def next_round_to_start(session: Session, league_id: int, round_number: int) -> int | None:
+    """
+    Devuelve el numero de la siguiente fecha de la liga que se puede arrancar, 
+    o None si no se puede arrancar ninguna
+    """
+
+    # se evita que dos partidos que terminan casi a la vez arranquen la siguiente 
+    # fecha dos veces
+    get_league_by_id(session, league_id, for_update=True)
+
+    # si todavia quedan partidos de la fecha sin terminar, NO arranco la siguiente fecha
+    unfinished = count_unfinished_round_matches(session, league_id, round_number)
+    if unfinished > 0:
+        return None
+
+    # se obtiene el numero de la ultima fecha de la liga
+    last_round_number = get_last_round_number(session, league_id)
+    # entonces si no hay partidos o ya se termino fecha
+    if last_round_number is None or round_number >= last_round_number:
+        return None
+
+    # se terminaron los partidos de le fecha y se puede arrancar la siguiente fecha 
+    return round_number + 1
+
+ 
+def resolve_league_round(
+        session: Session, 
+        session_factory: Callable[[], Session], 
+        league_id: int, round_number: int
+) -> None:
+    """
+    Comprueba si terminó la fecha actual y, si corresponde, 
+    inicia la siguiente fecha en segundo plano
+    """
+    # si no hay fecha siguiente, no hago nada
+    next_round = next_round_to_start(session, league_id, round_number)
+    if next_round is None:
+        return
+ 
+    # arranco la siguiente fecha en segundo plano, para no bloquear el request que termino el partido
+    # obtengo el loop de asyncio que esta corriendo en el hilo principal, para poder crear una tarea en segundo plano
+    loop = asyncio.get_running_loop()
+    task = loop.create_task(_start_round_in_background(session_factory, league_id, next_round)) # creo la tarea de fondo
+
+    # agrego la tarea al set de tareas activas, para que no se pierda si falla y para poder loguear el error
+    _round_start_tasks.add(task) 
+    task.add_done_callback(_on_round_start_done) # agrego el callback para cuando termine la tarea
+  
+ 
+def _on_round_start_done(task: asyncio.Task) -> None:
+    """
+    Procesa el resultado de la tarea que inició la siguiente fecha,
+    elimina la tarea de las tareas activas y registra cualquier error
+    """
+    
+    # la tarea ya terminó, se elimina de las tareas activas.
+    _round_start_tasks.discard(task)
+    # registra el error si la tarea terminó con una excepción.
+    if not task.cancelled() and task.exception() is not None:
+        logger.error("No se pudo arrancar la fecha siguiente de la liga.", exc_info=task.exception())
+
+ 
+def make_league_match_hook(session_factory: Callable[[], Session] = SessionLocal) -> LeagueMatchHook:
+    """
+    Crea el callback que se ejecuta cuando termina un partido de liga
+    """
+    # hook trata de arrancar la siguiente fecha de la liga en segundo plano si ya terminaron todos 
+    # los partidos de la fecha
+    def hook(league_id: int, round_number: int) -> None:
+        # si la fecha termino, arranca la siguiente fecha en segundo plano
+        with session_factory() as session:
+            resolve_league_round(session, session_factory, league_id, round_number)
+ 
+    return hook
+ 
+
+async def _start_round_in_background(
+    session_factory: Callable[[], Session], league_id: int, round_number: int
+) -> None:
+    """
+    Cuerpo de la tarea de fondo: abre una sesion propia y arranca la fecha.
+    start_league_round ya es idempotente (solo toma los partidos PENDING) y no deja salir errores.
+    """
+    with session_factory() as session:
+        await start_league_round(session, league_id, round_number)

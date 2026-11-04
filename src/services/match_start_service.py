@@ -40,7 +40,7 @@ from src.engine.match_runner import (
 from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
-from src.models import LineupEntry, MatchStatus, Player
+from src.models import LineupEntry, MatchStatus, Player, Match
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team, get_behaviors_by_ids
 from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 # cancelar un partido a la mitad.
 _running_matches: set[asyncio.Task] = set()
 
+LeagueMatchHook = Callable[[int, int], None]  # (league_id, round_number)
 
 # --- base -> estado inicial -------------------------------------------------
 
@@ -214,14 +215,11 @@ def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, Execute
     return state, execute_behavior
 
 
-
-
-
 # --- resultado final --------------------------------------------------------
 
 
-def save_match_result(session: Session, match_id: int, home_goals: int, away_goals: int) -> None:
-    """Guarda el marcador final, pasa el partido a FINISHED y publica MATCH_FINISHED como evento."""
+def save_match_result(session: Session, match_id: int, home_goals: int, away_goals: int) -> Match:
+    """Guarda el marcador final y publica los eventos correspondientes."""
     match = get_match_by_id(session, match_id)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
@@ -230,12 +228,33 @@ def save_match_result(session: Session, match_id: int, home_goals: int, away_goa
     match.away_goals = away_goals
     match.status = MatchStatus.FINISHED
     session.commit()
-    event_bus.publish("MATCH_FINISHED", {
+
+    # Los eventos se publican DESPUES del commit: quien los recibe ya ve el resultado guardado.
+    match_finished_event = {
         "match_id": match.match_id,
         "status": match.status.value,
-    })
+    }
+    if match.league_id is not None:
+        match_finished_event["league_id"] = match.league_id  # solo los partidos de liga lo traen
 
-def make_on_finished(session_factory: Callable[[], Session] = SessionLocal) -> OnFinished:
+    event_bus.publish("MATCH_FINISHED", match_finished_event)
+
+    if match.league_id is not None:
+        event_bus.publish("LEAGUE_MATCH_FINISHED", {
+            "league_id": match.league_id,
+            "match_id": match.match_id,
+            "score": {"home": match.home_goals, "away": match.away_goals},
+            "status": match.status.value,
+        })
+
+    return match
+
+
+def make_on_finished(
+        session_factory: Callable[[], 
+        Session] = SessionLocal, 
+        after_league_match: LeagueMatchHook | None = None
+) -> OnFinished:
     """
     El on_finished de run_match. Abre su PROPIA sesión: el motor corre
     mucho después de que se cerró la del request que lo inició. Si guardar
@@ -245,7 +264,12 @@ def make_on_finished(session_factory: Callable[[], Session] = SessionLocal) -> O
 
     def on_finished(state: MatchState) -> None:
         with session_factory() as session:
-            save_match_result(session, state.match_id, state.score.home, state.score.away)
+            
+            match = save_match_result(session, state.match_id, state.score.home, state.score.away)
+
+            # Si el partido era de liga, se llama al hook que puede iniciar la siguiente fecha
+            if after_league_match is not None and match.league_id is not None:
+                after_league_match(match.league_id, match.round_number)
 
     return on_finished
 
