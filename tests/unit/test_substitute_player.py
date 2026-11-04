@@ -9,7 +9,7 @@ Jugadores de _build_state (ver test_match_runner.py):
   - Equipo 2 (AWAY): titulares 200, 201, 202            | suplentes 203, 204, 205
 """
 
-from unittest.mock import Mock
+from unittest.mock import Mock # Utilizado para reemplazar funciones que no nos interesan en estos tests.
 
 import pytest
 
@@ -85,14 +85,17 @@ def test_deberia_el_siguiente_tick_ejecutar_el_comportamiento_del_entrante_y_no_
 
     substitute_player(state, EQUIPO_1, player_out_id=100, player_in_id=103)
 
-    # Se juega un tick: solo se usan piezas falsas para la física y el gol.
+    # Se juega un tick: solo se usan mocks para la física y el gol.
     run_tick(
         state,
-        execute_behavior=execute_behavior,
-        apply_intentions=Mock(),
-        detect_goal=Mock(return_value=None),
+        execute_behavior=execute_behavior,   # detección de interés
+        apply_intentions=Mock(),             # fisica falsa
+        detect_goal=Mock(return_value=None), # detección de gol falsa, retornamos que no hubo gol.
     )
 
+    # Verificamos únicamente que se haya llamado al on_tick del entrante y no al del saliente.
+    # assert_called_onde() assert_not_called() son métodos de los Mocks que cuentan cuántas veces 
+    # fueron llamados.
     state.players[103].on_tick.assert_called_once()  # el entrante juega con su comportamiento
     state.players[100].on_tick.assert_not_called()   # el saliente ya no juega
 
