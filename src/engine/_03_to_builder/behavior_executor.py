@@ -11,6 +11,7 @@ from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.data_types import Intention, Point2D, Vector2D
 import math 
+from typing import Optional
 
 
 def execute_behavior(state: MatchState, player_id: int) -> Intention:
@@ -49,9 +50,12 @@ def load_on_tick(code: str):
    
     return namespace["on_tick"] # namespace["on_tick"] es la función que definía el codigo
 
-def assign_behavior(player: MatchPlayerState, behavior_id: int, code: str) -> None:
+def assign_behavior(player: MatchPlayerState, behavior_id: Optional[int], code: str) -> None:
     """
     Le asigna un comportamiento a un jugador: guarda su behavior_id y su función on_tick.
+
+    behavior_id es None cuando el comportamiento no está guardado en la base
+    (por ejemplo, el arquero de los penales, ver src/penalty_behaviors.py).
 
     Primero carga el código y recién después modifica al jugador. Si el código
     falla (no compila o no define on_tick), lanza el error y el jugador conserva
