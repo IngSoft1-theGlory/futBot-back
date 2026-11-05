@@ -6,7 +6,8 @@ Ciclo del partido, tick a tick.
 - run_match: repite run_tick hasta el final del partido. Después de
   cada tick avisa a los clientes (notify) y espera. Cuando llega a un
   tick de pausa (Cooling Break o Half-Time) el reloj se detiene y el
-  partido espera en PAUSED antes de seguir.
+  partido espera en PAUSED antes de seguir. Tras el Half-Time, los equipos 
+  cambian de lado.
 
 Las piezas que vienen de otros módulos (comportamientos, física, regla
 de gol, aviso y guardado del resultado) se reciben por parámetro: así
@@ -31,7 +32,7 @@ from src.engine._01_to_world.metrics import (
     PauseType,
     pause_schedule_for,
 )
-from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState, PauseState
+from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState, PauseState, swap_sides
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine._01_to_world.data_types import Point2D, ActionType, Intention 
 
@@ -95,11 +96,15 @@ def run_tick(
         )
         scoring_side = None
     
-    # suma de gol al equipo que corresponda, si hubo gol
-    if scoring_side is TeamSide.HOME:
-        state.score.home += 1
-    elif scoring_side is TeamSide.AWAY:
-        state.score.away += 1
+    # Suma de gol al equipo que corresponda, si hubo gol.
+    # scoring_side es el lado del equipo que metió el gol. Si es el lado que defiende hoy
+    # el anfitrión, el gol es suyo. No se compara con HOME porque tras el Half-Time el
+    # anfitrión pasa a defender AWAY.
+    if scoring_side is not None:
+        if scoring_side is state.host_side:
+            state.score.home += 1
+        else:
+            state.score.away += 1
 
     state.current_tick += 1
 
@@ -148,6 +153,11 @@ async def _run_pause(
 
     # espera el tiempo de la pausa (Cooling Break o Half-Time)
     await asyncio.sleep(duration_seconds)
+
+    # al terminar el Half-Time los equipos cambian de lado (se hace al final para
+    # que los suplentes que entraron durante la pausa también queden del lado nuevo)
+    if slot.type is PauseType.HALF_TIME:
+        swap_sides(state)
 
     # termina la pausa: vuelve a IN_PROGRESS y borra state.pause
     state.pause = None

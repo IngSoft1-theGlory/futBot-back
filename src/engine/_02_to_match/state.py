@@ -17,7 +17,13 @@ from typing import Optional, Callable
 
 from src.schemas.lineup_config import LineupConfig
 from src.engine._01_to_world.metrics import PauseType
-from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
+from src.engine._01_to_world.pitch import (
+    BALL_INITIAL_POSITION,
+    TeamSide,
+    mirror_position,
+    opposite_side,
+    starter_position,
+)
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType, ActionType
 from src.schemas.lineup_config import LineupConfig
 
@@ -68,7 +74,7 @@ class MatchPlayerState:
     position: Optional[Point2D] = None
     current_action: ActionType = ActionType.IDLE
     attributes: dict[AttributeType, int] = field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
-    initial_position: Optional[Point2D] = None  # Donde el jugador arrancó el partido, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
+    initial_position: Optional[Point2D] = None  # Donde el jugador arranca en el lado actual, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
     on_tick: Optional[Callable] = None # para que cada jugador guarde su propia funcion
     is_goalkeeper: bool = False # para que cada jugador guarde si es arquero o no, por defecto es false (Revisar con de Arquero)
 
@@ -104,6 +110,10 @@ class MatchState:
     # La pausa en curso, o None si el partido no está en pausa.
     pause: Optional[PauseState] = None
 
+    # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
+    # que el marcador siga al equipo y no al lado.
+    host_side: TeamSide = TeamSide.HOME
+    
     # agrego modo penales para partidos de liga. por defecto es false
     penalties_enabled: bool = False
 
@@ -217,8 +227,27 @@ def build_initial_state(
         score=Score(home=0, away=0),
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
+        host_side=home.side,
         penalties_enabled=penalties_enabled,
     )
+
+
+def swap_sides(state: MatchState) -> None:
+    """
+    Intercambia los lados de los equipos (Half-Time): cada equipo pasa a
+    defender el arco contrario. Los jugadores en cancha vuelven a su posición
+    inicial espejada y la pelota al centro, quieta.
+    """
+    state.host_side = opposite_side(state.host_side)
+
+    for player in state.players.values():
+        player.side = opposite_side(player.side)  # también los suplentes
+        if player.position is not None and player.initial_position is not None:
+            player.initial_position = mirror_position(player.initial_position)
+            player.position = player.initial_position
+
+    state.ball.position = BALL_INITIAL_POSITION
+    state.ball.velocity = Vector2D(0.0, 0.0)
 
 
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
