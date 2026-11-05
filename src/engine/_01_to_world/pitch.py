@@ -16,6 +16,11 @@ PITCH_LENGTH = 105.0  # largo (eje x): de la línea de fondo de HOME (x=0) a la 
 PITCH_WIDTH = 60.0    # ancho (eje y): de 0 a 60, con el centro en y=30
 GOAL_WIDTH = 7.32     # ancho del arco, centrado en y = PITCH_WIDTH / 2
 
+# =============== Penales (ver penalties.prepare_turn) ===============
+
+PENALTY_DISTANCE = 11.0  # metros desde la línea de gol hasta el pateador
+PENALTY_BALL_GAP = 0.3   # metros entre el pateador y la pelota (menos que el alcance mínimo, 0.5 m con CONTROL 20)
+
 # =============== Lados, arcos y deteccion de gol ===============
 
 class TeamSide(Enum):
