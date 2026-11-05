@@ -161,7 +161,7 @@ def next_round_to_start(session: Session, league_id: int, round_number: int) -> 
 
     # se obtiene el numero de la ultima fecha de la liga
     last_round_number = get_last_round_number(session, league_id)
-    # entonces si no hay partidos o ya se termino fecha
+    # si la liga no tiene partidos o ya estamos en la ultima fecha, no hay siguiente fecha
     if last_round_number is None or round_number >= last_round_number:
         return None
 
@@ -210,10 +210,10 @@ def make_league_match_hook(session_factory: Callable[[], Session] = SessionLocal
     """
     Crea el callback que se ejecuta cuando termina un partido de liga
     """
-    # hook trata de arrancar la siguiente fecha de la liga en segundo plano si ya terminaron todos 
-    # los partidos de la fecha
+
+    # el hook intenta arrancar la siguiente fecha si ya terminaron todos los partidos de la actual
     def hook(league_id: int, round_number: int) -> None:
-        # si la fecha termino, arranca la siguiente fecha en segundo plano
+        # se abre una sesion para comprobar si se puede arrancar la siguiente fecha
         with session_factory() as session:
             resolve_league_round(session, session_factory, league_id, round_number)
  
@@ -224,8 +224,9 @@ async def _start_round_in_background(
     session_factory: Callable[[], Session], league_id: int, round_number: int
 ) -> None:
     """
-    Cuerpo de la tarea de fondo: abre una sesion propia y arranca la fecha.
-    start_league_round ya es idempotente (solo toma los partidos PENDING) y no deja salir errores.
+    Abre una sesion propia y arranca la fecha en segundo plano
     """
+
+    # se abre una sesion propia para arrancar la fecha
     with session_factory() as session:
         await start_league_round(session, league_id, round_number)

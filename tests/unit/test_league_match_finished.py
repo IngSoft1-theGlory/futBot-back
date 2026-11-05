@@ -1,11 +1,5 @@
 """
-Tests de GLORY-243: fin de un partido de liga y avance de fecha.
-
-Reusan de test_start_league_round.py:
-  - _armar_liga_iniciada: liga de 4 equipos, 3 fechas de 2 partidos, todos PENDING
-  - _partidos_de_la_fecha: los partidos de una fecha, ordenados
-  - cola: cola suscripta al bus de eventos
-  - frenar_motores: cancela los motores que queden corriendo al terminar el test
+Tests de fin de un partido de liga y avance de fecha
 """
 
 import asyncio
@@ -24,9 +18,6 @@ from tests.unit.test_start_league_round import (  # noqa: F401
     cola,
     frenar_motores,
 )
-
-
-# --- helpers -----------------------------------------------------------------
 
 
 def _dejar_un_partido_en_juego(session, liga):
@@ -70,9 +61,6 @@ def _estado_final(match_id, goles_local, goles_visitante):
     return SimpleNamespace(match_id=match_id, score=SimpleNamespace(home=goles_local, away=goles_visitante))
 
 
-# --- eventos al terminar un partido de liga ----------------------------------
-
-
 def test_deberia_publicar_los_eventos_de_liga_al_terminar_un_partido(session, cola):  # noqa: F811
     liga = _armar_liga_iniciada(session)
     partido = _dejar_un_partido_en_juego(session, liga)
@@ -87,9 +75,6 @@ def test_deberia_publicar_los_eventos_de_liga_al_terminar_un_partido(session, co
     assert league_match_finished["data"]["score"] == {"home": 2, "away": 1}
 
 
-# --- aviso a la liga (hook de make_on_finished) ------------------------------
-
-
 def test_deberia_avisar_a_la_liga_con_su_id_y_la_fecha_cuando_termina_un_partido_de_liga(session):
     liga = _armar_liga_iniciada(session)
     partido = _dejar_un_partido_en_juego(session, liga)
@@ -102,9 +87,6 @@ def test_deberia_avisar_a_la_liga_con_su_id_y_la_fecha_cuando_termina_un_partido
     on_finished(_estado_final(partido.match_id, 2, 1))
 
     assert llamadas == [(liga.league_id, 1)]
-
-
-# --- decision de avanzar de fecha --------------------------------------------
 
 
 def test_deberia_devolver_la_fecha_siguiente_cuando_terminan_todos_los_partidos_de_la_fecha(session):
@@ -126,9 +108,6 @@ def test_no_deberia_devolver_fecha_si_termino_la_ultima_fecha(session):
     _terminar_la_fecha(session, liga, 3)  # con 4 equipos hay 3 fechas
 
     assert next_round_to_start(session, liga.league_id, 3) is None
-
-
-# --- arranque de la fecha siguiente ------------------------------------------
 
 
 @pytest.mark.asyncio

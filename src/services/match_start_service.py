@@ -267,7 +267,7 @@ def make_on_finished(
             
             match = save_match_result(session, state.match_id, state.score.home, state.score.away)
 
-            # Si el partido era de liga, se llama al hook que puede iniciar la siguiente fecha
+            # si el partido era de liga, se comprueba si se puede iniciar la siguiente fecha
             if after_league_match is not None and match.league_id is not None:
                 after_league_match(match.league_id, match.round_number)
 

@@ -169,8 +169,9 @@ def get_pending_round_matches(session: Session, league_id: int, round_number: in
 
 def count_unfinished_round_matches(session: Session, league_id: int, round_number: int) -> int:
     """
-    Devuelve la cantidad de partidos de la fecha todavia no terminaron (PENDING o IN_PROGRESS),
-    donde 0 significa que la fecha termino
+  Devuelve la cantidad de partidos de una fecha cuyo estado NO es FINISHED,
+  retorna 0 si todos los partidos de la fecha están finalizados
+  o si la fecha no tiene partidos
     """
     statement = (
         select(func.count()) 
@@ -186,8 +187,9 @@ def count_unfinished_round_matches(session: Session, league_id: int, round_numbe
 
 def get_last_round_number(session: Session, league_id: int) -> int | None:
     """
-    Devuelve el numero de la ultima fecha existente de la liga, el round_number 
-    mas alto de sus partidos, o None si la liga no tiene partidos
+    Devuelve el numero de la última fecha registrada en la liga,
+    determinado por el round_number más alto de sus partidos,
+    retorna None si la liga no tiene partidos
     """
     statement = (select(func.max(Match.round_number)).where(Match.league_id == league_id))
 
