@@ -10,9 +10,8 @@ from src.engine._02_to_match.state import MatchState, MatchPlayerState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._03_to_builder.player_api import PlayerAPI
 from src.engine._01_to_world.data_types import Intention, Point2D, Vector2D
-import math 
+import math, random
 from typing import Optional
-
 
 def execute_behavior(state: MatchState, player_id: int) -> Intention:
     """
@@ -38,8 +37,8 @@ def load_on_tick(code: str):
     # Funciones que el comportamiento puede usar. Todo lo que no este aca no esta permitido: no se rechaza al guardar, pero falla al intentar ejecutar
     my_builtins = {"abs": abs, "min": min, "max": max, "len": len, "round": round, "float": float, "int": int, "sum": sum, "bool": bool, "str": str, "list": list, "tuple": tuple, "dict": dict, "any": any, "all": all, "sorted": sorted,} 
 
-    # Nombres disponibles para el código mientras corre. Como no puede hacer import, math, Point2D y Vector2D se le dan ya cargados
-    namespace = {"__builtins__": my_builtins, "math": math, "Point2D": Point2D, "Vector2D": Vector2D}
+    # Nombres disponibles para el código mientras corre. Como no puede hacer import, math, Point2D, Vector2D y random se le dan ya cargados
+    namespace = {"__builtins__": my_builtins, "math": math, "Point2D": Point2D, "Vector2D": Vector2D, "random": random.Random(),}
 
     # exec ejecuta el texto del comportamiento como si fuera código Python.
     exec(code, namespace)  # ese texto contiene `def on_tick(api): ...`, y al ejecutarse queda guardado en namespace
@@ -66,4 +65,3 @@ def assign_behavior(player: MatchPlayerState, behavior_id: Optional[int], code: 
     # si load_on_tick no lanza error, le asigno el comportamiento al jugador
     player.behavior_id = behavior_id
     player.on_tick = on_tick
-
