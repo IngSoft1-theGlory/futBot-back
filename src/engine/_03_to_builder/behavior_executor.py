@@ -53,6 +53,9 @@ def assign_behavior(player: MatchPlayerState, behavior_id: Optional[int], code: 
     """
     Le asigna un comportamiento a un jugador: guarda su behavior_id y su función on_tick.
 
+    behavior_id es None cuando el comportamiento no está guardado en la base
+    (por ejemplo, el arquero de los penales, ver src/penalty_behaviors.py).
+
     Primero carga el código y recién después modifica al jugador. Si el código
     falla (no compila o no define on_tick), lanza el error y el jugador conserva
     el comportamiento que tenía.

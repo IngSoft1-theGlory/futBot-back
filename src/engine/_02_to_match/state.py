@@ -251,3 +251,82 @@ def _copy_attributes(setup: TeamMatchSetup, player_id: int) -> dict[AttributeTyp
     if player_id not in setup.attributes:
         raise MatchInitializationError(f"Faltan los atributos del jugador {player_id}.")
     return dict(setup.attributes[player_id])  # copia: cada jugador tiene su propio dict
+
+# ====== Sustitución de jugadores ======
+
+class SubstitutionError(Exception):
+    """
+    Base de los errores de sustitución.
+
+    No es un AppError a propósito (igual que MatchInitializationError): el motor
+    no sabe de HTTP. El endpoint de sustitución los captura y los traduce.
+    """
+
+
+class NotInPauseError(SubstitutionError):
+    """El partido no está en una pausa."""
+
+
+class InvalidSubstitutionError(SubstitutionError):
+    """Los jugadores no sirven para el cambio (ver substitute_player)."""
+
+
+class SubstitutionLimitError(SubstitutionError):
+    """El equipo ya hizo su cambio en esta pausa."""
+
+
+def substitute_player(state: MatchState, team_id: int, player_out_id: int, player_in_id: int) -> None:
+    """
+    Cambia un titular (player_out) por un suplente (player_in) del mismo equipo.
+    Modifica state directamente y no devuelve nada.
+
+    Valida en este orden (el orden importa: es el que fija qué error se lanza
+    cuando hay más de un problema a la vez):
+      1. Hay pausa                           -> Caso contrario: NotInPauseError
+      2. Los jugadores sirven para el cambio -> Caso contrario: InvalidSubstitutionError
+      3. El equipo no cambió en esta pausa   -> Caso contrario:SubstitutionLimitError
+
+    Es síncrona y sin await a propósito: el chequeo del límite y el cambio son
+    una sola operación, así dos pedidos casi simultáneos no pueden pasar los dos.
+    """
+
+    # 1) Solo se puede cambiar durante una pausa: fuera de ella, state.pause es None.
+    if state.pause is None:
+        raise NotInPauseError("Solo se puede hacer un cambio durante una pausa.")
+
+    # 2) Los dos jugadores tienen que existir y ser del equipo; el saliente tiene que
+    #    estar en cancha y el entrante en el banco. "En cancha" = tener position
+    #    el mismo criterio que on_pitch_player_ids.
+    player_out = state.players.get(player_out_id)
+    player_in = state.players.get(player_in_id)
+    if (
+        player_out is None or player_in is None
+        or player_out.team_id != team_id or player_in.team_id != team_id
+        or player_out.position is None      # el saliente tiene que estar en cancha
+        or player_in.position is not None   # el entrante tiene que estar en el banco
+    ):
+        raise InvalidSubstitutionError("Cambio inválido: el saliente debe estar en cancha y el entrante en el banco, ambos del equipo.")
+
+    # 3) Un solo cambio por equipo en cada pausa. state.pause es un objeto nuevo en
+    #    cada pausa, así que substituted_team_ids arranca vacío solo: no hay que limpiarlo.
+    if team_id in state.pause.substituted_team_ids:
+        raise SubstitutionLimitError("El equipo ya hizo su cambio en esta pausa.")
+
+    # Todo validado: recién ahora se modifica el estado. Si algo falla arriba, no se toca nada.
+
+    # El entrante ocupa el lugar del saliente: mismo rol y misma posición.
+    # Sus attributes y behavior_id no se tocan: ya los trae cargados (los suplentes también).
+    player_in.position = player_out.position
+    player_in.role = player_out.role
+    player_in.initial_position = player_out.initial_position
+    player_in.is_starter = True
+
+    # El saliente vuelve al banco: queda como un suplente más (sin posición ni rol).
+    player_out.position = None
+    player_out.role = None
+    player_out.initial_position = None
+    player_out.is_starter = False
+    player_out.current_action = ActionType.IDLE  # no queda con la acción del último tick que jugó
+
+    # Se anota el cambio para bloquear el segundo del equipo en esta pausa.
+    state.pause.substituted_team_ids.add(team_id)
