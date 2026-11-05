@@ -36,6 +36,7 @@ from src.engine._02_to_match.state import MatchState
 from src.engine.match_runner import ExecuteBehavior
 from src.engine._04_to_physics.simulation import apply_intentions
 from src.realtime.event_bus import event_bus
+from src.models.league import LeagueStatus
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,31 @@ def begin_league_match(session: Session, match_id: int) -> tuple[Match, MatchSta
 
     return (match, state, execute_behavior)
 
+def finish_league(session: Session, league_id: int) -> None:
+    """
+    Finaliza la liga y notifica a los clubes,
+    si la liga no existe o ya está finalizada, no hace nada.
+    """
+    # se busca la liga y se bloquea su fila para evitar que otra sesion la modifique al mismo tiempo
+    league = get_league_by_id(session, league_id, for_update=True)  # bloquea la fila de la liga para que no la cierre otra sesion al mismo tiempo
+
+    # si la liga no existe o no esta en curso, no hago nada
+    if league is None or league.status is not LeagueStatus.IN_PROGRESS:
+        return
+
+    # se actualiza el estado de la liga
+    try:
+        league.status = LeagueStatus.FINISHED
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    # se notifica a los clubes que la liga termino
+    event_bus.publish("LEAGUE_FINISHED", {
+        "league_id": league_id,
+        "status": LeagueStatus.FINISHED.value,
+    })
 
 _round_start_tasks: set[asyncio.Task] = set()
 
@@ -163,6 +189,7 @@ def next_round_to_start(session: Session, league_id: int, round_number: int) -> 
     last_round_number = get_last_round_number(session, league_id)
     # si la liga no tiene partidos o ya estamos en la ultima fecha, no hay siguiente fecha
     if last_round_number is None or round_number >= last_round_number:
+        finish_league(session, league_id) # si ya terminaron todos los partidos de la ultima fecha, se termina la liga
         return None
 
     # se terminaron los partidos de le fecha y se puede arrancar la siguiente fecha 
