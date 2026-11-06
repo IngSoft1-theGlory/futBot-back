@@ -4,19 +4,24 @@ Módulo de servicio para la tabla de posiciones
 from src.models import Match, Team
 from src.schemas.league import StandingRowOut
 
-WIN, DRAW, LOSS = "WIN", "DRAW", "LOSS"
-POINTS = {WIN: 3, DRAW: 1, LOSS: 0}
-RESULT_FIELD = {WIN: "wins", DRAW: "draws", LOSS: "losses"}
+WIN, DRAW, LOSS, PENALTY_WIN = "WIN", "DRAW", "LOSS", "PENALTY_WIN"
+POINTS = {WIN: 3, DRAW: 1, LOSS: 0, PENALTY_WIN: 2}
+RESULT_FIELD = {WIN: "wins", DRAW: "draws", LOSS: "losses", PENALTY_WIN: "wins"}  # PENALTY_WIN se cuenta como victoria en la tabla de posiciones
 
 
 def get_match_result(match):
     """ 
-    Calcula el resultado de un partido (victoria, empate o derrota) para el equipo local y el visitante.
+    Calcula el resultado de un partido (victoria, empate, derrota o victoria por penales) para el equipo local y el visitante.
     """
     if match.home_goals > match.away_goals:
         return WIN, LOSS
     if match.home_goals < match.away_goals:
         return LOSS, WIN
+    if match.home_penalty_goals is not None and match.away_penalty_goals is not None:
+        if match.home_penalty_goals > match.away_penalty_goals:
+            return PENALTY_WIN, LOSS
+        if match.home_penalty_goals < match.away_penalty_goals:
+            return LOSS, PENALTY_WIN
     return DRAW, DRAW
 
 
@@ -56,7 +61,7 @@ def build_standings(teams: list[Team], matches: list[Match]) -> list[StandingRow
     # por cada partido, actualizar las estadísticas de los equipos locales y visitantes,
     # que se obtiene del dicionario team_stats
     # la información de cada partido se obtiene desde el objeto Match, que tiene los atributos 
-    # team_host_id, team_away_id, home_goals y away_goals
+    # team_host_id, team_away_id, home_goals, away_goals, home_penalty_goals y away_penalty_goals
     for match in matches:
         home_team_id = match.team_host_id
         away_team_id = match.team_away_id
