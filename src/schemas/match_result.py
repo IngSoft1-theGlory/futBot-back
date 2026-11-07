@@ -13,6 +13,7 @@ class MatchResultTeamOut(BaseModel):
     team_id: int
     team_name: str | None  # Team.team_name es nullable en la base
     goals: int
+    penalty_goals: int | None  # goles de penales 
 
 
 # Lo que devuelve GET /api/v1/matches/{match_id}/result
