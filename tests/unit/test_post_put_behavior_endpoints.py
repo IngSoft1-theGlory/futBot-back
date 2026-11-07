@@ -1,7 +1,7 @@
 import pytest
 
 from src.core.exceptions import BehaviorNotFoundError, ForbiddenError, InvalidData
-from src.models import Behavior
+from src.models import Behavior, BehaviorType
 from src.schemas.behavior import CreateUpdateBehaviorRequest
 from src.services.behavior_service import create_behavior, update_behavior
 from src.services.user_service import create_user_with_team
@@ -37,8 +37,8 @@ def crear_comportamiento(session, user_id=None, is_default=False):
     return behavior
 
 
-def cuerpo(name="Nuevo", description="Descripcion nueva", code="def on_tick(api):\n    return"):
-    return CreateUpdateBehaviorRequest(name=name, description=description, code=code)
+def cuerpo(name="Nuevo", description="Descripcion nueva", code="def on_tick(api):\n    return", behavior_type=BehaviorType.PLAYER):
+    return CreateUpdateBehaviorRequest(name=name, description=description, code=code, behavior_type=behavior_type)
 
 
 # ---------- post ----------
@@ -50,6 +50,7 @@ def test_deberia_crear_comportamiento_propio_no_predeterminado(session, usuario)
     assert behavior.name == "Nuevo"
     assert behavior.user_id == usuario.user_id
     assert behavior.is_default is False
+    assert behavior.behavior_type == BehaviorType.PLAYER
 
 
 def test_deberia_lanzar_invalid_data_y_no_crear_si_el_nombre_esta_vacio(session, usuario):
