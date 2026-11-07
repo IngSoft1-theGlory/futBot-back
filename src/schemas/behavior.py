@@ -25,6 +25,7 @@ class BehaviorResponse(BaseModel):
     description: str
     code: str
     is_default: bool
+    behavior_type: BehaviorType
 
 
 class CreateUpdateBehaviorRequest(BaseModel):
@@ -32,4 +33,4 @@ class CreateUpdateBehaviorRequest(BaseModel):
     name: str 
     description: str 
     code: str
-    behavior_type: BehaviorType
+    behavior_type: BehaviorType = BehaviorType.PLAYER
