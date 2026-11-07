@@ -86,6 +86,35 @@ def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
         return TeamSide.HOME
     return None
 
+def goal_line_crossing(start: Point2D, end: Point2D) -> Optional[Point2D]:
+    """
+    Soluciona el problema de detect_goal que solo mira dónde termina la pelota en el tick: 
+    un tiro rápido puede cruzar el arco y no ser detectado como gol, incluso si cruzó la linea de gol
+    entremedio.
+
+    Si el tramo start -> end cruza una línea de gol por entre los palos, devuelve el punto
+    de la línea por donde cruza; si no, None.
+
+    detect_goal solo mira dónde TERMINA la pelota en el tick: un tiro rápido puede cruzar el
+    arco y terminar fuera de los palos. Con este punto el motor frena la pelota en la línea.
+    """
+    # ¿El tramo cruza la línea de fondo de algún arco? (la pelota viene desde adentro de la cancha)
+    if start.x > HOME_GOAL.line_x >= end.x:
+        goal = HOME_GOAL
+    elif start.x < AWAY_GOAL.line_x <= end.x:
+        goal = AWAY_GOAL
+    else:
+        return None
+
+    # Regla de tres: si llega a la línea habiendo recorrido esa fracción del tramo en x,
+    # en y recorrió la misma fracción.
+    fraction = (goal.line_x - start.x) / (end.x - start.x)
+    y = start.y + fraction * (end.y - start.y)
+
+    if goal.contains_y(y):
+        return Point2D(goal.line_x, y)
+    return None
+
 # =============== Posiciones iniciales ===============
 
 # Posicion inicial de cada rol, por formación: FORMATION_POSITIONS[formación][rol]

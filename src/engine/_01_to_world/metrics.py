@@ -35,6 +35,12 @@ def kick_speed(power: int, power_percentage: float) -> float:
 # Si la pelota pasa a esta distancia o menos de un arquero, la ataja, con 1.0 m el arquero cubre 2 m de los 7.32 m del arco (cerca de un cuarto), valor provisorio: ajustar probando
 GOALKEEPER_SAVE_RADIUS = 1.0
 
+# ======================================== Penales =============================================
+
+PENALTY_MAX_TICKS = 20          # ticks que dura como máximo un penal si nadie hace gol (10 s)
+PENALTY_MAX_ROUNDS = 3          # rondas máximas de la tanda (una ronda = un penal de cada equipo)
+PENALTY_PAUSE_SECONDS = 3.0     # espera entre un penal y el siguiente, con el estado congelado
+
 # ======================================== Tiempos =============================================
 
 TICK_DURATION_SECONDS = 0.5                 # Duración por Tick.
