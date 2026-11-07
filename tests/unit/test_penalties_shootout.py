@@ -68,8 +68,8 @@ async def test_deberia_ganar_el_host_y_terminar_la_tanda_si_convierte_solo_el_en
 @pytest.mark.asyncio
 async def test_deberia_sortear_al_host_y_sumarle_un_gol_si_siguen_empatados_despues_de_3_rondas(monkeypatch):
     state = _build_state()
-    # play_shootout sortea con random.choice([True, False]): True es que gana el host
-    monkeypatch.setattr(penalties.random, "choice", Mock(return_value=True))
+    # El sorteo lo gana el host
+    monkeypatch.setattr(penalties.random, "choice", Mock(return_value=state.host_team_id))
     detect_goal = Mock(return_value=SIN_GOL)  # nadie convierte nunca
 
     await _jugar_tanda(state, detect_goal)
