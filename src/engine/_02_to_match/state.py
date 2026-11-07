@@ -125,6 +125,11 @@ class MatchState:
     # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
     # que el marcador siga al equipo y no al lado.
     host_side: TeamSide = TeamSide.HOME
+
+    # Equipos anfitrión y visitante. A diferencia de host_side no cambian nunca: la tanda
+    # de penales los usa para saber quién patea y si el gol va a phome o a paway.
+    host_team_id: Optional[int] = None
+    away_team_id: Optional[int] = None
     
     # agrego modo penales para partidos de liga. por defecto es false
     penalties_enabled: bool = False
@@ -243,6 +248,8 @@ def build_initial_state(
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
         host_side=home.side,
+        host_team_id=home.team_id,
+        away_team_id=away.team_id,
         penalties_enabled=penalties_enabled,
     )
 
