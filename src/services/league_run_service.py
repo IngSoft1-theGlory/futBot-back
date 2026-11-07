@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,6 @@ from src.services.match_start_service import (
     save_match_result,
     launch_match,
     make_on_finished,
-    LeagueMatchHook,
 )
 from src.engine._02_to_match.state import MatchState 
 from src.engine.match_runner import ExecuteBehavior
@@ -40,6 +39,7 @@ from src.realtime.event_bus import event_bus
 logger = logging.getLogger(__name__)
 
 FIRST_ROUND_NUMBER = 1  # numero de la primera fecha de una liga (generate_fixture las numera desde 1)
+
 
 async def start_league_round(session: Session, league_id: int, round_number: int) -> None:
     """
@@ -85,7 +85,7 @@ async def start_league_match(session: Session, match_id: int) -> None:
         save_match_result(session, match_id, 0, 0)
 
         match = get_match_by_id(session, match_id) # recargo el partido para tener el league_id y round_number
-        resolve_league_round(session, SessionLocal, match.league_id, match.round_number) # si el partido no se pudo preparar, se intenta arrancar la siguiente fecha de la liga en segundo plano
+        advance_league(session, SessionLocal, match.league_id, match.round_number) # arranco la fecha siguiente si corresponde
         return
 
     # lanzo el motor
@@ -93,7 +93,7 @@ async def start_league_match(session: Session, match_id: int) -> None:
         state, 
         execute_behavior=execute_behavior, 
         apply_intentions=apply_intentions,
-        on_finished=make_on_finished(after_league_match=make_league_match_hook()),
+        on_finished=make_on_finished(),
     )
 
     # publico match_started con el league_id 
@@ -142,7 +142,27 @@ def begin_league_match(session: Session, match_id: int) -> tuple[Match, MatchSta
     return (match, state, execute_behavior)
 
 
-_round_start_tasks: set[asyncio.Task] = set()
+def advance_league(
+    session: Session, session_factory: Callable[[], Session], league_id: int, round_number: int
+) -> None:
+    """
+    Se llama al termina un partido de liga, si era el ultimo partido de la fecha,
+    arranca la siguiente en segundo plano, si aun quedan partidos en progreso, o era la ultima
+    fecha, no arranca nada
+ 
+    session es la que se usa para decidir ahora. session_factory es para que la fecha,
+    siguiente abra su propia sesion, porque esta puede estar cerrada para cuando arranque
+    """
+    next_round = next_round_to_start(session, league_id, round_number)
+    if next_round is None:
+        return
+ 
+   # se crea la tarea que va a arrancar la siguiente fecha
+    start_round_job = _start_round(session_factory, league_id, next_round)
+ 
+    # se  manda a correr en segundo plano, sin esperar a que termine
+    _run_in_background(start_round_job)
+
 
 def next_round_to_start(session: Session, league_id: int, round_number: int) -> int | None:
     """
@@ -169,64 +189,42 @@ def next_round_to_start(session: Session, league_id: int, round_number: int) -> 
     return round_number + 1
 
  
-def resolve_league_round(
-        session: Session, 
-        session_factory: Callable[[], Session], 
-        league_id: int, round_number: int
-) -> None:
-    """
-    Comprueba si terminó la fecha actual y, si corresponde, 
-    inicia la siguiente fecha en segundo plano
-    """
-    # si no hay fecha siguiente, no hago nada
-    next_round = next_round_to_start(session, league_id, round_number)
-    if next_round is None:
-        return
+# asyncio guarda referencias de las tareas (debiles), ya si no se guardan, el garbage
+# collector puede cancelar una tarea a la mitad, por eso se guardan aca mientras corren
+_background_tasks: set[asyncio.Task] = set()
  
-    # arranco la siguiente fecha en segundo plano, para no bloquear el request que termino el partido
-    # obtengo el loop de asyncio que esta corriendo en el hilo principal, para poder crear una tarea en segundo plano
-    loop = asyncio.get_running_loop()
-    task = loop.create_task(_start_round_in_background(session_factory, league_id, next_round)) # creo la tarea de fondo
-
-    # agrego la tarea al set de tareas activas, para que no se pierda si falla y para poder loguear el error
-    _round_start_tasks.add(task) 
-    task.add_done_callback(_on_round_start_done) # agrego el callback para cuando termine la tarea
-  
  
-def _on_round_start_done(task: asyncio.Task) -> None:
+def _run_in_background(coroutine: Coroutine) -> None:
     """
-    Procesa el resultado de la tarea que inició la siguiente fecha,
-    elimina la tarea de las tareas activas y registra cualquier error
-    """
-    
-    # la tarea ya terminó, se elimina de las tareas activas.
-    _round_start_tasks.discard(task)
-    # registra el error si la tarea terminó con una excepción.
-    if not task.cancelled() and task.exception() is not None:
-        logger.error("No se pudo arrancar la fecha siguiente de la liga.", exc_info=task.exception())
-
+    Manda a ejecutar un trabajo async en segundo plano y sigue de largo, sin esperar a que termine
  
-def make_league_match_hook(session_factory: Callable[[], Session] = SessionLocal) -> LeagueMatchHook:
-    """
-    Crea el callback que se ejecuta cuando termina un partido de liga
+    Se usa para arrancar la fecha siguiente, on_finished es una funcion comun (NO async), asi que
+    no puede hacer await y quedarse esperando a que la fecha arranque, por lo que se le pide al
+    event loop que ejecute el trabajo cuando pueda y vuelve enseguida
+ 
+    coroutine es ese trabajo, es lo que devuelve al llamar a una funcion async def, ejemplo
+    _start_round(...), llamar a esa funcion no ejecuta nada, solo deja el trabajo armado
     """
 
-    # el hook intenta arrancar la siguiente fecha si ya terminaron todos los partidos de la actual
-    def hook(league_id: int, round_number: int) -> None:
-        # se abre una sesion para comprobar si se puede arrancar la siguiente fecha
-        with session_factory() as session:
-            resolve_league_round(session, session_factory, league_id, round_number)
+    # el event loop ejecuta el codigo async del servidor, pido el que esta corriendo ahora, 
+    # ejecuta una tarea (task) y sigo sin esperarla
+    task = asyncio.get_running_loop().create_task(coroutine)
  
-    return hook
+    # guardo la tarea en el set para que Python no la borre mientras corre (motivo arriba del set)
+    _background_tasks.add(task)
  
-
-async def _start_round_in_background(
-    session_factory: Callable[[], Session], league_id: int, round_number: int
-) -> None:
+    # cuando la tarea termina, se llama a discard con ella y la saca del set
+    task.add_done_callback(_background_tasks.discard)
+ 
+ 
+async def _start_round(session_factory: Callable[[], Session], league_id: int, round_number: int) -> None:
     """
-    Abre una sesion propia y arranca la fecha en segundo plano
+    Arranca una fecha desde la tarea de fondo, con una sesion propia, si falla, lo deja en el log 
+    nadie mas lo va a ver
     """
-
-    # se abre una sesion propia para arrancar la fecha
-    with session_factory() as session:
-        await start_league_round(session, league_id, round_number)
+    try:
+        with session_factory() as session: # se abre una sesion nueva para arrancar la fecha, porque la que llamo 
+                                            # a advance_league puede estar cerrada cuando se ejecute esta tarea
+            await start_league_round(session, league_id, round_number) # arranca todos los partidos PENDING de la fecha
+    except Exception:
+        logger.exception("No se pudo arrancar la fecha %s de la liga %s.", round_number, league_id)

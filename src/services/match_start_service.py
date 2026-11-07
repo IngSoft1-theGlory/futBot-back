@@ -57,7 +57,6 @@ logger = logging.getLogger(__name__)
 # cancelar un partido a la mitad.
 _running_matches: set[asyncio.Task] = set()
 
-LeagueMatchHook = Callable[[int, int], None]  # (league_id, round_number)
 
 # --- base -> estado inicial -------------------------------------------------
 
@@ -219,7 +218,7 @@ def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, Execute
 
 
 def save_match_result(session: Session, match_id: int, home_goals: int, away_goals: int) -> Match:
-    """Guarda el marcador final y publica los eventos correspondientes."""
+    """Guarda el marcador final y publica los eventos correspondientes"""
     match = get_match_by_id(session, match_id)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
@@ -229,7 +228,7 @@ def save_match_result(session: Session, match_id: int, home_goals: int, away_goa
     match.status = MatchStatus.FINISHED
     session.commit()
 
-    # Los eventos se publican DESPUES del commit: quien los recibe ya ve el resultado guardado.
+    # los eventos se publican DESPUES del commit: quien los recibe ya ve el resultado guardado
     match_finished_event = {
         "match_id": match.match_id,
         "status": match.status.value,
@@ -250,27 +249,27 @@ def save_match_result(session: Session, match_id: int, home_goals: int, away_goa
     return match
 
 
-def make_on_finished(
-        session_factory: Callable[[], 
-        Session] = SessionLocal, 
-        after_league_match: LeagueMatchHook | None = None
-) -> OnFinished:
+def make_on_finished(session_factory: Callable[[], Session] = SessionLocal) -> OnFinished:
     """
-    El on_finished de run_match. Abre su PROPIA sesión: el motor corre
-    mucho después de que se cerró la del request que lo inició. Si guardar
-    falla, la excepción sube a la tarea (que la loguea, ver _on_task_done)
-    y run_match igual libera el estado de memoria.
+    El on_finished de run_match, Abre su PROPIA sesión, el motor corre mucho despues 
+    de que se cerro la del request que lo inicio. Si guardar falla, la excepción 
+    sube a la tarea y run_match igual libera el estado de memoria
     """
-
+ 
     def on_finished(state: MatchState) -> None:
         with session_factory() as session:
-            
             match = save_match_result(session, state.match_id, state.score.home, state.score.away)
-
-            # si el partido era de liga, se comprueba si se puede iniciar la siguiente fecha
-            if after_league_match is not None and match.league_id is not None:
-                after_league_match(match.league_id, match.round_number)
-
+ 
+            # si el partido era de liga, se avisa a la liga y arranca la fecha siguiente o la cierra
+            if match.league_id is not None:
+                # league_run_service importa este modulo de advance_league, es un import interno de la funcion
+                # on_finished, con esto evito el ImportError circular, si lo importara al inicio del archivo, 
+                # cada uno esperaría al otro al cargarse y daría ImportError
+                from src.services.league_run_service import advance_league
+                
+                # se avisa a la liga que el partido terminó y se arranca la fecha siguiente
+                advance_league(session, session_factory, match.league_id, match.round_number)
+ 
     return on_finished
 
 
