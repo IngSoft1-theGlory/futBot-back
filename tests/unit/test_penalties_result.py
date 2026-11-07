@@ -11,7 +11,8 @@ from src.services.standings_service import build_standings
 from tests.unit.test_get_league_endpoint import _crear_liga, otro_usuario 
 from tests.unit.test_standings_service import _equipos 
 
-def _partido_de_liga_terminado(session, usuario, otro, **goles):
+def _partido_de_liga_terminado(session, usuario, otro, home_goals=0, away_goals=0,
+    home_penalty_goals=None, away_penalty_goals=None):
     """
     Partido de liga terminado entre los dos usuarios.
     """
@@ -19,7 +20,8 @@ def _partido_de_liga_terminado(session, usuario, otro, **goles):
     match = Match(
         team_host_id=usuario.team_id, team_away_id=otro.team_id,
         status=MatchStatus.FINISHED, league_id=liga.league_id,
-        match_duration=5, round_number=1, **goles,
+        match_duration=5, round_number=1, home_goals=home_goals, away_goals=away_goals,
+        home_penalty_goals=home_penalty_goals, away_penalty_goals=away_penalty_goals,
     )
     session.add(match)
     session.commit()
