@@ -53,8 +53,8 @@ class Behavior(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
-    # agrego tipo a los comportamientos, para diferenciar entre comportamientos de jugador y DT. Por default van a ser de tipo jugador, asi no rompo los que ya existen
-    # server_default es para que el default sea player en alembic, native_enum es false para simplificar la migracion
+    # agrego tipo a los comportamientos, para diferenciar entre comportamientos de jugador y DT. Por default van a ser de tipo jugador
+    # server_default es para que los comportamientos que ya existian queden como PLAYER cuando se hace la migracion de alembic, native_enum es false para simplificar la migracion
     behavior_type: Mapped[BehaviorType] = mapped_column(Enum(BehaviorType, native_enum = False, name="behavior_type"), nullable=False, default=BehaviorType.PLAYER, server_default="PLAYER")
 
     def __repr__(self) -> str:
