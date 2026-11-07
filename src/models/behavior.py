@@ -7,14 +7,19 @@ Representa un comportamiento predeterminado del sistema
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Boolean, Integer, String, Text
+from sqlalchemy import ForeignKey, Boolean, Integer, String, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base
 
+import enum
+
 if TYPE_CHECKING:
     from src.models.user import User
 
+class BehaviorType (enum.Enum):
+    COACH = "COACH" 
+    PLAYER = "PLAYER"
 
 class Behavior(Base):
     __tablename__ = "behaviors"
@@ -47,6 +52,10 @@ class Behavior(Base):
     is_default: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+
+    # agrego tipo a los comportamientos, para diferenciar entre comportamientos de jugador y DT. Por default van a ser de tipo jugador, asi no rompo los que ya existen
+    # server_default es para que el default sea player en alembic, native_enum es false para simplificar la migracion
+    behavior_type: Mapped[BehaviorType] = mapped_column(Enum(BehaviorType, native_enum = False, name="behavior_type"), nullable=False, default=BehaviorType.PLAYER, server_default="PLAYER")
 
     def __repr__(self) -> str:
         return (
