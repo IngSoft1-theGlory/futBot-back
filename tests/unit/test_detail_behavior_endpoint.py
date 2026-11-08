@@ -89,7 +89,7 @@ def test_deberia_devolver_los_campos_del_comportamiento(client, auth_headers, co
     response = client.get(f"{URL}/{default.behavior_id}", headers=auth_headers)
 
     comportamiento = response.json()
-    assert set(comportamiento.keys()) == {"behavior_id", "name", "description", "code", "is_default"}
+    assert set(comportamiento.keys()) == {"behavior_id", "name", "description", "code", "is_default", "behavior_type"}
     assert comportamiento["is_default"] is True
 
 

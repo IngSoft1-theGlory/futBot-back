@@ -35,7 +35,14 @@ from src.engine._01_to_world.metrics import (
     PauseType,
     pause_schedule_for,
 )
-from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState, PauseState, swap_sides
+from src.engine._02_to_match.state import (
+    MatchPhase,
+    MatchRegistry,
+    MatchState,
+    PauseState,
+    apply_planned_substitutions,
+    swap_sides,
+)
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine._01_to_world.data_types import Point2D, ActionType, Intention 
 
@@ -197,6 +204,10 @@ async def _run_pause(
         number=slot.number,
         ends_at=time.monotonic() + duration_seconds,
     )
+
+    # aplica los cambios que los equipos dejaron planificados. Va antes de avisar el inicio
+    # de la pausa: así, cuando el front consulte el estado, ya ve la alineación nueva.
+    apply_planned_substitutions(state)
 
     # avisa a los clientes que empezó la pausa (Cooling Break o Half-Time)
     await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=True)

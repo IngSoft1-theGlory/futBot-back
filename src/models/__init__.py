@@ -8,10 +8,10 @@ Este __init__ importa todos los modelos del proyecto para que:
 
 from src.models.team import Team 
 from src.models.user import User  
-from src.models.behavior import Behavior
+from src.models.behavior import Behavior, BehaviorType
 from src.models.player import Player
 from src.models.match import Match, MatchStatus
 from src.models.lineup_entry import LineupEntry
 from src.models.league import League, LeagueStatus
 
-__all__ = ["Team", "User","Behavior","Player", "Match", "MatchStatus", "LineupEntry", "League", "LeagueStatus"]
+__all__ = ["Team", "User","Behavior","Player", "Match", "MatchStatus", "LineupEntry", "League", "LeagueStatus", "BehaviorType"]
