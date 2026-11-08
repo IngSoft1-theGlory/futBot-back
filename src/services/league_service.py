@@ -39,7 +39,7 @@ from src.schemas.league import (
 )
 
 from src.models.league import League, LeagueStatus
-from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
+from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league, get_member_league_ids
 from src.repositories.user_repository import get_user_by_id
 from src.repositories.match_repository import get_league_fixture, get_finished_league_matches
 from src.core.security import hash_password, verify_join_token, verify_password
@@ -102,7 +102,7 @@ def validate_league_capacity(max_teams: int) -> None:
         raise InvalidLeagueCapacityError ("El cupo máximo de la liga debe ser un número par entre 4 y 12")
 
 
-def list_leagues(session: Session, page: str | None, limit: str | None, status: str | None) -> list[LeagueOut]:
+def list_leagues(session: Session, user_id: int, page: str | None, limit: str | None, status: str | None) -> list[LeagueOut]:
     """ 
     obtiene un listado de ligas, filtradas por status y paginadas por page y limit.
     Valida los parametros de entrada y lanza InvalidQueryParamsError si alguno es invalido
@@ -152,6 +152,11 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
         limit=limit_int,
     )
 
+    # Se determinan las ligas en las que participa un equipo
+    user = get_user_by_id(session, user_id)
+    league_ids = [league.league_id for league, _ in rows]
+    member_ids = get_member_league_ids(session, user.team_id, league_ids) if user else set()
+
     # Se construye la lista de ligas a devolver, con el formato requerido por LeagueOut
     result = []
     for league, team_count in rows:
@@ -164,6 +169,7 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
                 status=league.status,
                 # si tiene password_hash, es privada; si no, es pública. El hash nunca sale del service.
                 is_private=league.password_hash is not None,
+                is_member=league.league_id in member_ids,
             )
         )
         

@@ -116,15 +116,16 @@ async def exit_league_endpoint(
     # responde 204 No Content, op. exitosa pero no hay contenido para devolver
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=LeagueListOut)
 def list_leagues_endpoint(
     page: str | None = None,      
     limit: str | None = None,    
     status: str | None = None,  
+    user_id: int = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
     # se llama al service para obtener la lista de ligas, con paginación y filtrado por estado
-    leagues = list_leagues(session, status=status, page=page, limit=limit)
+    leagues = list_leagues(session, user_id=user_id, status=status, page=page, limit=limit)
     return {"leagues": leagues}
 
 @router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)

@@ -39,6 +39,7 @@ class LeagueOut(BaseModel):
     current_teams_count: int
     status: LeagueStatus
     is_private: bool
+    is_member: bool
 
 class LeagueListOut(BaseModel):
     leagues: list[LeagueOut]
