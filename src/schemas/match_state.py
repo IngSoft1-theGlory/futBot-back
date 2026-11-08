@@ -33,6 +33,11 @@ class PauseOut(BaseModel):
     type: str
     remaining_seconds: float
 
+# Cambio que el equipo de quien consulta dejó planificado para la próxima pausa
+class PlannedSubstitutionOut(BaseModel):
+    player_in_id: int
+    player_out_id: int
+
 # Respuesta del endpoint GET /matches/{match_id}/state.
 # Incluye el marcador y los jugadores con sus atributos.
 class MatchStateResponse(BaseModel):
@@ -44,6 +49,7 @@ class MatchStateResponse(BaseModel):
     substitutes: list[MatchPlayerOut]   # suplentes, solo del equipo de quien consulta
     phase: str
     pause: PauseOut | None
+    planned_substitution: PlannedSubstitutionOut | None   # solo del equipo de quien consulta
     ball: PointOut
       
 # Peticion para cambiar comportamiento durante un partido
