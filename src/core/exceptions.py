@@ -169,6 +169,10 @@ class OddTeamsCountError(BadRequestError):
     """Rama 400 ODD_TEAMS_COUNT: hay un numero impar de equipos en la liga."""
     error_code = "ODD_TEAMS_COUNT"
 
+class LeagueNotInProgressError(ConflictError):
+    """Rama 409 LEAGUE_NOT_IN_PROGRESS: la liga no está en curso."""
+    error_code = "LEAGUE_NOT_IN_PROGRESS"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
