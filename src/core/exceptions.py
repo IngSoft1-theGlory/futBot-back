@@ -180,6 +180,10 @@ class InvalidPlayerSelectionError(BadRequestError):
 class SubstitutionLimitExceededError(ConflictError):
     """Rama 409 SUBSTITUTION_LIMIT_EXCEEDED: el equipo ya hizo su cambio en esta pausa."""
     error_code = "SUBSTITUTION_LIMIT_EXCEEDED"
+    
+class LeagueNotInProgressError(ConflictError):
+    """Rama 409 LEAGUE_NOT_IN_PROGRESS: la liga no está en curso."""
+    error_code = "LEAGUE_NOT_IN_PROGRESS"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

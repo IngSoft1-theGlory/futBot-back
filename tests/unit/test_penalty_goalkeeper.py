@@ -133,8 +133,11 @@ def test_deberia_la_pelota_que_pasa_por_el_arquero_quedar_quieta_y_no_contar_gol
 
 # CA4
 def test_deberia_la_pelota_que_pasa_fuera_del_radio_seguir_su_camino():
-    start = Point2D(11.0, 30.0 + R + 0.5)  # pasa 0.5 m por afuera del radio
-    state = _state(_goalkeeper(position=GOAL_CENTER_HOME), start, SHOT_VELOCITY)
+    # El arquero está pegado al poste de arriba y el tiro pasa 0.5 m por afuera de su radio,
+    # o sea por afuera de los palos: así la pelota no entra al arco y no frena por un gol
+    arquero = Point2D(0.0, HOME_GOAL.post_max_y)
+    start = Point2D(11.0, arquero.y + R + 0.5)
+    state = _state(_goalkeeper(position=arquero), start, SHOT_VELOCITY)
 
     apply_intentions(state, {})
 

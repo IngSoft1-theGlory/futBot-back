@@ -86,7 +86,7 @@ def test_deberia_devolver_cada_comportamiento_con_los_campos_del_contrato(client
     response = client.get(URL, headers=auth_headers)
 
     primero = response.json()[0]
-    assert set(primero.keys()) == {"behavior_id", "name", "description", "code", "is_default"}
+    assert set(primero.keys()) == {"behavior_id", "name", "description", "code", "is_default", "behavior_type"}
     assert primero["is_default"] is True
 
 
