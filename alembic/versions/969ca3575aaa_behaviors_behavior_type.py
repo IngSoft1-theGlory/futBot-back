@@ -1,7 +1,7 @@
 """behaviors behavior_type
 
 Revision ID: 969ca3575aaa
-Revises: 73f3c6df5cb9
+Revises: bae51cba2fdb
 Create Date: 2026-11-07 12:05:00.573326
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '969ca3575aaa'
-down_revision: Union[str, Sequence[str], None] = '73f3c6df5cb9'
+down_revision: Union[str, Sequence[str], None] = 'bae51cba2fdb'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
