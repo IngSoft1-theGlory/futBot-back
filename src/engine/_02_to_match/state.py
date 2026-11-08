@@ -179,6 +179,27 @@ class MatchRegistry:
 match_registry = MatchRegistry()
 
 
+class CoachRegistry: 
+    """
+    Diccionario en memoria de los comportamientos de DT elegidos por cada equipo en cada liga
+    """
+    def __init__(self) -> None: 
+        self._coaches: dict[tuple[int, int], int] = {} # (league_id, team_id) -> behavior_id
+
+    def set(self, league_id: int, team_id: int, behavior_id: int) -> None: 
+        """ elige o reemplaza el comportamiento de DT de un equipo en una liga """
+        self._coaches[(league_id, team_id)] = behavior_id
+
+    def get(self, league_id: int, team_id: int) -> Optional[int]:
+        """ retorna el behavior_id elegido por el equipo en la liga, o None si no eligió ninguno """
+        return self._coaches.get((league_id, team_id)) # uso el metodo de get de diccionarios, no este que estoy definiendo
+
+    def remove(self, league_id: int, team_id: int) -> None: 
+        """ quita el comportamiento de DT elegido por el equipo en la liga """
+        self._coaches.pop((league_id, team_id), None) # el None es para cuando no existe la clave, asi no tira KeyError, directamente no intenta remover nada
+
+coach_registry = CoachRegistry() 
+
 # ====== Construcción del estado inicial ======
 
 class MatchInitializationError(Exception):
