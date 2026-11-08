@@ -198,7 +198,7 @@ class CoachRegistry:
         """ quita el comportamiento de DT elegido por el equipo en la liga """
         self._coaches.pop((league_id, team_id), None) # el None es para cuando no existe la clave, asi no tira KeyError, directamente no intenta remover nada
 
-coach_regitry = CoachRegistry() 
+coach_registry = CoachRegistry() 
 
 # ====== Construcción del estado inicial ======
 

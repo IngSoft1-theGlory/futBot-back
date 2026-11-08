@@ -32,7 +32,7 @@ def choose_coach_behavior(session: Session, league_id: int, user_id: int, team_i
         raise TeamNotInLeagueError("El equipo no está inscripto en la liga.") # otro 404
 
     if league.status != LeagueStatus.IN_PROGRESS:
-        raise LeagueNotInProgressError("La liga no está en curso.") # solo puedo elegir DT para ligas en curso
+        raise LeagueNotInProgressError("El director técnico solo se puede elegir mientras la liga está en curso") # solo puedo elegir DT para ligas en curso
 
     if payload.behavior_id is None:
         coach_registry.remove(league_id, team_id) # si me pasan None, se quita el comportamiento de DT del equipo en la liga
