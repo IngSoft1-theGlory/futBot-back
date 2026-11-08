@@ -55,7 +55,7 @@ def prepare_shootout(state: MatchState) -> None:
     state.score.phome = 0
     state.score.paway = 0
 
-def prepare_turn(state, kicker_team_id, keeper_team_id, round_index) -> None:
+def prepare_turn(state: MatchState, kicker_team_id: int, keeper_team_id: int, round_index: int) -> None:
     """
     Prepara un turno de la tanda: un equipo patea y el otro ataja.
     Toma del orden sorteado por prepare_shootout al pateador de kicker_team_id y al
@@ -74,7 +74,9 @@ def prepare_turn(state, kicker_team_id, keeper_team_id, round_index) -> None:
     assign_penalty_kicker(kicker)
     assign_penalty_goalkeeper(keeper)
 
-    # Solo el pateador y el arquero juegan el turno: los demás salen de la cancha
+    # Se saca de la cancha a TODOS los jugadores (position = None es "fuera de la cancha"), 
+    # incluidos el pateador y el arquero. Más abajo a esos dos se les vuelve a dar una posición, 
+    # así que al terminar solo ellos quedan en cancha.
     for player in state.players.values():
         player.position = None
 

@@ -5,6 +5,7 @@ from src.default_behaviors import DEFAULT_BEHAVIORS
 from src.engine._03_to_builder.behavior_executor import load_on_tick
 from src.schemas.behavior import CreateUpdateBehaviorRequest
 from src.services.behavior_service import create_behavior, validate_behavior_code
+from src.models.behavior import BehaviorType
 
 VALIDO = "def on_tick(api):\n    return"
 
@@ -52,6 +53,7 @@ def test_deberia_lanzar_invalid_data_al_crear_con_codigo_invalido():
         name="Nuevo",
         description="Descripcion",
         code="def on_tick(api):\n    while True:\n        pass",
+        behavior_type=BehaviorType.PLAYER
     )
     # la validacion del codigo ocurre antes de usar la base, por eso no hace falta una sesión real
     with pytest.raises(InvalidData):
