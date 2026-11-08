@@ -43,7 +43,7 @@ from src.schemas.league import (
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
 from src.repositories.user_repository import get_user_by_id
-from src.repositories.match_repository import get_league_fixture, get_finished_league_matches, get_players_by_team
+from src.repositories.match_repository import get_league_fixture, get_finished_league_matches, get_players_by_team, get_lineup_entries
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
 from src.services.standings_service import build_standings
@@ -56,6 +56,7 @@ from src.services.lineup_service import (
     validate_min_players, 
     validate_lineup,
     replace_league_lineup,
+    build_lineup_config,
 )
 
 MIN_TEAMS_TO_START = 4  # cantidad mínima de equipos para iniciar una liga
@@ -401,10 +402,10 @@ def start_league(session: Session, user_id: int, league_id: int) -> League:
 
     return league
 
-def update_league_lineup(session: Session, user_id: int, league_id: int, team_id: int, payload: LineupConfig) -> LeagueLineupOut:
-    """Cambia la alineación vigente del equipo en la liga. Se usa desde el próximo partido que juegue."""
+def _validate_team_in_league(session: Session, user_id: int, league_id: int, team_id: int, for_update: bool = False) -> League:
+    """Devuelve la liga si existe, el equipo es del usuario y está inscripto en ella."""
 
-    league = get_league_by_id(session, league_id, for_update=True)
+    league = get_league_by_id(session, league_id, for_update=for_update)
     if league is None:
         raise LeagueNotFoundError("No existe una liga con el ID especificado.")
 
@@ -412,6 +413,23 @@ def update_league_lineup(session: Session, user_id: int, league_id: int, team_id
 
     if not is_team_in_league(session, league_id, team_id):
         raise TeamNotInLeagueError("El equipo no está inscripto en la liga.")
+
+    return league
+
+def get_league_lineup(session: Session, user_id: int, league_id: int, team_id: int) -> LeagueLineupOut:
+    """Devuelve la alineación vigente del equipo en la liga."""
+
+    _validate_team_in_league(session, user_id, league_id, team_id)
+
+    entries = get_lineup_entries(session, league_id=league_id, team_id=team_id)
+    config = build_lineup_config(entries)
+
+    return LeagueLineupOut(league_id=league_id, team_id=team_id, **config.model_dump())
+
+def update_league_lineup(session: Session, user_id: int, league_id: int, team_id: int, payload: LineupConfig) -> LeagueLineupOut:
+    """Cambia la alineación vigente del equipo en la liga. Se usa desde el próximo partido que juegue."""
+
+    league = _validate_team_in_league(session, user_id, league_id, team_id, for_update=True)
 
     if league.status == LeagueStatus.FINISHED:
         raise LeagueFinishedError("No se puede cambiar la alineación de una liga que ya terminó.")
