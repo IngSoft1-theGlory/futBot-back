@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
 from src.models import League, LeagueStatus
+from src.schemas.lineup_config import LineupConfig
 
 from fastapi.concurrency import run_in_threadpool
 
@@ -25,7 +26,8 @@ from src.services.league_service import (
     check_league_password, 
     exit_league,
     join_league,
-    start_league
+    start_league,
+    update_league_lineup,
 )
 from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
@@ -38,7 +40,8 @@ from src.schemas.league import (
     JoinLeagueResponse,
     LeagueDetailOut,
     StartLeagueRequest,
-    StartLeagueResponse
+    StartLeagueResponse,
+    LeagueLineupOut,
 )
 
 
@@ -178,6 +181,17 @@ async def join_league_endpoint(
         await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
+
+@router.put("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
+async def update_league_lineup_endpoint(
+    league_id: int,
+    team_id: int,
+    payload: LineupConfig,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueLineupOut:
+    """Reemplaza la alineación vigente del equipo en la liga."""
+    return await run_in_threadpool(update_league_lineup, session, user_id, league_id, team_id, payload)
 
 def _publish_league_initiated(league: League) -> None:
     """ Publica el evento LEAGUE_INITIATED cuando una liga es iniciada. """

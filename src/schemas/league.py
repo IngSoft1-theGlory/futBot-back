@@ -109,6 +109,10 @@ class JoinLeagueResponse(BaseModel):
     league_id: int
     team_id: int
 
+class LeagueLineupOut(LineupConfig):
+    league_id: int
+    team_id: int
+
 class StartLeagueRequest(BaseModel):
     status : Literal["IN_PROGRESS"]
 
