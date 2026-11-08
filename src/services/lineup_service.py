@@ -15,6 +15,7 @@ from __future__ import annotations
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from src.models.behavior import BehaviorType
 from src.models.lineup_entry import LineupEntry
 from src.schemas.lineup_config import LineupConfig
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
@@ -161,7 +162,8 @@ def _check_players(config: LineupConfig, team_players: list) -> None:
 
 
 def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> None:
-    """Falla si algún behavior_id no existe o el usuario no puede usarlo."""
+    """Falla si algún behavior_id no existe, el usuario no puede usarlo o es de DT (COACH):
+    en una alineación solo van comportamientos de jugador (PLAYER)."""
     # guardo todos los behavior_id de titulares y suplentes en una lista (pueden venir repetidos)
     behavior_ids = []
     for starter in config.starting_players:
@@ -171,10 +173,11 @@ def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> No
 
     # la función solo devuelve los comportamientos que existen, los ids que no existan no vienen
     behaviors = get_behaviors_by_ids(session, behavior_ids)
-    # me quedo solo con los ids que el usuario puede usar
+    # me quedo solo con los ids que el usuario puede usar y que son de jugador
+    # (un COACH queda afuera, así se rechaza con el mismo error que un comportamiento no válido)
     usable_ids = []
     for behavior in behaviors:
-        if behavior.is_default or behavior.user_id == user_id:
+        if behavior.behavior_type == BehaviorType.PLAYER and (behavior.is_default or behavior.user_id == user_id):
             usable_ids.append(behavior.behavior_id)
 
     # si alguno de los pedidos no está entre los usables, lo rechazo
