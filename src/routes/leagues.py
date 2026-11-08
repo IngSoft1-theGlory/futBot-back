@@ -6,18 +6,9 @@ from __future__ import annotations
 
 from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, CreateLeagueRequest, CreateLeagueResponse
 from src.core.security import get_current_user, create_join_token, get_current_user
-from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
-from src.services.league_service import create_league, list_leagues, get_league_detail
 from src.models import League, LeagueStatus
-
-from fastapi.concurrency import run_in_threadpool
-
-from sqlalchemy.orm import Session
-
-from src.database.base import get_db
-from src.realtime.event_bus import event_bus
 from src.core.security import get_current_user, create_join_token
 from src.services.league_service import (
     create_league, 
@@ -25,8 +16,11 @@ from src.services.league_service import (
     check_league_password, 
     exit_league,
     join_league,
-    start_league
+    start_league,
+    get_league_detail,
+    cancel_league
 )
+
 from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
     VerifyPasswordRequest, 
@@ -40,6 +34,12 @@ from src.schemas.league import (
     StartLeagueRequest,
     StartLeagueResponse
 )
+
+from fastapi.concurrency import run_in_threadpool
+from src.realtime.event_bus import event_bus
+
+from sqlalchemy.orm import Session
+from src.database.base import get_db
 
 
 # Todas las rutas de este archivo empiezan con /api/v1/leagues
@@ -218,3 +218,27 @@ async def start_league_endpoint(
 
     # devuelve el estado de la liga recien iniciada
     return response
+
+# async def: el endpoint corre en el event loop, que es donde debe publicarse
+# el evento (event_bus.publish no es thread-safe)
+# uso response_class en vez de response_model porque no devuelve JSON, sino solo el status code 204
+@router.delete("/{league_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def cancel_league_endpoint(
+    league_id: int, 
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db)
+) -> Response: 
+    """ El anfitrion cancela la liga antes de que inicie """
+
+    # run_in_threadpool: el servicio usa la base de forma bloqueante (Session sync)
+    # se corre en otro hilo para no trabar el event loop y el resto de los requests
+
+    # await: espera a que termine ese hilo antes de seguir (asi el evento se publica despues del commit, y no si el servicio lanza un error)
+    await run_in_threadpool(cancel_league, session, user_id, league_id)
+
+    event_bus.publish("LEAGUE_CANCELLED", {
+        "league_id": league_id
+    })
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    

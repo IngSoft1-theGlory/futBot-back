@@ -169,6 +169,10 @@ class OddTeamsCountError(BadRequestError):
     """Rama 400 ODD_TEAMS_COUNT: hay un numero impar de equipos en la liga."""
     error_code = "ODD_TEAMS_COUNT"
 
+class NotLeagueHostError(ForbiddenError):
+    """Rama 403 NOT_LEAGUE_HOST: el usuario no es el anfitrión de la liga."""
+    error_code = "NOT_LEAGUE_HOST"
+
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con
     add_exception_handler(AppError, app_error_handler)."""
