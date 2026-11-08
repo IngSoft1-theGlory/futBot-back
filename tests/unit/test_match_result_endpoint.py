@@ -42,8 +42,8 @@ def test_deberia_devolver_el_resultado_final_segun_el_contrato(client, usuario, 
     assert r.json() == {
         "match_id": terminado.match_id,
         "status": "FINISHED",
-        "home_team": {"team_id": usuario.team_id, "team_name": "Local FC", "goals": 3},
-        "away_team": {"team_id": rival.team_id, "team_name": "Rival FC", "goals": 1},
+        "home_team": {"team_id": usuario.team_id, "team_name": "Local FC", "goals": 3, "penalty_goals": None},
+        "away_team": {"team_id": rival.team_id, "team_name": "Rival FC", "goals": 1, "penalty_goals": None},
     }
 
 
@@ -83,8 +83,8 @@ def test_deberia_devolver_solo_los_campos_del_contrato(client, usuario, terminad
     data = client.get(url(terminado.match_id), headers=headers(usuario)).json()
 
     assert set(data) == {"match_id", "status", "home_team", "away_team"}
-    assert set(data["home_team"]) == {"team_id", "team_name", "goals"}
-    assert set(data["away_team"]) == {"team_id", "team_name", "goals"}
+    assert set(data["home_team"]) == {"team_id", "team_name", "goals", "penalty_goals"}
+    assert set(data["away_team"]) == {"team_id", "team_name", "goals", "penalty_goals"}
 
 
 def test_cualquier_usuario_autenticado_puede_ver_el_resultado(client, db, terminado):
