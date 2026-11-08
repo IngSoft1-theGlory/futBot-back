@@ -116,3 +116,11 @@ class StartLeagueResponse(BaseModel):
     league_id : int
     league_name : str
     status : LeagueStatus
+
+class ChooseCoachRequest(BaseModel):
+    behavior_id: int | None = None 
+
+class ChooseCoachResponse(BaseModel): 
+    league_id: int
+    team_id: int 
+    behavior_id: int | None = None

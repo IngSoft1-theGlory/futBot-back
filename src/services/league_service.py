@@ -35,7 +35,9 @@ from src.schemas.league import (
     JoinLeagueRequest, 
     FixtureMatchOut, 
     FixtureTeamOut, 
-    FixtureScoreOut
+    FixtureScoreOut,
+    ChooseCoachRequest,
+    ChooseCoachResponse
 )
 
 from src.models.league import League, LeagueStatus
