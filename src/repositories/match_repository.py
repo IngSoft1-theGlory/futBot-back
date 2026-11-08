@@ -24,8 +24,13 @@ def get_behaviors_by_ids(session: Session, behavior_ids: list[int]) -> list[Beha
     
     return list(session.scalars(statement).all())
 
-def get_match_by_id(session: Session, match_id: int) -> Match | None:
-    """El partido con ese id, o None si no existe."""
+def get_match_by_id(session: Session, match_id: int, for_update: bool = False) -> Match | None:
+    """
+    El partido con ese id, o None si no existe
+    Si for_update es True, bloquea la fila hasta el commit (otra sesion que la pida, espera)
+    """
+    if for_update:
+        return session.get(Match, match_id, with_for_update=True)
     return session.get(Match, match_id)
 
 def get_lineup_entries(session: Session, match_id: int | None = None, league_id: int | None = None, team_id: int | None = None) -> list[LineupEntry]:
