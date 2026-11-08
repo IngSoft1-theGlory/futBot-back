@@ -24,6 +24,7 @@ from src.repositories.match_repository import (
 )
 from src.core.exceptions import MatchNotFoundError, MatchUnavailableError, InvalidConfigurationError
 from src.models.match import MatchStatus, Match
+from src.models.league import LeagueStatus
 from src.services.lineup_service import copy_league_lineup_to_match
 from src.services.match_start_service import (
     prepare_engine,
@@ -182,11 +183,40 @@ def next_round_to_start(session: Session, league_id: int, round_number: int) -> 
     # se obtiene el numero de la ultima fecha de la liga
     last_round_number = get_last_round_number(session, league_id)
     # si la liga no tiene partidos o ya estamos en la ultima fecha, no hay siguiente fecha
+    # se termina la liga y se devuelve None
     if last_round_number is None or round_number >= last_round_number:
+        finish_league(session, league_id) # paso la liga a FINISHED
         return None
 
     # se terminaron los partidos de le fecha y se puede arrancar la siguiente fecha 
     return round_number + 1
+
+
+def finish_league(session: Session, league_id: int) -> None:
+    """
+    Finaliza la liga y notifica a los clubes,
+    si la liga no existe o no esta en curso, no hace nada
+    """
+    # busco la liga y bloqueo su fila para que otra sesion no la cierre al mismo tiempo
+    league = get_league_by_id(session, league_id, for_update=True)
+
+    # si la liga no existe o no esta en curso, no hago nada
+    if league is None or league.status is not LeagueStatus.IN_PROGRESS:
+        return
+
+    # paso la liga a FINISHED
+    try:
+        league.status = LeagueStatus.FINISHED
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    # aviso a los clubes que la liga termino (despues del commit)
+    event_bus.publish("LEAGUE_FINISHED", {
+        "league_id": league_id,
+        "status": LeagueStatus.FINISHED.value,
+    })
 
  
 # asyncio guarda referencias de las tareas (debiles), ya si no se guardan, el garbage
