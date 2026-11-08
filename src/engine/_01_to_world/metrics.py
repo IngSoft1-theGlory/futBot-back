@@ -30,6 +30,11 @@ def kick_speed(power: int, power_percentage: float) -> float:
     """
     return MAX_KICK_SPEED_METERS_PER_SECOND * power / MAX_ATTRIBUTE_VALUE * power_percentage
 
+# ======================================== Arquero =============================================
+
+# Si la pelota pasa a esta distancia o menos de un arquero, la ataja, con 1.0 m el arquero cubre 2 m de los 7.32 m del arco (cerca de un cuarto), valor provisorio: ajustar probando
+GOALKEEPER_SAVE_RADIUS = 1.0
+
 # ======================================== Tiempos =============================================
 
 TICK_DURATION_SECONDS = 0.5                 # Duración por Tick.

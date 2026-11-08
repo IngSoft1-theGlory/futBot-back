@@ -61,6 +61,9 @@ class FixtureTeamOut(BaseModel):
 class FixtureScoreOut(BaseModel):
     home: int
     away: int
+    phome: int | None = None # goles de penales del anfitrión, solo si hubo penales
+    paway: int | None = None # goles de penales del visitante, solo si hubo penales
+
 
 class FixtureMatchOut(BaseModel):
     match_id: int

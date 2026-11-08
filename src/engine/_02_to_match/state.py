@@ -17,7 +17,13 @@ from typing import Optional, Callable
 
 from src.schemas.lineup_config import LineupConfig
 from src.engine._01_to_world.metrics import PauseType
-from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, TeamSide, starter_position
+from src.engine._01_to_world.pitch import (
+    BALL_INITIAL_POSITION,
+    TeamSide,
+    mirror_position,
+    opposite_side,
+    starter_position,
+)
 from src.engine._01_to_world.data_types import Point2D, Vector2D, AttributeType, ActionType
 from src.schemas.lineup_config import LineupConfig
 
@@ -68,8 +74,9 @@ class MatchPlayerState:
     position: Optional[Point2D] = None
     current_action: ActionType = ActionType.IDLE
     attributes: dict[AttributeType, int] = field(default_factory=dict)  # default_factory para que cada jugador tenga su propio dict (mutable)
-    initial_position: Optional[Point2D] = None  # Donde el jugador arrancó el partido, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
+    initial_position: Optional[Point2D] = None  # Donde el jugador arranca en el lado actual, y a donde vuelve tras un gol (ver simulation._reset_after_goal)
     on_tick: Optional[Callable] = None # para que cada jugador guarde su propia funcion
+    is_goalkeeper: bool = False # para que cada jugador guarde si es arquero o no, por defecto es false (Revisar con de Arquero)
 
 
 @dataclass
@@ -83,6 +90,18 @@ class PauseState:
     ends_at: float  # instante de fin, medido con time.monotonic(, pues es un reloj que solo avanza y no se ve afectado por cambios de la hora del sistema.
     substituted_team_ids: set[int] = field(default_factory=set) # IDs de los equipos que ya hicieron su cambio en esta pausa. Se vacía al terminar la pausa.
 
+@dataclass
+class PenaltyShootout:
+    """
+    Estado de la tanda de penales: para cada equipo, el orden en que patean
+    y el orden en que atajan sus titulares.
+    """
+    # kicker_order y keeper_order son dicts, con el fin de buscar por team_id y que devuelva la lista
+    # de jugadores que participan en la tanda.
+    # field(default_factory=dict) y no '= {}': así cada tanda tiene sus propios dicts
+    kicker_order: dict[int, list[int]] = field(default_factory=dict)  # team_id -> player_ids, en orden de pateo
+    keeper_order: dict[int, list[int]] = field(default_factory=dict)  # team_id -> player_ids, en orden de atajada
+    prepared: bool = False                                            # True cuando el orden ya fue sorteado
 
 @dataclass
 class MatchState:
@@ -103,8 +122,15 @@ class MatchState:
     # La pausa en curso, o None si el partido no está en pausa.
     pause: Optional[PauseState] = None
 
+    # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
+    # que el marcador siga al equipo y no al lado.
+    host_side: TeamSide = TeamSide.HOME
+    
     # agrego modo penales para partidos de liga. por defecto es false
     penalties_enabled: bool = False
+
+    # La tanda de penales, o None si todavía no se preparó.
+    penalty_shootout: Optional[PenaltyShootout] = None
 
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
@@ -216,8 +242,27 @@ def build_initial_state(
         score=Score(home=0, away=0),
         ball=BallState(position=BALL_INITIAL_POSITION, velocity=Vector2D(0.0, 0.0)),
         players=players,
+        host_side=home.side,
         penalties_enabled=penalties_enabled,
     )
+
+
+def swap_sides(state: MatchState) -> None:
+    """
+    Intercambia los lados de los equipos (Half-Time): cada equipo pasa a
+    defender el arco contrario. Los jugadores en cancha vuelven a su posición
+    inicial espejada y la pelota al centro, quieta.
+    """
+    state.host_side = opposite_side(state.host_side)
+
+    for player in state.players.values():
+        player.side = opposite_side(player.side)  # también los suplentes
+        if player.position is not None and player.initial_position is not None:
+            player.initial_position = mirror_position(player.initial_position)
+            player.position = player.initial_position
+
+    state.ball.position = BALL_INITIAL_POSITION
+    state.ball.velocity = Vector2D(0.0, 0.0)
 
 
 def _build_player_states(setup: TeamMatchSetup) -> dict[int, MatchPlayerState]:
@@ -250,3 +295,82 @@ def _copy_attributes(setup: TeamMatchSetup, player_id: int) -> dict[AttributeTyp
     if player_id not in setup.attributes:
         raise MatchInitializationError(f"Faltan los atributos del jugador {player_id}.")
     return dict(setup.attributes[player_id])  # copia: cada jugador tiene su propio dict
+
+# ====== Sustitución de jugadores ======
+
+class SubstitutionError(Exception):
+    """
+    Base de los errores de sustitución.
+
+    No es un AppError a propósito (igual que MatchInitializationError): el motor
+    no sabe de HTTP. El endpoint de sustitución los captura y los traduce.
+    """
+
+
+class NotInPauseError(SubstitutionError):
+    """El partido no está en una pausa."""
+
+
+class InvalidSubstitutionError(SubstitutionError):
+    """Los jugadores no sirven para el cambio (ver substitute_player)."""
+
+
+class SubstitutionLimitError(SubstitutionError):
+    """El equipo ya hizo su cambio en esta pausa."""
+
+
+def substitute_player(state: MatchState, team_id: int, player_out_id: int, player_in_id: int) -> None:
+    """
+    Cambia un titular (player_out) por un suplente (player_in) del mismo equipo.
+    Modifica state directamente y no devuelve nada.
+
+    Valida en este orden (el orden importa: es el que fija qué error se lanza
+    cuando hay más de un problema a la vez):
+      1. Hay pausa                           -> Caso contrario: NotInPauseError
+      2. Los jugadores sirven para el cambio -> Caso contrario: InvalidSubstitutionError
+      3. El equipo no cambió en esta pausa   -> Caso contrario:SubstitutionLimitError
+
+    Es síncrona y sin await a propósito: el chequeo del límite y el cambio son
+    una sola operación, así dos pedidos casi simultáneos no pueden pasar los dos.
+    """
+
+    # 1) Solo se puede cambiar durante una pausa: fuera de ella, state.pause es None.
+    if state.pause is None:
+        raise NotInPauseError("Solo se puede hacer un cambio durante una pausa.")
+
+    # 2) Los dos jugadores tienen que existir y ser del equipo; el saliente tiene que
+    #    estar en cancha y el entrante en el banco. "En cancha" = tener position
+    #    el mismo criterio que on_pitch_player_ids.
+    player_out = state.players.get(player_out_id)
+    player_in = state.players.get(player_in_id)
+    if (
+        player_out is None or player_in is None
+        or player_out.team_id != team_id or player_in.team_id != team_id
+        or player_out.position is None      # el saliente tiene que estar en cancha
+        or player_in.position is not None   # el entrante tiene que estar en el banco
+    ):
+        raise InvalidSubstitutionError("Cambio inválido: el saliente debe estar en cancha y el entrante en el banco, ambos del equipo.")
+
+    # 3) Un solo cambio por equipo en cada pausa. state.pause es un objeto nuevo en
+    #    cada pausa, así que substituted_team_ids arranca vacío solo: no hay que limpiarlo.
+    if team_id in state.pause.substituted_team_ids:
+        raise SubstitutionLimitError("El equipo ya hizo su cambio en esta pausa.")
+
+    # Todo validado: recién ahora se modifica el estado. Si algo falla arriba, no se toca nada.
+
+    # El entrante ocupa el lugar del saliente: mismo rol y misma posición.
+    # Sus attributes y behavior_id no se tocan: ya los trae cargados (los suplentes también).
+    player_in.position = player_out.position
+    player_in.role = player_out.role
+    player_in.initial_position = player_out.initial_position
+    player_in.is_starter = True
+
+    # El saliente vuelve al banco: queda como un suplente más (sin posición ni rol).
+    player_out.position = None
+    player_out.role = None
+    player_out.initial_position = None
+    player_out.is_starter = False
+    player_out.current_action = ActionType.IDLE  # no queda con la acción del último tick que jugó
+
+    # Se anota el cambio para bloquear el segundo del equipo en esta pausa.
+    state.pause.substituted_team_ids.add(team_id)

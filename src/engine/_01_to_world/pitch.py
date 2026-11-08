@@ -21,7 +21,7 @@ GOAL_WIDTH = 7.32     # ancho del arco, centrado en y = PITCH_WIDTH / 2
 class TeamSide(Enum):
     """Lado de cancha que defiende cada equipo"""
 
-    # HOME defiende x=0 y ataca hacia x=PITCH_LENGTH; AWAY es el espejo
+    # Dos lados: HOME defiende x=0 y ataca hacia x=PITCH_LENGTH; AWAY es el espejo.
     HOME = "HOME"
     AWAY = "AWAY"
 
@@ -84,8 +84,8 @@ def detect_goal(ball_position: Point2D) -> Optional[TeamSide]:
 # =============== Posiciones iniciales ===============
 
 # Posicion inicial de cada rol, por formación: FORMATION_POSITIONS[formación][rol]
-# Están definido para HOME (ataca hacia x creciente); starter_position las rota para AWAY.
-# Cada equipo arranca en su propia mitad.
+# Están definidas para el lado HOME (ataca hacia x creciente); starter_position las rota 
+# para el lado AWAY. Cada equipo arranca en su propia mitad.
 FORMATION_POSITIONS: dict[str, dict[str, Point2D]] = {
     "2-1": {
         "DEF_LEFT": Point2D(25.0, 15.0),
@@ -102,6 +102,16 @@ FORMATION_POSITIONS: dict[str, dict[str, Point2D]] = {
 BALL_INITIAL_POSITION = Point2D(PITCH_LENGTH / 2, PITCH_WIDTH / 2)  # centro de la cancha
 
 
+def mirror_position(position: Point2D) -> Point2D:
+    """Gira una posición 180° respecto del centro de la cancha."""
+    return Point2D(PITCH_LENGTH - position.x, PITCH_WIDTH - position.y)
+
+
+def opposite_side(side: TeamSide) -> TeamSide:
+    """El lado contrario a `side`."""
+    return TeamSide.AWAY if side is TeamSide.HOME else TeamSide.HOME
+
+
 def starter_position(formation_type: str, role: str, side: TeamSide) -> Point2D:
     """
     Posición inicial de un titular según su formación, rol y lado.
@@ -111,4 +121,4 @@ def starter_position(formation_type: str, role: str, side: TeamSide) -> Point2D:
         return base
     # AWAY se gira la posición 180° respecto del centro de la cancha.
     # Así cada rol mantiene su lado respecto de su propio equipo.
-    return Point2D(PITCH_LENGTH - base.x, PITCH_WIDTH - base.y)
+    return mirror_position(base)
