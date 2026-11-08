@@ -10,7 +10,7 @@ from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
-from src.services.choose_coach import choose_coach_behavior
+from src.services.coach_service import choose_coach_behavior
 from src.models import League, LeagueStatus
 
 from fastapi.concurrency import run_in_threadpool

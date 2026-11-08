@@ -6,7 +6,7 @@ from src.core.exceptions import InvalidData, LeagueNotInProgressError
 from src.engine._02_to_match.state import coach_registry
 from src.models import BehaviorType, LeagueStatus
 from src.schemas.league import ChooseCoachRequest
-from src.services.choose_coach import choose_coach_behavior
+from src.services.coach_service import choose_coach_behavior
 
 # reutilizo fixtures y helpers de otros tests
 from tests.unit.test_behavior_type import crear_en_base
@@ -50,10 +50,10 @@ def test_deberia_rechazar_un_comportamiento_que_no_es_coach(session, anfitrion):
     liga = crear_liga(session, anfitrion, status=LeagueStatus.IN_PROGRESS)
     dt = crear_en_base(session, anfitrion.user_id, BehaviorType.COACH)
     de_jugador = crear_en_base(session, anfitrion.user_id, BehaviorType.PLAYER) 
-    elegir(session, anfitrion, liga, dt.behavior_id) # reasigno con un comportamiento de jugador, no de DT
-
+    elegir(session, anfitrion, liga, dt.behavior_id) 
     with pytest.raises(InvalidData):
-        elegir(session, anfitrion, liga, de_jugador.behavior_id)
+        elegir(session, anfitrion, liga, de_jugador.behavior_id) # reasigno con un comportamiento de jugador, no de DT
+
 
     assert coach_registry.get(liga.league_id, anfitrion.team_id) == dt.behavior_id  # sigue el comportamiento anterior
 
