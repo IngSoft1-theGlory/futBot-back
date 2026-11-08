@@ -34,15 +34,18 @@ from src.engine.match_runner import (
     ExecuteBehavior,
     NotifyTick,
     OnFinished,
+    PlayShootout,
     run_match,
     NotifyPause,
+    NotifyPenalties,
 )
+from src.engine import penalties
 from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
 from src.models import LineupEntry, MatchStatus, Player, Match
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team, get_behaviors_by_ids
-from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause
+from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause, notify_penalties as broadcast_penalties
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
@@ -217,14 +220,26 @@ def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, Execute
 # --- resultado final --------------------------------------------------------
 
 
-def save_match_result(session: Session, match_id: int, home_goals: int, away_goals: int) -> Match:
-    """Guarda el marcador final y publica los eventos correspondientes"""
+def save_match_result(
+    session: Session,
+    match_id: int,
+    home_goals: int,
+    away_goals: int,
+    home_penalty_goals: int | None = None,
+    away_penalty_goals: int | None = None,
+) -> None:
+    """Guarda el marcador final, pasa el partido a FINISHED y publica MATCH_FINISHED como evento.
+
+    Los goles de penales son opcionales: vacíos (None) significa que el partido terminó en
+    tiempo reglamentario; con valor, que se definió por penales."""
     match = get_match_by_id(session, match_id)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
 
     match.home_goals = home_goals
     match.away_goals = away_goals
+    match.home_penalty_goals = home_penalty_goals
+    match.away_penalty_goals = away_penalty_goals
     match.status = MatchStatus.FINISHED
     session.commit()
 
@@ -258,7 +273,12 @@ def make_on_finished(session_factory: Callable[[], Session] = SessionLocal) -> O
  
     def on_finished(state: MatchState) -> None:
         with session_factory() as session:
-            match = save_match_result(session, state.match_id, state.score.home, state.score.away)
+            # phome y paway son None si no hubo penales: así el partido se guarda como terminado
+            # en tiempo reglamentario
+            match = save_match_result(
+                session, state.match_id, state.score.home, state.score.away,
+                state.score.phome, state.score.paway,
+            )
  
             # si el partido era de liga, se avisa a la liga y arranca la fecha siguiente o la cierra
             if match.league_id is not None:
@@ -322,6 +342,8 @@ def launch_match(
     # no podrían poner las pausas en 0.
     pause_durations: dict[PauseType, float] = PAUSE_DURATION_SECONDS,
     notify_pause: NotifyPause | None = broadcast_pause,
+    play_shootout: PlayShootout | None = penalties.play_shootout,
+    notify_penalties: NotifyPenalties | None = broadcast_penalties,
 ) -> asyncio.Task:
     """
     Lanza run_match como tarea de fondo y devuelve la tarea. Requiere el
@@ -350,6 +372,8 @@ def launch_match(
             on_finished=on_finished,
             pause_durations=pause_durations,
             notify_pause=notify_pause,
+            play_shootout=play_shootout,
+            notify_penalties=notify_penalties,
         ),
         name=f"match-{state.match_id}",
     )

@@ -263,6 +263,29 @@ def test_deberia_save_match_result_fallar_si_el_partido_no_existe(session):
     with pytest.raises(LookupError):
         save_match_result(session, 999, 0, 0)
 
+# --- penales en el resultado guardado ---------------------------------------
+
+
+def test_deberia_save_match_result_guardar_los_goles_de_penales_cuando_se_le_pasan(session, partido):
+    save_match_result(session, partido.match_id, 1, 1, home_penalty_goals=2, away_penalty_goals=1)
+
+    # expunge_all hace que get() lea de la base y no del objeto que ya estaba en memoria
+    session.expunge_all()
+    guardado = session.get(Match, partido.match_id)
+    assert (guardado.home_penalty_goals, guardado.away_penalty_goals) == (2, 1)
+
+def test_deberia_make_on_finished_pasarle_phome_y_paway_del_estado_al_guardado(session, partido):
+    state = prepare_match(session, partido.match_id)
+    state.score.home, state.score.away = 1, 1       # empataron en el tiempo reglamentario
+    state.score.phome, state.score.paway = 2, 1     # y se definió por penales
+
+    make_on_finished(_fabrica_de_sesiones(session))(state)
+
+    session.expunge_all()
+    guardado = session.get(Match, partido.match_id)
+    assert (guardado.home_penalty_goals, guardado.away_penalty_goals) == (2, 1)
+
+
 @pytest.fixture()
 def eventos_globales():
     """Un suscriptor al bus GLOBAL (el mismo bus que alimenta al WS global).
