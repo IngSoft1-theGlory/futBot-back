@@ -40,6 +40,7 @@ class Match(Base):
         # Para evitar que un partido tenga el mismo equipo como anfitrion y visitante
         CheckConstraint("team_host_id != team_away_id", name="host_differs_from_away"),
         CheckConstraint("home_goals >= 0 AND away_goals >= 0", name="goals_non_negative"),
+        CheckConstraint("home_penalty_goals >= 0 AND away_penalty_goals >= 0", name="penalty_goals_non_negative"),
     )
 
     # Identificador unico del partido (lo comparten /friendly y /matches)
@@ -72,6 +73,14 @@ class Match(Base):
     )
     away_goals: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # goles de penales. null si el partido no se resuelve por penales
+    home_penalty_goals: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=None, server_default=None
+    )
+    away_penalty_goals: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=None, server_default=None
     )
 
     # Equipo anfitrion: obligatorio. CASCADE: si se borra el equipo,

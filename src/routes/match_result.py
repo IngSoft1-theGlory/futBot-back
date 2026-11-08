@@ -37,10 +37,12 @@ def get_match_result_endpoint(
             "team_id": match.host_team.team_id,
             "team_name": match.host_team.team_name,
             "goals": match.home_goals,
+            "penalty_goals": match.home_penalty_goals,
         },
         away_team={
             "team_id": match.away_team.team_id,
             "team_name": match.away_team.team_name,
             "goals": match.away_goals,
+            "penalty_goals": match.away_penalty_goals,
         },
     )

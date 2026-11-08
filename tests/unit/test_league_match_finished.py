@@ -44,8 +44,11 @@ def _armar_amistoso_en_juego(session):
     return amistoso
 
 def _estado_final(match_id, goles_local, goles_visitante):
-    # on_finished solo lee el id y el marcador, no hace falta un MatchState completo
-    return SimpleNamespace(match_id=match_id, score=SimpleNamespace(home=goles_local, away=goles_visitante))
+    # on_finished solo lee el id y el marcador (con los penales en None: no hubo), no hace falta un MatchState completo
+    return SimpleNamespace(
+        match_id=match_id,
+        score=SimpleNamespace(home=goles_local, away=goles_visitante, phome=None, paway=None),
+    )
 
 @pytest.fixture()
 def publicar(monkeypatch):
