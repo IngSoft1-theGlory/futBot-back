@@ -12,6 +12,7 @@ Lo usan todos los endpoints que arman una configuración de partido
 
 from __future__ import annotations
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from src.models.lineup_entry import LineupEntry
@@ -63,6 +64,13 @@ def save_lineup(session: Session, match_id:int | None, team_id: int, config: Lin
             role = None,
             is_starter = False,
         ))
+
+def replace_league_lineup(session: Session, league_id: int, team_id: int, config: LineupConfig) -> None:
+    """Reemplaza la alineación del equipo en la liga. No hace commit: lo hace quien la llama"""
+
+    # el delete se ejecuta en el momento, así las filas nuevas no chocan con las viejas (mismo jugador o rol)
+    session.execute(delete(LineupEntry).where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id))
+    save_lineup(session, None, team_id, config, league_id)
 
 def copy_league_lineup_to_match(session: Session, match: Match) -> None:
     """Copia al partido la alineación vigente que cada equipo tiene en la liga.

@@ -118,6 +118,10 @@ class LeagueAlreadyStartedError(ConflictError):
     """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
     error_code = "LEAGUE_ALREADY_STARTED"
 
+class LeagueFinishedError(ConflictError):
+    """Rama 409 LEAGUE_FINISHED: la liga ya terminó."""
+    error_code = "LEAGUE_FINISHED"
+
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
 
