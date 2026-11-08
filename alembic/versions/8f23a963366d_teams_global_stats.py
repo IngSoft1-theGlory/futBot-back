@@ -2,7 +2,7 @@
 teams global stats
 
 Revision ID: 8f23a963366d
-Revises: bae51cba2fdb
+Revises: 969ca3575aaa
 Create Date: 2026-11-08 14:39:54.305863
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '8f23a963366d'
-down_revision: Union[str, Sequence[str], None] = 'bae51cba2fdb'
+down_revision: Union[str, Sequence[str], None] = '969ca3575aaa'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -18,8 +18,6 @@ from src.services.standings_service import DRAW, LOSS, POINTS, get_match_result
 def add_match_to_global_stats(session: Session, match: Match) -> bool:
     """
     Suma el resultado del partido a las estadisticas globales de sus dos equipos y devuelve True si sumo (el ranking cambio) o False si el partido no cuenta
-
-    el resultado del partido, asi se guardan las dos cosas juntas o ninguna.
     """
     # los amistosos no tienen liga -> no suman
     if match.league_id is None:

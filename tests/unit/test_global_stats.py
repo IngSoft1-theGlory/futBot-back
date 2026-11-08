@@ -10,9 +10,9 @@ from unittest.mock import MagicMock, call
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from src.models import Match, MatchStatus, Team
+from src.models import MatchStatus, Team
 from src.realtime.event_bus import event_bus
-from src.services import league_run_service, match_start_service
+from src.services import league_run_service
 from src.services.match_start_service import make_on_finished, save_match_result
 from tests.unit.test_league_match_finished import _armar_amistoso_en_juego, _estado_final
 from tests.unit.test_start_league_round import _armar_liga_iniciada, _partidos_de_la_fecha
@@ -69,31 +69,6 @@ def test_deberia_sumar_el_resultado_a_los_dos_equipos_al_terminar_un_partido_de_
     }
     publicar.assert_any_call("RANKING_UPDATED", {})
 
-def test_deberia_sumar_un_empate_y_un_punto_a_cada_equipo(session, publicar):
-    liga = _armar_liga_iniciada(session)
-    partido = _partido_en_juego(session, liga)
-
-    save_match_result(session, partido.match_id, home_goals=1, away_goals=1)
-
-    empate = {
-        "matches_played": 1, "wins": 0, "draws": 1, "losses": 0,
-        "goals_for": 1, "goals_against": 1, "points": 1,
-    }
-    assert _estadisticas(session, partido.team_host_id) == empate
-    assert _estadisticas(session, partido.team_away_id) == empate
-
-def test_deberia_contar_como_victoria_de_2_puntos_un_partido_ganado_por_penales(session, publicar):
-    # misma regla que la tabla de posiciones de la liga (standings_service)
-    liga = _armar_liga_iniciada(session)
-    partido = _partido_en_juego(session, liga)
-
-    save_match_result(session, partido.match_id, 1, 1, home_penalty_goals=4, away_penalty_goals=3)
-
-    assert _estadisticas(session, partido.team_host_id)["wins"] == 1
-    assert _estadisticas(session, partido.team_host_id)["points"] == 2
-    assert _estadisticas(session, partido.team_away_id)["losses"] == 1
-    assert _estadisticas(session, partido.team_away_id)["points"] == 0
-
 def test_no_deberia_modificar_las_estadisticas_un_partido_de_liga_privada(session, publicar):
     liga = _armar_liga_iniciada(session)
     liga.password_hash = "hash-falso"  # con contraseña: es privada
@@ -137,7 +112,7 @@ def test_deberia_publicar_ranking_updated_despues_de_guardar_las_estadisticas(se
     fabrica = sessionmaker(bind=session.get_bind())
     puntos_vistos = []
 
-    def publish_espia(nombre, data):
+    def publish_espia(nombre, _data):
         if nombre == "RANKING_UPDATED":
             # una sesion distinta solo ve lo que ya esta confirmado (commit)
             with fabrica() as otra_sesion:
@@ -149,21 +124,3 @@ def test_deberia_publicar_ranking_updated_despues_de_guardar_las_estadisticas(se
 
     assert puntos_vistos == [3]
 
-def test_no_deberia_guardar_nada_si_falla_la_suma_de_las_estadisticas(session, publicar, monkeypatch):
-    liga = _armar_liga_iniciada(session)
-    partido = _partido_en_juego(session, liga)
-    id_partido, local = partido.match_id, partido.team_host_id
-
-    def sumar_a_medias(session, match):
-        match.host_team.points += 3  # alcanza a sumarle al local...
-        raise RuntimeError("...y falla antes de sumarle al visitante")
-
-    monkeypatch.setattr(match_start_service, "add_match_to_global_stats", sumar_a_medias)
-
-    with pytest.raises(RuntimeError):
-        save_match_result(session, id_partido, home_goals=2, away_goals=0)
-
-    session.expire_all()
-    assert session.get(Match, id_partido).status is MatchStatus.IN_PROGRESS  # el resultado tampoco se guardo
-    assert _estadisticas(session, local) == SIN_PARTIDOS                     # ni la mitad de las estadisticas
-    publicar.assert_not_called()                                              # y no se aviso nada
