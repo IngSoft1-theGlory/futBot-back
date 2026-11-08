@@ -4,7 +4,7 @@ Tests de la preparación de un turno de la tanda de penales (prepare_turn).
 
 import pytest
 
-from src.engine._01_to_world.data_types import ActionType
+from src.engine._01_to_world.data_types import ActionType, AttributeType
 from src.engine._01_to_world.pitch import PENALTY_BALL_GAP, PENALTY_DISTANCE, TeamSide, goal_center
 from src.engine._02_to_match.state import swap_sides
 from src.engine._03_to_builder.behavior_executor import execute_behavior
@@ -22,6 +22,8 @@ def _estado_con_tanda():
     state = _build_state()
     swap_sides(state)  # como en un partido real: los penales llegan después del Half-Time
     prepare_shootout(state)
+    # Se pisan los valores que se colocaron a los jugadores con el fin de que el test sea 
+    # determinista y no dependa del azar.
     state.penalty_shootout.kicker_order = {1: [100, 101, 102], 2: [200, 201, 202]}
     state.penalty_shootout.keeper_order = {1: [100, 101, 102], 2: [200, 201, 202]}
     return state
@@ -79,3 +81,14 @@ def test_deberia_quedar_solo_con_el_comportamiento_arquero_quien_pateo_en_el_tur
     # y el que ataja antes y patea ahora, queda solo como pateador
     assert state.players[200].is_goalkeeper is False
     assert execute_behavior(state, 200).action == ActionType.KICK_BALL
+
+def test_deberia_el_pateador_con_control_minimo_poder_patear_la_pelota_a_0_3_metros():
+    state = _estado_con_tanda()
+    # Con CONTROL 20 (el mínimo) el alcance es de solo 0,5 m: la pelota a 0,3 m tiene que alcanzar igual
+    state.players[100].attributes[AttributeType.CONTROL] = 20
+
+    prepare_turn(state, kicker_team_id=1, keeper_team_id=2, round_index=0)
+
+    pateador = state.players[100]
+    assert state.ball.position.distance_to(pateador.position) == pytest.approx(0.3)
+    assert execute_behavior(state, 100).action == ActionType.KICK_BALL
