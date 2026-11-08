@@ -58,6 +58,7 @@ def create_behavior_endpoint(
     description=behavior.description,
     code=behavior.code, 
     is_default=False, 
+    behavior_type=behavior.behavior_type
     )
 
 
@@ -76,4 +77,5 @@ def update_behavior_endpoint(
         description=behavior.description,
         code=behavior.code, 
         is_default=False, 
+        behavior_type=behavior.behavior_type # devuelve el tipo actual, pq el tipo no se modifica 
     )
