@@ -10,6 +10,7 @@ from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
+from src.services.coach_service import choose_coach_behavior
 from src.models import League, LeagueStatus
 from src.schemas.lineup_config import LineupConfig
 
@@ -42,6 +43,8 @@ from src.schemas.league import (
     StartLeagueRequest,
     StartLeagueResponse,
     LeagueLineupOut,
+    ChooseCoachRequest,
+    ChooseCoachResponse,
 )
 
 
@@ -232,3 +235,19 @@ async def start_league_endpoint(
 
     # devuelve el estado de la liga recien iniciada
     return response
+
+
+@router.put("/{league_id}/teams/{team_id}/coach", 
+    response_model=ChooseCoachResponse)
+def choose_coach_endpoint(
+    league_id: int, 
+    team_id: int,
+    payload: ChooseCoachRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ChooseCoachResponse:
+
+    # armo la respuesta y la devuelvo
+    coach = choose_coach_behavior(session, league_id, user_id, team_id=team_id, payload=payload)
+
+    return coach

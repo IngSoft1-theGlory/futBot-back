@@ -57,6 +57,7 @@ from src.services.lineup_service import (
     validate_lineup,
     replace_league_lineup,
 )
+from src.engine._02_to_match.state import coach_registry
 
 MIN_TEAMS_TO_START = 4  # cantidad mínima de equipos para iniciar una liga
 
@@ -198,10 +199,17 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
 
     teams = get_league_teams(session, league_id)
     is_private = league.password_hash is not None
+    
+    user = get_user_by_id(session, user_id)
+
+    # DT que eligió el equipo del usuario en esta liga 
+    # None si no eligio ninguno
+    coach_behavior_id = None
+    if user is not None:
+        coach_behavior_id = coach_registry.get(league_id, user.team_id)
 
     # una liga privada solo la pueden ver los equipos inscriptos
     if is_private:
-        user = get_user_by_id(session, user_id)
         if user is None or all(team.team_id != user.team_id for team in teams):
             raise ForbiddenError("No se permite ver el estado de esta liga")
 
@@ -239,7 +247,8 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
         fixture=fixture,    
         ranking=ranking,
-        penalties_enabled=league.penalties_enabled
+        penalties_enabled=league.penalties_enabled,
+        coach_behavior_id=coach_behavior_id
     )
 
 

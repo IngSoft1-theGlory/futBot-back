@@ -127,6 +127,7 @@ def test_deberia_devolver_el_detalle_completo_de_una_liga_publica(
         "ranking": [],
         "fixture": [],
         "penalties_enabled": False,
+        "coach_behavior_id": None,
     }
 
 
