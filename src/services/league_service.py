@@ -26,6 +26,7 @@ from src.core.exceptions import (
     TeamNotInLeagueError,
     InsufficientTeamsError,
     OddTeamsCountError,
+    NotLeagueHostError,
 )
 
 from src.schemas.league import (
@@ -420,6 +421,32 @@ def start_league(session: Session, user_id: int, league_id: int) -> League:
         raise
 
     return league
+
+def cancel_league(session: Session, user_id: int, league_id: int) -> None: 
+    """
+    Cancela una liga pendiente, borrando la liga y sus lineup_entries. 
+    Solo el anfitrion puede cancelar la liga
+    """
+
+    league = get_league_by_id(session, league_id, for_update=True)
+
+    if league is None: 
+        raise LeagueNotFoundError("No existe una liga con el ID especificado.")
+
+    user = get_user_by_id(session, user_id)
+    if user is None or user.team_id != league.host_team_id:
+        raise NotLeagueHostError("Sólo el anfitrión puede eliminar la liga")    
+    
+    if league.status != LeagueStatus.PENDING:
+        raise LeagueAlreadyStartedError("No se puede eliminar una liga que ya fue iniciada")
+
+    try:
+        # delete() marca la liga para borrarse, sin hacer commit
+        session.delete(league)   # Las lineup_entries se borran solas por el on delete cascade de la FK
+        session.commit() 
+    except Exception:
+        session.rollback()
+        raise
 
 def _validate_team_in_league(session: Session, user_id: int, league_id: int, team_id: int, for_update: bool = False) -> League:
     """Devuelve la liga si existe, el equipo es del usuario y está inscripto en ella."""
