@@ -80,7 +80,7 @@ def test_deberia_publicar_los_eventos_de_liga_al_terminar_un_partido(session, pu
 
     save_match_result(session, partido.match_id, home_goals=2, away_goals=1)
 
-    # se revisa que estos 2 eventos se publique en este orden
+    # se revisa que estos 3 eventos se publiquen en este orden (la liga es publica, por eso al final tambien se avisa que cambio el ranking global)
     assert publicar.call_args_list == [
         call("MATCH_FINISHED", {"match_id": partido.match_id, "status": "FINISHED", "league_id": liga.league_id}),
         call("LEAGUE_MATCH_FINISHED", {
@@ -89,6 +89,7 @@ def test_deberia_publicar_los_eventos_de_liga_al_terminar_un_partido(session, pu
             "score": {"home": 2, "away": 1},
             "status": "FINISHED",
         }),
+        call("RANKING_UPDATED", {}),
     ]
 
 def test_deberia_arrancar_la_siguiente_fecha_una_sola_vez_al_finalizar_la_anterior(

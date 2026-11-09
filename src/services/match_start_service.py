@@ -63,6 +63,7 @@ from src.models.match import MatchStatus
 from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior, load_on_tick
 from src.engine._03_to_builder import coach_api
 from src.core.exceptions import InvalidConfigurationError
+from src.services.global_stats_service import add_match_to_global_stats
 
 logger = logging.getLogger(__name__)
 
@@ -280,16 +281,29 @@ def save_match_result(
 
     Los goles de penales son opcionales: vacíos (None) significa que el partido terminó en
     tiempo reglamentario; con valor, que se definió por penales."""
-    match = get_match_by_id(session, match_id)
+    # bloqueo la fila del partido hasta el commit, si otro cierre del mismo partido llega a la vez, espera a que este termine y despues lo encuentra FINISHED
+    match = get_match_by_id(session, match_id, for_update=True)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
 
-    match.home_goals = home_goals
-    match.away_goals = away_goals
-    match.home_penalty_goals = home_penalty_goals
-    match.away_penalty_goals = away_penalty_goals
-    match.status = MatchStatus.FINISHED
-    session.commit()
+    # si ya estaba terminado, este cierre es repetido y el partido ya se sumó al ranking
+    was_already_finished = match.status is MatchStatus.FINISHED
+
+    try:
+        match.home_goals = home_goals
+        match.away_goals = away_goals
+        match.home_penalty_goals = home_penalty_goals
+        match.away_penalty_goals = away_penalty_goals
+        match.status = MatchStatus.FINISHED
+
+        ranking_changed = False
+        if not was_already_finished:
+            ranking_changed = add_match_to_global_stats(session, match)
+
+        session.commit()  # resultado y estadísticas se guardan juntos, o no se guarda nada
+    except Exception:
+        session.rollback()  # si algo falló, deshago todo: no queda nada a medias
+        raise
 
     # los eventos se publican DESPUES del commit: quien los recibe ya ve el resultado guardado
     match_finished_event = {
@@ -308,6 +322,9 @@ def save_match_result(
             "score": {"home": match.home_goals, "away": match.away_goals},
             "status": match.status.value,
         })
+
+    if ranking_changed:
+        event_bus.publish("RANKING_UPDATED", {})  # sin datos: el front vuelve a pedir el ranking
 
     return match
 

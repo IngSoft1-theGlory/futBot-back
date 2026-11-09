@@ -27,6 +27,22 @@ class Team(Base):
     team_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     team_logo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    """
+    Estadisticas globales del club, las que usa el ranking global
+    
+    Solo las cambia global_stats_service, cuando termina un partido de una liga publica
+    
+    Mapped[int] ya dice que es un numero entero y que no puede quedar vacio (no es Optional)
+    
+    default lo pone SQLAlchemy y server_default lo pone la base (los equipos que ya existian arrancan en 0)
+    """
+    matches_played: Mapped[int] = mapped_column(default=0, server_default="0")  # partidos jugados
+    wins: Mapped[int] = mapped_column(default=0, server_default="0")            # ganados
+    draws: Mapped[int] = mapped_column(default=0, server_default="0")           # empatados
+    losses: Mapped[int] = mapped_column(default=0, server_default="0")          # perdidos
+    goals_for: Mapped[int] = mapped_column(default=0, server_default="0")       # goles a favor
+    goals_against: Mapped[int] = mapped_column(default=0, server_default="0")   # goles en contra
+    points: Mapped[int] = mapped_column(default=0, server_default="0")          # puntos
 
     # sin cascade acá a propósito: la cascada vive del lado de User (que es
     # quien tiene la FK). ponerla también acá sería duplicar la regla en

@@ -122,6 +122,12 @@ class MatchState:
     # La pausa en curso, o None si el partido no está en pausa.
     pause: Optional[PauseState] = None
 
+    # Cambios que cada equipo dejó planificados antes de una pausa:
+    # team_id -> (player_out_id, player_in_id). Se aplican solos cuando empieza
+    # la próxima pausa (ver apply_planned_substitutions). Un solo plan por equipo,
+    # de ahi el porque se utiliza un dict con field(default_factory=dict) y no '= {}'.
+    planned_substitutions: dict[int, tuple[int, int]] = field(default_factory=dict)
+
     # Lado que defiende hoy el anfitrión. Cambia en el Half-Time y sirve para
     # que el marcador siga al equipo y no al lado.
     host_side: TeamSide = TeamSide.HOME
@@ -355,6 +361,33 @@ class SubstitutionLimitError(SubstitutionError):
     """El equipo ya hizo su cambio en esta pausa."""
 
 
+def validate_substitution_players(
+    state: MatchState, team_id: int, player_out_id: int, player_in_id: int
+) -> tuple[MatchPlayerState, MatchPlayerState]:
+    """
+    Comprueba que los jugadores sirvan para el cambio, sin modificar nada.
+    Devuelve (player_out, player_in) o lanza InvalidSubstitutionError.
+
+    La usan substitute_player (cambio en la pausa) y el endpoint (para validar un
+    cambio planificado fuera de la pausa, cuando todavía no se aplica nada).
+    """
+
+    # Los dos jugadores tienen que existir y ser del equipo; el saliente tiene que
+    # estar en cancha y el entrante en el banco. "En cancha" = tener position,
+    # el mismo criterio que on_pitch_player_ids.
+    player_out = state.players.get(player_out_id)
+    player_in = state.players.get(player_in_id)
+    if (
+        player_out is None or player_in is None
+        or player_out.team_id != team_id or player_in.team_id != team_id
+        or player_out.position is None      # el saliente tiene que estar en cancha
+        or player_in.position is not None   # el entrante tiene que estar en el banco
+    ):
+        raise InvalidSubstitutionError("Cambio inválido: el saliente debe estar en cancha y el entrante en el banco, ambos del equipo.")
+
+    return player_out, player_in
+
+
 def substitute_player(state: MatchState, team_id: int, player_out_id: int, player_in_id: int) -> None:
     """
     Cambia un titular (player_out) por un suplente (player_in) del mismo equipo.
@@ -374,18 +407,8 @@ def substitute_player(state: MatchState, team_id: int, player_out_id: int, playe
     if state.pause is None:
         raise NotInPauseError("Solo se puede hacer un cambio durante una pausa.")
 
-    # 2) Los dos jugadores tienen que existir y ser del equipo; el saliente tiene que
-    #    estar en cancha y el entrante en el banco. "En cancha" = tener position
-    #    el mismo criterio que on_pitch_player_ids.
-    player_out = state.players.get(player_out_id)
-    player_in = state.players.get(player_in_id)
-    if (
-        player_out is None or player_in is None
-        or player_out.team_id != team_id or player_in.team_id != team_id
-        or player_out.position is None      # el saliente tiene que estar en cancha
-        or player_in.position is not None   # el entrante tiene que estar en el banco
-    ):
-        raise InvalidSubstitutionError("Cambio inválido: el saliente debe estar en cancha y el entrante en el banco, ambos del equipo.")
+    # 2) Los jugadores tienen que servir para el cambio (ver validate_substitution_players).
+    player_out, player_in = validate_substitution_players(state, team_id, player_out_id, player_in_id)
 
     # 3) Un solo cambio por equipo en cada pausa. state.pause es un objeto nuevo en
     #    cada pausa, así que substituted_team_ids arranca vacío solo: no hay que limpiarlo.
@@ -410,3 +433,22 @@ def substitute_player(state: MatchState, team_id: int, player_out_id: int, playe
 
     # Se anota el cambio para bloquear el segundo del equipo en esta pausa.
     state.pause.substituted_team_ids.add(team_id)
+
+
+def apply_planned_substitutions(state: MatchState) -> None:
+    """
+    Aplica los 2 cambios que los equipos dejaron planificados antes de esta pausa.
+    Se llama cuando empieza una pausa (ya existe state.pause), así cada cambio
+    cuenta como el cambio del equipo en esa pausa.
+    """
+
+    # Cuando empieza la pausa, el motor no sabe cuáles equipos planificaron algo: 
+    # uno, los dos o ninguno. Se tiene que mirar el diccionario y recorrerlo.
+    for team_id, (player_out_id, player_in_id) in state.planned_substitutions.items():
+        try:
+            substitute_player(state, team_id, player_out_id, player_in_id)
+        except SubstitutionError:
+            pass  # el plan ya no sirve: se descarta y el partido sigue
+
+    # el plan se usa una sola vez, se haya podido aplicar o no
+    state.planned_substitutions.clear()
