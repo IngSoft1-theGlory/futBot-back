@@ -15,6 +15,7 @@ from src.core.security import create_access_token
 from src.database.base import get_db
 from src.main import app
 from src.models import Behavior, League, LeagueStatus, LineupEntry, Player, Team
+from src.services.league_service import list_leagues
 
 URL = "/api/v1/leagues"
 
@@ -72,16 +73,15 @@ def _crear_equipo(session, nombre):
     session.commit()
     return equipo
 
-# --------------------------------------------------------------------------
 
-def _inscribir(session, liga, equipo, comportamiento):
+def _inscribir(session, liga, equipo, comportamiento, primer_numero=1):
     """
     Inscribe un equipo en la liga como lo hara el POST de unirse:
     6 filas en lineup_entries (3 titulares con rol y 3 suplentes sin rol),
     con league_id y sin match_id.
     """
     roles = ["DEF_LEFT", "DEF_RIGHT", "FORWARD", None, None, None]
-    for numero, role in enumerate(roles, start=1):
+    for numero, role in enumerate(roles, start=primer_numero):
         jugador = Player(
             team_id=equipo.team_id, name=f"J{numero}", number=numero,
             power=60, agility=60, control=60, speed=60, strength=60,
@@ -98,6 +98,7 @@ def _inscribir(session, liga, equipo, comportamiento):
         ))
     session.commit()
 
+# --------------------------------------------------------------------------
 
 def test_deberia_devolver_los_campos_de_cada_liga_sin_exponer_la_password(
     client, session, usuario_con_equipo, auth_headers
@@ -112,7 +113,7 @@ def test_deberia_devolver_los_campos_de_cada_liga_sin_exponer_la_password(
     # Exactamente estos campos: no hay password ni password_hash
     for liga in ligas.values():
         assert set(liga) == {
-            "league_id", "league_name", "max_teams", "current_teams_count", "status", "is_private",
+            "league_id", "league_name", "max_teams", "current_teams_count", "status", "is_private", "is_member",
         }
     assert ligas["Publica"]["is_private"] is False
     assert ligas["Privada"]["is_private"] is True
@@ -178,6 +179,33 @@ def test_deberia_devolver_200_con_lista_vacia_sin_ligas_o_con_pagina_fuera_de_ra
     fuera_de_rango = client.get(URL, params={"page": 5}, headers=auth_headers)
     assert fuera_de_rango.status_code == 200
     assert fuera_de_rango.json() == {"leagues": []}
+
+
+def test_deberia_marcar_is_member_en_las_liga_que_participa(
+    session, usuario_con_equipo, comportamiento
+):
+    mi_equipo = usuario_con_equipo.team
+    rival = _crear_equipo(session, "Instituto")
+
+    # Anfitrion: creo mi liga y estoy inscripto en ella
+    de_anfitrion = _crear_liga(session, mi_equipo, nombre="Anfitrion")
+    _inscribir(session, de_anfitrion, mi_equipo, comportamiento)
+
+    # Miembro: crea un rival la liga y me inscribo
+    # (primer_numero=7: mi equipo ya uso las camisetas 1 a 6 en la liga anterior)
+    de_miembro = _crear_liga(session, rival, nombre="Miembro")
+    _inscribir(session, de_miembro, rival, comportamiento)
+    _inscribir(session, de_miembro, mi_equipo, comportamiento, primer_numero=7)
+    
+    # Ajeno: un rival crea una liga y no me inscribo
+    de_ajeno = _crear_liga(session, rival, nombre="Ajeno")
+    _inscribir(session, de_ajeno, rival, comportamiento, primer_numero=7)
+
+    ligas = list_leagues(session, usuario_con_equipo.user_id, None, None, None)
+
+    assert {liga.league_name: liga.is_member for liga in ligas} == {
+        "Anfitrion": True, "Miembro": True, "Ajeno": False,
+    }
 
 
 @pytest.mark.parametrize(

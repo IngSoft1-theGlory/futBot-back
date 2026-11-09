@@ -81,3 +81,12 @@ def is_team_in_league(session: Session, league_id: int, team_id: int) -> bool:
     )  
     # Devuelve true si existe al menos una fila, false si no
     return session.scalar(statement) is not None
+
+def get_member_league_ids(session: Session, team_id: int, league_ids: list[int]) -> set[int]:
+    """ Devuelve, de las ligas indicadas, en cuáles está inscripto el equipo """
+    statement = (
+        select(LineupEntry.league_id)   # selecciona solo el id de la liga
+        .where(LineupEntry.team_id == team_id, LineupEntry.league_id.in_(league_ids)) # filtra por equipo y ligas 
+        .distinct()   # el equipo tiene 6 filas por liga, así cada liga aparece una sola vez
+    )
+    return set(session.scalars(statement).all())
