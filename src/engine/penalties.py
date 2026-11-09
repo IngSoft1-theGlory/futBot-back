@@ -5,7 +5,8 @@ Tanda de penales.
   en que atajan sus titulares, así como dejar el marcador de penales en 0-0.
 - prepare_turn ubica al pateador, al arquero y la pelota de un penal.
 - play_shootout juega la tanda completa ronda a ronda (la llama run_match).
-- play_penalty juega un solo penal, hasta que hay gol o se agotan los ticks.
+- play_penalty juega un solo penal: avisa cómo quedaron ubicados los jugadores, espera un
+  poco, y después juega los ticks hasta que hay gol o se agotan.
 """
 
 from __future__ import annotations
@@ -14,7 +15,9 @@ import asyncio
 import logging
 import random
 
-from src.engine._01_to_world.metrics import PENALTY_MAX_ROUNDS, PENALTY_MAX_TICKS, PENALTY_PAUSE_SECONDS
+from src.engine._01_to_world.metrics import (
+    PENALTY_MAX_ROUNDS, PENALTY_MAX_TICKS, PENALTY_PAUSE_SECONDS, PENALTY_SETUP_SECONDS,
+)
 from src.engine._02_to_match.state import MatchState, PenaltyShootout
 from src.engine.match_runner import ApplyIntentions, DetectGoal, ExecuteBehavior, NotifyTick, play_tick
 
@@ -74,9 +77,9 @@ def prepare_turn(state: MatchState, kicker_team_id: int, keeper_team_id: int, ro
     assign_penalty_kicker(kicker)
     assign_penalty_goalkeeper(keeper)
 
-    # Se saca de la cancha a TODOS los jugadores (position = None es "fuera de la cancha"), 
-    # incluidos el pateador y el arquero. Más abajo a esos dos se les vuelve a dar una posición, 
-    # así que al terminar solo ellos quedan en cancha.
+    # Se saca de la cancha a TODOS los jugadores (position = None es "fuera de la cancha"), incluidos
+    # el pateador y el arquero. Más abajo a esos dos se les vuelve a dar una posición, así que al
+    # terminar solo ellos quedan en cancha. Esto también retira a los del turno anterior.
     for player in state.players.values():
         player.position = None
 
@@ -94,6 +97,15 @@ def prepare_turn(state: MatchState, kicker_team_id: int, keeper_team_id: int, ro
     # Se ubica la pelota quieta entre ambos, a PENALTY_BALL_GAP del pateador, del lado del arco.
     state.ball.position = Point2D(kicker.position.x - PENALTY_BALL_GAP, goal.y)
     state.ball.velocity = Vector2D(0.0, 0.0)
+
+
+async def _notify_safely(notify: NotifyTick, state: MatchState) -> None:
+    """Avisa a los clientes el estado de la tanda. Si el aviso falla, la tanda sigue."""
+    try:
+        await notify(state)
+    except Exception:
+        logger.exception("notify falló en un penal del partido %s; la tanda sigue.", state.match_id)
+
 
 def _add_penalty_goal(state: MatchState, team_id: int) -> None:
     """Suma 1 gol de penal al equipo team_id: a phome si es el anfitrión, a paway si es el visitante."""
@@ -114,6 +126,7 @@ async def play_shootout(
     notify: NotifyTick,
     tick_interval_seconds: float,
     penalty_pause_seconds: float = PENALTY_PAUSE_SECONDS,
+    penalty_setup_seconds: float = PENALTY_SETUP_SECONDS,
 ) -> None:
     """
     Juega la tanda de penales ronda a ronda hasta que haya un ganador. El resultado
@@ -124,6 +137,9 @@ async def play_shootout(
       - si convirtió un solo equipo, ese equipo gana y la tanda termina
       - si convirtieron los dos o ninguno, se juega otra ronda
       - si después de todas las rondas siguen empatados, se sortea al ganador
+
+    penalty_pause_seconds es la espera entre un penal y el siguiente, para ver cómo terminó el anterior.
+    penalty_setup_seconds es la espera de cada penal con los jugadores ya ubicados y antes de la patada.
     """
     prepare_shootout(state)  # sortea el orden y deja phome y paway en 0
 
@@ -146,6 +162,7 @@ async def play_shootout(
             state, host, away, round_index,
             execute_behavior=execute_behavior, apply_intentions=apply_intentions,
             detect_goal=detect_goal, notify=notify, tick_interval_seconds=tick_interval_seconds,
+            setup_seconds=penalty_setup_seconds,
         )
 
         await asyncio.sleep(penalty_pause_seconds)
@@ -155,6 +172,7 @@ async def play_shootout(
             state, away, host, round_index,
             execute_behavior=execute_behavior, apply_intentions=apply_intentions,
             detect_goal=detect_goal, notify=notify, tick_interval_seconds=tick_interval_seconds,
+            setup_seconds=penalty_setup_seconds,
         )
 
         round_index += 1
@@ -176,12 +194,20 @@ async def _play_penalty(
     detect_goal: DetectGoal,
     notify: NotifyTick,
     tick_interval_seconds: float,
+    setup_seconds: float,
 ) -> None:
     """
-    Juega UN penal: ubica a los jugadores y juega ticks hasta que haya gol en el
-    arco o pasen PENALTY_MAX_TICKS ticks. El gol se suma al equipo que patea.
+    Juega UN penal: ubica a los jugadores, avisa cómo quedaron y espera setup_seconds, y después
+    juega ticks hasta que haya gol en el arco o pasen PENALTY_MAX_TICKS ticks.
+    El gol se suma al equipo que patea.
     """
     prepare_turn(state, kicker_team_id, keeper_team_id, round_index)
+
+    # Se avisa cómo quedó todo antes de patear: jugadores en su lugar y pelota quieta. Sin este aviso
+    # el cliente recibiría recién el primer tick, cuando la pelota ya viajó (con ticks de 0,5 s y un
+    # tiro de 12 m por tick, un penal de 11 m termina en ese primer tick). La espera deja ver ese cuadro.
+    await _notify_safely(notify, state)
+    await asyncio.sleep(setup_seconds)
 
     goal = False
     ticks_played = 0
@@ -204,10 +230,7 @@ async def _play_penalty(
             # el arco es fijo y los dos equipos patean contra él.
             _add_penalty_goal(state, kicker_team_id)
 
-        try:
-            await notify(state)  # igual que en el partido: avisa a los clientes después de cada tick
-        except Exception:
-            logger.exception("notify falló en un penal del partido %s; la tanda sigue.", state.match_id)
+        await _notify_safely(notify, state)  # igual que en el partido: avisa a los clientes después de cada tick
         await asyncio.sleep(tick_interval_seconds)
 
         ticks_played += 1
