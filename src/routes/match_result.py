@@ -33,6 +33,7 @@ def get_match_result_endpoint(
     return MatchResultResponse(
         match_id=match.match_id,
         status=match.status.value,  # get_match_result solo deja pasar FINISHED
+        league_id=match.league_id,  # None si es amistoso: así el front sabe si es partido de liga
         home_team={
             "team_id": match.host_team.team_id,
             "team_name": match.host_team.team_name,
