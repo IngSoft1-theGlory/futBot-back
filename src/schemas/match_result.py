@@ -20,5 +20,6 @@ class MatchResultTeamOut(BaseModel):
 class MatchResultResponse(BaseModel):
     match_id: int
     status: str  # siempre "FINISHED" (texto, no el Enum)
+    league_id: int | None  # id de la liga si es un partido de liga; None (null) si es amistoso
     home_team: MatchResultTeamOut  # el anfitrión
     away_team: MatchResultTeamOut  # el visitante
