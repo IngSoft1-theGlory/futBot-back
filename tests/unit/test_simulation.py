@@ -421,6 +421,118 @@ def test_deberia_pelota_que_cruza_el_arco_en_un_tick_quedar_quieta_en_la_linea_y
     assert state.ball.velocity == Vector2D(0.0, 0.0)
     assert detect_goal(state.ball.position) == lado_que_convierte
 
+# REBOTE DE LA PELOTA EN LOS LÍMITES DE LA CANCHA
+
+def _tick_con_la_pelota_en(posicion: Point2D, velocidad: Vector2D):
+    # Preparamos un estado de partido limpio desde cero
+    state = _state()
+    
+    state.ball.position = posicion
+    state.ball.velocity = velocidad
+    
+    apply_intentions(state, {})
+    
+    return state
+
+
+@pytest.mark.parametrize(
+    "inicio, velocidad, posicion_final, velocidad_final",
+    [
+        # Lateral superior e inferior: la pelota choca la banda y rebota invirtiendo solo el eje Y
+        # El límite inferior en y=0.0 y el superior en y=60.0 (la cancha mide 60 m de alto)
+        # Por ello se prueban los bordes 58.0 y 2.0, con velocidades de 6 m/s hacia arriba y hacia 
+        # abajo respectivamente
+        (Point2D(50.0, 58.0), Vector2D(0.0, 6.0), Point2D(50.0, 59.0), Vector2D(0.0, -6.0)),
+        (Point2D(50.0, 2.0), Vector2D(0.0, -6.0), Point2D(50.0, 1.0), Vector2D(0.0, 6.0)),
+        
+        # Línea de fondo fuera del arco: choca la pared del fondo y rebota invirtiendo solo el eje X
+        # El límite izquierdo en x=0.0 y el derecho en x=105.0 (la cancha mide 105 m de ancho)
+        # Por ello se prueban los bordes 3.0 y 102.0, con velocidades de 8 m/s hacia la izquierda 
+        # y hacia la derecha respectivamente.
+        (Point2D(3.0, 10.0), Vector2D(-8.0, 0.0), Point2D(1.0, 10.0), Vector2D(8.0, 0.0)),
+        (Point2D(102.0, 10.0), Vector2D(8.0, 0.0), Point2D(104.0, 10.0), Vector2D(-8.0, 0.0)),
+        
+        # Esquina: pega justo en el vértice de la cancha y rebota en diagonal 
+        # invirtiendo ambos ejes (X e Y)
+        (Point2D(103.0, 58.0), Vector2D(10.0, 10.0), Point2D(102.0, 57.0), Vector2D(-10.0, -10.0)),
+    ],
+)
+def test_deberia_pelota_que_sale_de_la_cancha_rebotar_en_la_direccion_opuesta(
+    inicio, velocidad, posicion_final, velocidad_final
+):
+    # Hacemos correr la pelota hacia el borde según el escenario configurado
+    state = _tick_con_la_pelota_en(inicio, velocidad)
+
+    # Verificamos que la posición resultante tras el impacto coincida con la coordenada esperada
+    assert state.ball.position.x == pytest.approx(posicion_final.x)
+    assert state.ball.position.y == pytest.approx(posicion_final.y)
+    
+    # Confirmamos que la velocidad invirtió su sentido en los ejes correspondientes
+    assert state.ball.velocity.x == pytest.approx(velocidad_final.x)
+    assert state.ball.velocity.y == pytest.approx(velocidad_final.y)
+
+
+def test_deberia_pelota_que_rebota_conservar_la_rapidez():
+    # Le imprimimos a la pelota una velocidad diagonal con decimales específicos (-7.3, -11.9)
+    velocidad = Vector2D(-7.3, -11.9)
+
+    # La colocamos a pasos de la esquina (2.0, 1.0) para que en este tick choque contra 
+    # el vértice de la cancha.
+    state = _tick_con_la_pelota_en(Point2D(2.0, 1.0), velocidad)
+
+    # La rapidez debe mantenerse totalmente intacta tras el choque
+    assert state.ball.velocity.magnitude() == pytest.approx(velocidad.magnitude())
+    
+    # En el eje X cruzó la línea de fondo, por lo que invierte su velocidad a positiva
+    assert state.ball.velocity.x == pytest.approx(7.3)
+    
+    # En el eje Y cruzó la banda lateral, por lo que invierte su velocidad a positiva
+    assert state.ball.velocity.y == pytest.approx(11.9)
+
+
+@pytest.mark.parametrize(
+    "inicio, velocidad, lado_que_convierte, linea_x",
+    [
+        # Pelota dirigida directo al arco local (x=0)
+        (Point2D(3.0, 30.0), Vector2D(-8.0, 0.0), TeamSide.AWAY, 0.0),
+        # Pelota dirigida directo al arco visitante (x=105)
+        (Point2D(102.0, 30.0), Vector2D(8.0, 0.0), TeamSide.HOME, 105.0),
+    ],
+)
+def test_deberia_pelota_que_entra_al_arco_no_rebotar(inicio, velocidad, lado_que_convierte, linea_x):
+    # Lanzamos la pelota hacia el arco durante el tick actual
+    state = _tick_con_la_pelota_en(inicio, velocidad)
+
+    # Al ser gol entre los postes, el balón no debe rebotar: se frena en seco sobre la línea de meta
+    assert state.ball.position.x == pytest.approx(linea_x)
+    assert state.ball.velocity == Vector2D(0.0, 0.0)
+    
+    # El detector convalida el tanto para el equipo atacante
+    assert detect_goal(state.ball.position) == lado_que_convierte
+
+
+def _behavior_quieto(_state, _player_id):
+    # Comportamiento auxiliar donde los jugadores deciden quedarse totalmente inactivos
+    return Intention(ActionType.IDLE)
+
+
+@pytest.mark.parametrize("y_del_tiro", [20.0, 25.0])  # y=25.0 pasa pegado afuera del palo
+def test_deberia_tiro_desviado_rebotar_y_no_contar_gol(y_del_tiro):
+    # Preparamos la jugada: tiro rasante al fondo pero desviado por fuera de los tres palos
+    state = _state()
+    state.ball.position = Point2D(3.0, y_del_tiro)
+    state.ball.velocity = Vector2D(-8.0, 0.0)
+
+    # Avanzamos el tick completo del partido con los jugadores inmóviles
+    run_tick(state, execute_behavior=_behavior_quieto, apply_intentions=apply_intentions, detect_goal=detect_goal)
+
+    # Al no pasar entre los postes, el marcador se mantiene intacto en cero a cero
+    assert (state.score.home, state.score.away) == (0, 0)
+    
+    # La pelota choca contra la pared de fondo fuera del arco y rebota hacia adentro del campo de juego
+    assert state.ball.position.x == pytest.approx(1.0)
+    assert state.ball.velocity.x == pytest.approx(8.0)
+    
 # SECCIÓN 6: REINICIO Y REORIENTACIÓN POST-GOL
 
 # Coordenadas donde se coloca la pelota tras un gol 

@@ -141,8 +141,17 @@ def test_deberia_la_pelota_que_pasa_fuera_del_radio_seguir_su_camino():
 
     apply_intentions(state, {})
 
-    assert state.ball.velocity == SHOT_VELOCITY  # no la frenó
+    # 1. El arquero no llega a desviar el remate y la pelota sigue su curso en diagonal, 
+    # pero como el tiro fue desviado, pasa por afuera de los tres palos y cruza la línea de fondo (x < 0).
+    # Al chocar con el límite exterior, rebota: mantiene la componente vertical (Y)
+    # pero invierte la horizontal (X).
+    assert state.ball.velocity == Vector2D(-SHOT_VELOCITY.x, SHOT_VELOCITY.y)
+
+    # 2. Tras el impacto en la pared de fondo, la pelota "regresa" hacia adentro del campo 
+    # la distancia equivalente a lo que se excedió del movimiento en este tick.
+    # Verificamos que la posición final X sea exactamente la coordenada reflejada 
+    # respecto a la línea de fondo.
     assert _same_point(
         state.ball.position,
-        Point2D(start.x + SHOT_VELOCITY.x * TICK_DURATION_SECONDS, start.y),  # avanzó lo normal
+        Point2D(-(start.x + SHOT_VELOCITY.x * TICK_DURATION_SECONDS), start.y),
     )

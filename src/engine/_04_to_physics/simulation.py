@@ -24,14 +24,18 @@ Si en ese tramo pasa cerca de un arquero (is_goalkeeper), queda quieta en el
 punto de contacto (atajada). Si cruza la línea de gol por entre los palos, queda
 quieta en la línea (gol). Frena en lo primero que le toque. Como eso pasa antes de
 detect_goal, una atajada no cuenta como gol.
+Si no toca nada y termina fuera de la cancha (un lateral, o una línea de fondo fuera
+de los palos), rebota: vuelve hacia adentro con la misma rapidez.
 """
 
 import math
 from typing import Optional
 
 from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
-from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS, GOALKEEPER_SAVE_RADIUS, TICK_DURATION_SECONDS
-from src.engine._01_to_world.pitch import TeamSide, detect_goal, kickoff_ball_position, goal_line_crossing
+from src.engine._01_to_world.metrics import GOALKEEPER_SAVE_RADIUS, TICK_DURATION_SECONDS
+from src.engine._01_to_world.pitch import (
+    PITCH_LENGTH, PITCH_WIDTH, detect_goal, goal_line_crossing, TeamSide, kickoff_ball_position
+)
 from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._04_to_physics.resolve import resolve
@@ -97,7 +101,7 @@ def _move_ball(state: MatchState) -> None:
     """
     Avanza la pelota un tick: posicion = posicion + velocidad * duración del tick
     La pelota queda quieta en el primer punto que toca: un arquero que la ataja o la línea
-    de gol.
+    de gol. Si no toca nada y termina fuera de la cancha, rebota (ver _bounce).
     """
     start = state.ball.position
     end = Point2D(
@@ -127,7 +131,30 @@ def _move_ball(state: MatchState) -> None:
         state.ball.position = min(contacts, key=start.distance_to)
         state.ball.velocity = Vector2D(0.0, 0.0)
     else:
-        state.ball.position = end
+        # Sin contactos no hubo gol ni atajada, así que si `end` quedó fuera de la cancha
+        # es por un lateral o por el fondo afuera de los palos: la pelota rebota.
+        x, velocity_x = _bounce(end.x, state.ball.velocity.x, PITCH_LENGTH)
+        y, velocity_y = _bounce(end.y, state.ball.velocity.y, PITCH_WIDTH)
+        state.ball.position = Point2D(x, y)
+        state.ball.velocity = Vector2D(velocity_x, velocity_y)
+
+
+def _bounce(coordinate: float, velocity: float, limit: float) -> tuple[float, float]:
+    """
+    Rebote en un eje de la cancha, que va de 0 a `limit`. Devuelve (coordenada, velocidad).
+
+    Es como un espejo en la línea: si la pelota se pasó 1 m, vuelve 1 m hacia
+    adentro y la velocidad de ese eje cambia de sentido (misma rapidez).
+        coordenada < 0      -> -coordenada
+        coordenada > limit  -> 2 * limit - coordenada
+    Una sola reflexión alcanza: la pelota avanza como máximo 15 m por tick
+    (30 m/s * 0,5 s), menos que el ancho de la cancha.
+    """
+    if coordinate < 0:
+        return -coordinate, -velocity
+    if coordinate > limit:
+        return 2 * limit - coordinate, -velocity
+    return coordinate, velocity
 
 
 # ========================================== Atajada ================================================
