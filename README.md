@@ -5,7 +5,7 @@ API REST con **FastAPI**, base de datos con **SQLAlchemy 2.0** (migraciones con 
 ## Requisitos
 
 - **Python 3.11+**
-- **Docker Desktop** abierto (para Postgres)
+-- **Docker** (para Postgres): en Windows o macOS, con Docker Desktop abierto; en Linux, con el servicio de Docker activo.
 - **make** (opcional). En Windows usá Git Bash o WSL; si no, mirá la tabla [Sin make](#sin-make).
 
 ## Levantar el backend (primera vez)
