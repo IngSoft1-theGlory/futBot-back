@@ -151,6 +151,45 @@ def test_deberia_filtrar_por_status_y_devolver_todas_si_no_se_envia(
         assert [liga["status"] for liga in ligas] == [status]
 
 
+def test_deberia_filtrar_por_varios_status_separados_por_coma(
+    client, session, usuario_con_equipo, auth_headers
+):
+    _crear_liga(session, usuario_con_equipo.team, nombre="P", status=LeagueStatus.PENDING)
+    _crear_liga(session, usuario_con_equipo.team, nombre="I", status=LeagueStatus.IN_PROGRESS)
+    _crear_liga(session, usuario_con_equipo.team, nombre="F", status=LeagueStatus.FINISHED)
+
+    response = client.get(URL, params={"status": "PENDING,IN_PROGRESS"}, headers=auth_headers)
+
+    assert response.status_code == 200
+    # Vienen las dos, de la mas nueva a la mas vieja, cada una con su status, y ninguna FINISHED
+    assert [(liga["league_name"], liga["status"]) for liga in response.json()["leagues"]] == [
+        ("I", "IN_PROGRESS"), ("P", "PENDING"),
+    ]
+
+
+def test_deberia_paginar_juntas_las_ligas_de_varios_status(
+    client, session, usuario_con_equipo, auth_headers
+):
+    # Los estados se intercalan para comprobar que se paginan todas juntas y no por estado
+    estados = [
+        LeagueStatus.PENDING, LeagueStatus.FINISHED, LeagueStatus.IN_PROGRESS,
+        LeagueStatus.PENDING, LeagueStatus.FINISHED, LeagueStatus.IN_PROGRESS,
+    ]
+    for n, estado in enumerate(estados, start=1):
+        _crear_liga(session, usuario_con_equipo.team, nombre=f"L{n}", status=estado)
+
+    def nombres(page):
+        params = {"status": "PENDING,IN_PROGRESS", "page": page, "limit": 2}
+        resp = client.get(URL, params=params, headers=auth_headers)
+        assert resp.status_code == 200
+        return [liga["league_name"] for liga in resp.json()["leagues"]]
+
+    # L2 y L5 son FINISHED: no aparecen en ninguna pagina
+    assert nombres(1) == ["L6", "L4"]
+    assert nombres(2) == ["L3", "L1"]
+    assert nombres(3) == []
+
+
 def test_deberia_paginar_segun_page_y_limit_de_la_mas_nueva_a_la_mas_vieja(
     client, session, usuario_con_equipo, auth_headers
 ):
@@ -210,7 +249,10 @@ def test_deberia_marcar_is_member_en_las_liga_que_participa(
 
 @pytest.mark.parametrize(
     "params",
-    [{"page": 0}, {"page": "abc"}, {"limit": 0}, {"limit": 101}, {"status": "XXX"}],
+    [
+        {"page": 0}, {"page": "abc"}, {"limit": 0}, {"limit": 101},
+        {"status": "XXX"}, {"status": "PENDING,JUGANDO"},
+    ],
 )
 def test_deberia_devolver_400_con_parametros_invalidos(client, auth_headers, params):
     response = client.get(URL, params=params, headers=auth_headers)
