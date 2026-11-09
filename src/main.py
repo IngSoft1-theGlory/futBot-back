@@ -18,7 +18,7 @@ from src.routes.match_state import router as match_state_router
 from src.routes.substitution import router as substitution_router
 from src.routes.leagues import router as join_token_router
 from src.routes.leagues import router as leagues_router
-
+from src.routes.rankings import router as rankings_router 
 
 from src.core.exceptions import AppError, app_error_handler
 
@@ -50,6 +50,7 @@ app.include_router(match_state_router)  # suma las rutas de /api/v1/matches/*/st
 app.include_router(substitution_router)  # suma la ruta de /api/v1/matches/*/teams/*/substitutions
 app.include_router(join_token_router) # /api/v1/leagues/{leagueId}/verify-password
 app.include_router(leagues_router) # suma las rutas de /api/v1/leagues
+app.include_router(rankings_router)  # suma la ruta de /api/v1/rankings/global
 
 # conecta la función pura de exceptions.py con ESTE app puntual: cada
 # vez que algo lance una AppError (o subclase), FastAPI va a llamar
