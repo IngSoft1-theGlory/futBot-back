@@ -21,6 +21,7 @@ from src.services.league_service import (
     get_league_detail,
     cancel_league,
     update_league_lineup,
+    get_league_lineup,
 )
 from src.services.coach_service import choose_coach_behavior
 from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
@@ -121,15 +122,16 @@ async def exit_league_endpoint(
     # responde 204 No Content, op. exitosa pero no hay contenido para devolver
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@router.get("", response_model=LeagueListOut, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=LeagueListOut)
 def list_leagues_endpoint(
     page: str | None = None,      
     limit: str | None = None,    
     status: str | None = None,  
+    user_id: int = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
     # se llama al service para obtener la lista de ligas, con paginación y filtrado por estado
-    leagues = list_leagues(session, status=status, page=page, limit=limit)
+    leagues = list_leagues(session, user_id=user_id, status=status, page=page, limit=limit)
     return {"leagues": leagues}
 
 @router.post("/{league_id}/verify-password", response_model=VerifyPasswordResponse)
@@ -183,6 +185,16 @@ async def join_league_endpoint(
         await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
+
+@router.get("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
+def get_league_lineup_endpoint(
+    league_id: int,
+    team_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueLineupOut:
+    """Devuelve la alineación vigente del equipo en la liga."""
+    return get_league_lineup(session, user_id, league_id, team_id)
 
 @router.put("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
 async def update_league_lineup_endpoint(

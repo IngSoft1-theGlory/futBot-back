@@ -42,9 +42,9 @@ from src.schemas.league import (
 )
 
 from src.models.league import League, LeagueStatus
-from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
+from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league, get_member_league_ids
 from src.repositories.user_repository import get_user_by_id
-from src.repositories.match_repository import get_league_fixture, get_finished_league_matches, get_players_by_team
+from src.repositories.match_repository import get_league_fixture, get_finished_league_matches, get_players_by_team, get_lineup_entries
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
 from src.services.standings_service import build_standings
@@ -57,6 +57,7 @@ from src.services.lineup_service import (
     validate_min_players, 
     validate_lineup,
     replace_league_lineup,
+    build_lineup_config,
 )
 from src.engine._02_to_match.state import coach_registry
 
@@ -108,9 +109,10 @@ def validate_league_capacity(max_teams: int) -> None:
         raise InvalidLeagueCapacityError ("El cupo máximo de la liga debe ser un número par entre 4 y 12")
 
 
-def list_leagues(session: Session, page: str | None, limit: str | None, status: str | None) -> list[LeagueOut]:
+def list_leagues(session: Session, user_id: int, page: str | None, limit: str | None, status: str | None) -> list[LeagueOut]:
     """ 
     obtiene un listado de ligas, filtradas por status y paginadas por page y limit.
+    status puede traer un estado ("PENDING") o varios separados por coma ("PENDING,IN_PROGRESS").
     Valida los parametros de entrada y lanza InvalidQueryParamsError si alguno es invalido
     """
     # Validacion de page y limit: si no son enteros positivos, 
@@ -137,26 +139,34 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
         if limit_int > 100:
             raise InvalidQueryParamsError("limit no puede ser mayor a 100.")
 
-    # Validacion de status: si no es None, intentar convertirlo a LeagueStatus; 
-    # si falla, lanza InvalidQueryParamsError
+    # Validacion de status: si no es None, se separa por comas y cada valor se
+    # convierte a LeagueStatus; si alguno falla, lanza InvalidQueryParamsError
     if status is None: # Si no se envia un estado, se mantiene None y devuelve todas las ligas
-        status_enum = None
+        statuses = None
     else:
-        try:
-            status_enum = LeagueStatus(status)
-        except ValueError:
-            # Se lanza InvalidQueryParamsError con un mensaje que indica los valores válidos de status
-            raise InvalidQueryParamsError(
-                f"status debe ser uno de {', '.join(s.value for s in LeagueStatus)}."
-                ) from None
+        statuses = []
+        # "PENDING,IN_PROGRESS" -> ["PENDING", "IN_PROGRESS"]; "PENDING" -> ["PENDING"]
+        for status_text in status.split(","):
+            try:
+                statuses.append(LeagueStatus(status_text))
+            except ValueError:
+                # Se lanza InvalidQueryParamsError con un mensaje que indica los valores válidos de status
+                raise InvalidQueryParamsError(
+                    f"status debe ser uno de {', '.join(s.value for s in LeagueStatus)}."
+                    ) from None
 
     # Se obtienen las ligas  de la base de datos filtrados y validados.
     rows = get_leagues(
         session,
-        status=status_enum,
+        statuses=statuses,
         page=page_int,
         limit=limit_int,
     )
+
+    # Se determinan las ligas en las que participa un equipo
+    user = get_user_by_id(session, user_id)
+    league_ids = [league.league_id for league, _ in rows]
+    member_ids = get_member_league_ids(session, user.team_id, league_ids) if user else set()
 
     # Se construye la lista de ligas a devolver, con el formato requerido por LeagueOut
     result = []
@@ -170,6 +180,7 @@ def list_leagues(session: Session, page: str | None, limit: str | None, status: 
                 status=league.status,
                 # si tiene password_hash, es privada; si no, es pública. El hash nunca sale del service.
                 is_private=league.password_hash is not None,
+                is_member=league.league_id in member_ids,
             )
         )
         
@@ -437,11 +448,10 @@ def cancel_league(session: Session, user_id: int, league_id: int) -> None:
         session.rollback()
         raise
 
-    
-def update_league_lineup(session: Session, user_id: int, league_id: int, team_id: int, payload: LineupConfig) -> LeagueLineupOut:
-    """Cambia la alineación vigente del equipo en la liga. Se usa desde el próximo partido que juegue."""
+def _validate_team_in_league(session: Session, user_id: int, league_id: int, team_id: int, for_update: bool = False) -> League:
+    """Devuelve la liga si existe, el equipo es del usuario y está inscripto en ella."""
 
-    league = get_league_by_id(session, league_id, for_update=True)
+    league = get_league_by_id(session, league_id, for_update=for_update)
     if league is None:
         raise LeagueNotFoundError("No existe una liga con el ID especificado.")
 
@@ -449,6 +459,23 @@ def update_league_lineup(session: Session, user_id: int, league_id: int, team_id
 
     if not is_team_in_league(session, league_id, team_id):
         raise TeamNotInLeagueError("El equipo no está inscripto en la liga.")
+
+    return league
+
+def get_league_lineup(session: Session, user_id: int, league_id: int, team_id: int) -> LeagueLineupOut:
+    """Devuelve la alineación vigente del equipo en la liga."""
+
+    _validate_team_in_league(session, user_id, league_id, team_id)
+
+    entries = get_lineup_entries(session, league_id=league_id, team_id=team_id)
+    config = build_lineup_config(entries)
+
+    return LeagueLineupOut(league_id=league_id, team_id=team_id, **config.model_dump())
+
+def update_league_lineup(session: Session, user_id: int, league_id: int, team_id: int, payload: LineupConfig) -> LeagueLineupOut:
+    """Cambia la alineación vigente del equipo en la liga. Se usa desde el próximo partido que juegue."""
+
+    league = _validate_team_in_league(session, user_id, league_id, team_id, for_update=True)
 
     if league.status == LeagueStatus.FINISHED:
         raise LeagueFinishedError("No se puede cambiar la alineación de una liga que ya terminó.")
