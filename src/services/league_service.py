@@ -105,6 +105,7 @@ def validate_league_capacity(max_teams: int) -> None:
 def list_leagues(session: Session, user_id: int, page: str | None, limit: str | None, status: str | None) -> list[LeagueOut]:
     """ 
     obtiene un listado de ligas, filtradas por status y paginadas por page y limit.
+    status puede traer un estado ("PENDING") o varios separados por coma ("PENDING,IN_PROGRESS").
     Valida los parametros de entrada y lanza InvalidQueryParamsError si alguno es invalido
     """
     # Validacion de page y limit: si no son enteros positivos, 
@@ -131,23 +132,26 @@ def list_leagues(session: Session, user_id: int, page: str | None, limit: str | 
         if limit_int > 100:
             raise InvalidQueryParamsError("limit no puede ser mayor a 100.")
 
-    # Validacion de status: si no es None, intentar convertirlo a LeagueStatus; 
-    # si falla, lanza InvalidQueryParamsError
+    # Validacion de status: si no es None, se separa por comas y cada valor se
+    # convierte a LeagueStatus; si alguno falla, lanza InvalidQueryParamsError
     if status is None: # Si no se envia un estado, se mantiene None y devuelve todas las ligas
-        status_enum = None
+        statuses = None
     else:
-        try:
-            status_enum = LeagueStatus(status)
-        except ValueError:
-            # Se lanza InvalidQueryParamsError con un mensaje que indica los valores válidos de status
-            raise InvalidQueryParamsError(
-                f"status debe ser uno de {', '.join(s.value for s in LeagueStatus)}."
-                ) from None
+        statuses = []
+        # "PENDING,IN_PROGRESS" -> ["PENDING", "IN_PROGRESS"]; "PENDING" -> ["PENDING"]
+        for status_text in status.split(","):
+            try:
+                statuses.append(LeagueStatus(status_text))
+            except ValueError:
+                # Se lanza InvalidQueryParamsError con un mensaje que indica los valores válidos de status
+                raise InvalidQueryParamsError(
+                    f"status debe ser uno de {', '.join(s.value for s in LeagueStatus)}."
+                    ) from None
 
     # Se obtienen las ligas  de la base de datos filtrados y validados.
     rows = get_leagues(
         session,
-        status=status_enum,
+        statuses=statuses,
         page=page_int,
         limit=limit_int,
     )
