@@ -69,8 +69,8 @@ async def _jugar_con_dt(total_ticks):
     """Juega un partido donde el equipo 1 tiene DT. Anota (tick, en_pausa) cada vez que se lo ejecuta."""
     # armo un partido de prueba con total_ticks
     state = _build_state(total_ticks)
-    # le digo al estado que el equipo 1 tiene DT. por q pone None entonces?
-    state.coach_on_ticks[1] = None
+    # le digo al estado que el equipo 1 tiene DT
+    state.coach_on_ticks[1] = None # La funcion no hace nada porque el DT falso no la usa
 
     # acá voy a ir anotando, una entrada por cada vez que se ejecute el DT
     llamadas = []

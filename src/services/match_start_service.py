@@ -53,7 +53,7 @@ from src.engine import penalties
 from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
-from src.models import LineupEntry, MatchStatus, Player, Match, BehaviorType
+from src.models import LineupEntry, MatchStatus, Player, BehaviorType
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team, get_behaviors_by_ids
 from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause, notify_penalties as broadcast_penalties
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
