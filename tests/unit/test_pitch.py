@@ -2,7 +2,9 @@
 
 import pytest
 
-from src.engine._01_to_world.pitch import GOAL_WIDTH, PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal
+from src.engine._01_to_world.pitch import (
+    GOAL_WIDTH, KICKOFF_OFFSET, PITCH_LENGTH, PITCH_WIDTH, TeamSide, detect_goal, kickoff_ball_position,
+)
 from src.engine._01_to_world.data_types import Point2D
 
 CENTRO_Y = PITCH_WIDTH / 2
@@ -30,3 +32,19 @@ def test_deberia_contar_gol_en_el_borde_del_ancho_del_arco(x):
 @pytest.mark.parametrize("x", [0.0, PITCH_LENGTH])
 def test_deberia_no_contar_gol_si_la_pelota_cruza_la_linea_fuera_del_arco(x):
     assert detect_goal(Point2D(x, CENTRO_Y + GOAL_WIDTH)) is None
+
+
+# --- Posición de la pelota en el saque tras un gol ---
+
+def test_deberia_el_saque_de_home_quedar_en_la_linea_central_corrido_hacia_el_arco_de_home():
+    posicion = kickoff_ball_position(TeamSide.HOME)
+
+    assert posicion.x == pytest.approx(PITCH_LENGTH / 2 - KICKOFF_OFFSET)  # HOME defiende x=0
+    assert posicion.y == CENTRO_Y
+
+
+def test_deberia_el_saque_de_away_quedar_en_la_linea_central_corrido_hacia_el_arco_de_away():
+    posicion = kickoff_ball_position(TeamSide.AWAY)
+
+    assert posicion.x == pytest.approx(PITCH_LENGTH / 2 + KICKOFF_OFFSET)  # AWAY defiende x=PITCH_LENGTH
+    assert posicion.y == CENTRO_Y

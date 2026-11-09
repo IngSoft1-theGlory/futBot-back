@@ -135,6 +135,22 @@ FORMATION_POSITIONS: dict[str, dict[str, Point2D]] = {
 
 BALL_INITIAL_POSITION = Point2D(PITCH_LENGTH / 2, PITCH_WIDTH / 2)  # centro de la cancha
 
+# Después de un gol la pelota no arranca en el centro exacto: se corre este tanto (en metros)
+# hacia el arco del equipo que recibió el gol, para que ese equipo llegue primero a la pelota.
+KICKOFF_OFFSET = 14.0
+
+
+def kickoff_ball_position(conceding_side: TeamSide) -> Point2D:
+    """
+    Dónde arranca la pelota después de un gol: sobre la línea central (y = centro), corrida
+    KICKOFF_OFFSET metros hacia el arco del equipo que recibió el gol (`conceding_side`).
+    El saque inicial del partido no pasa por acá: arranca en BALL_INITIAL_POSITION.
+    """
+    # HOME defiende x=0 (su arco queda a la izquierda, x menor); AWAY defiende x=PITCH_LENGTH
+    if conceding_side is TeamSide.HOME:
+        return Point2D(BALL_INITIAL_POSITION.x - KICKOFF_OFFSET, BALL_INITIAL_POSITION.y)
+    return Point2D(BALL_INITIAL_POSITION.x + KICKOFF_OFFSET, BALL_INITIAL_POSITION.y)
+
 
 def mirror_position(position: Point2D) -> Point2D:
     """Gira una posición 180° respecto del centro de la cancha."""
