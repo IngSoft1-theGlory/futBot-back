@@ -35,7 +35,7 @@ from src.engine._02_to_match.state import (
     attributes_of,
     build_initial_state,
     match_registry,
-    coach_registry
+    coach_registry,
 )
 from src.engine.match_runner import (
     ApplyIntentions,
@@ -47,6 +47,7 @@ from src.engine.match_runner import (
     run_match,
     NotifyPause,
     NotifyPenalties,
+    ExecuteCoach,
 )
 from src.engine import penalties
 from src.engine._01_to_world.metrics import (
@@ -60,6 +61,7 @@ from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePl
 from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
 from src.models.match import MatchStatus
 from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior, load_on_tick
+from src.engine._03_to_builder import coach_api
 from src.core.exceptions import InvalidConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -390,6 +392,7 @@ def launch_match(
     notify_pause: NotifyPause | None = broadcast_pause,
     play_shootout: PlayShootout | None = penalties.play_shootout,
     notify_penalties: NotifyPenalties | None = broadcast_penalties,
+    execute_coach: ExecuteCoach | None = coach_api.execute_coach,
 ) -> asyncio.Task:
     """
     Lanza run_match como tarea de fondo y devuelve la tarea. Requiere el
@@ -420,6 +423,7 @@ def launch_match(
             notify_pause=notify_pause,
             play_shootout=play_shootout,
             notify_penalties=notify_penalties,
+            execute_coach=execute_coach,
         ),
         name=f"match-{state.match_id}",
     )

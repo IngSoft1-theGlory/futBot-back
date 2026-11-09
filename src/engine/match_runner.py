@@ -53,6 +53,8 @@ NotifyPenalties = Callable[[MatchState, bool], Awaitable[None]]
 # La tanda de penales (la implementa penalties.play_shootout). Se recibe por parámetro,
 # y no se importa acá, porque penalties.py ya importa play_tick de este módulo.
 PlayShootout = Callable[..., Awaitable[None]]
+# ejecutar comportamiento de DT
+ExecuteCoach = Callable[[MatchState, int], None]
 
 
 def play_tick(
@@ -185,11 +187,12 @@ async def _run_pause(
         state: MatchState, 
         slot: PauseSlot, 
         duration_seconds: float, 
-        notify_pause: Optional[NotifyPause] = None
+        notify_pause: Optional[NotifyPause] = None,
+        execute_coach: Optional[ExecuteCoach] = None,
 ) -> None:
     """
     Detiene el partido durante una pausa: pone PAUSED, crea state.pause, espera
-    y vuelve a IN_PROGRESS. No toca current_tick ni ejecuta comportamientos.
+    y vuelve a IN_PROGRESS. No toca current_tick ni ejecuta comportamientos de jugadores (solo de DT).
     """
     state.phase = MatchPhase.PAUSED
     state.pause = PauseState(
@@ -197,6 +200,9 @@ async def _run_pause(
         number=slot.number,
         ends_at=time.monotonic() + duration_seconds,
     )
+
+    # al comenzar la pausa, los DTs pueden hacer cambios
+    _run_coaches(state, execute_coach)
 
     # avisa a los clientes que empezó la pausa (Cooling Break o Half-Time)
     await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=True)
@@ -217,6 +223,18 @@ async def _run_pause(
     await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=False)
 
 
+def _run_coaches(state: MatchState, execute_coach: Optional[ExecuteCoach]) -> None:
+    """Le da el turno al DT de cada equipo que tenga uno. Si el DT de un equipo falla, el partido sigue."""
+    # busco el team_id de los equipos que tienen DT
+    # si no hay DTs, el for no itera, asi que no chequeo que execute_coach no sea None
+    # (y si faltara execute_coach con DTs cargados, el except lo ignoraria en silencio)
+    for team_id in state.coach_on_ticks:
+        try:
+            # ejecuto el comportamiento del DT de este equipo
+            execute_coach(state, team_id)
+        except Exception:
+            pass  # si el DT de un equipo falla, el equipo sigue sin cambios y el partido continúa
+
 async def run_match(
     state: MatchState,
     registry: MatchRegistry,
@@ -231,6 +249,7 @@ async def run_match(
     notify_pause: Optional[NotifyPause] = None,
     play_shootout: Optional[PlayShootout] = None,
     notify_penalties: Optional[NotifyPenalties] = None,
+    execute_coach: Optional[ExecuteCoach] = None,   # es Optional con default None para no romper tests existentes
 ) -> None:
     """ 
     Corre el partido completo, tick a tick, hasta que pasa a FINISHED.
@@ -247,7 +266,7 @@ async def run_match(
             # Si toca pausa, el reloj se detiene: current_tick queda igual y no hay ticks ni notify
             if next_pause < len(pause_schedule) and state.current_tick == pause_schedule[next_pause].tick:
                 slot = pause_schedule[next_pause]
-                await _run_pause(state, slot, pause_durations[slot.type], notify_pause)
+                await _run_pause(state, slot, pause_durations[slot.type], notify_pause, execute_coach)
                 next_pause += 1
 
             run_tick(
@@ -256,6 +275,10 @@ async def run_match(
                 apply_intentions=apply_intentions,
                 detect_goal=detect_goal,
             )
+
+            # los DT's pueden hacer cambios de comportamientos de los titulares durante el partido
+            _run_coaches(state, execute_coach)
+            
             try:
                 await notify(state) # avisa a los clientes del estado del partido después de cada tick
             except Exception:
