@@ -100,12 +100,17 @@ class LeagueDetailOut(BaseModel):
     ranking: list[StandingRowOut] = Field(default_factory=list)
     fixture: list[FixtureMatchOut] = Field(default_factory=list)
     penalties_enabled: bool
+    coach_behavior_id: int | None = None # comportamiento de DT elegido para el equipo del usuario en la liga, si es que hay
 
 class JoinLeagueRequest(LineupConfig):
     team_id: int
     join_token: str | None = None # solo requerido para ligas privadas
 
 class JoinLeagueResponse(BaseModel):
+    league_id: int
+    team_id: int
+
+class LeagueLineupOut(LineupConfig):
     league_id: int
     team_id: int
 
@@ -116,3 +121,11 @@ class StartLeagueResponse(BaseModel):
     league_id : int
     league_name : str
     status : LeagueStatus
+
+class ChooseCoachRequest(BaseModel):
+    behavior_id: int | None 
+
+class ChooseCoachResponse(BaseModel): 
+    league_id: int
+    team_id: int 
+    behavior_id: int | None

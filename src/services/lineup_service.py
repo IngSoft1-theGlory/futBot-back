@@ -12,8 +12,10 @@ Lo usan todos los endpoints que arman una configuración de partido
 
 from __future__ import annotations
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from src.models.behavior import BehaviorType
 from src.models.lineup_entry import LineupEntry
 from src.schemas.lineup_config import LineupConfig
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
@@ -63,6 +65,13 @@ def save_lineup(session: Session, match_id:int | None, team_id: int, config: Lin
             role = None,
             is_starter = False,
         ))
+
+def replace_league_lineup(session: Session, league_id: int, team_id: int, config: LineupConfig) -> None:
+    """Reemplaza la alineación del equipo en la liga. No hace commit: lo hace quien la llama"""
+
+    # el delete se ejecuta en el momento, así las filas nuevas no chocan con las viejas (mismo jugador o rol)
+    session.execute(delete(LineupEntry).where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id))
+    save_lineup(session, None, team_id, config, league_id)
 
 def copy_league_lineup_to_match(session: Session, match: Match) -> None:
     """Copia al partido la alineación vigente que cada equipo tiene en la liga.
@@ -153,7 +162,8 @@ def _check_players(config: LineupConfig, team_players: list) -> None:
 
 
 def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> None:
-    """Falla si algún behavior_id no existe o el usuario no puede usarlo."""
+    """Falla si algún behavior_id no existe, el usuario no puede usarlo o es de DT (COACH):
+    en una alineación solo van comportamientos de jugador (PLAYER)."""
     # guardo todos los behavior_id de titulares y suplentes en una lista (pueden venir repetidos)
     behavior_ids = []
     for starter in config.starting_players:
@@ -163,10 +173,11 @@ def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> No
 
     # la función solo devuelve los comportamientos que existen, los ids que no existan no vienen
     behaviors = get_behaviors_by_ids(session, behavior_ids)
-    # me quedo solo con los ids que el usuario puede usar
+    # me quedo solo con los ids que el usuario puede usar y que son de jugador
+    # (un COACH queda afuera, así se rechaza con el mismo error que un comportamiento no válido)
     usable_ids = []
     for behavior in behaviors:
-        if behavior.is_default or behavior.user_id == user_id:
+        if behavior.behavior_type == BehaviorType.PLAYER and (behavior.is_default or behavior.user_id == user_id):
             usable_ids.append(behavior.behavior_id)
 
     # si alguno de los pedidos no está entre los usables, lo rechazo

@@ -118,6 +118,10 @@ class LeagueAlreadyStartedError(ConflictError):
     """Rama 409 LEAGUE_ALREADY_STARTED: la liga ya no está en PENDING."""
     error_code = "LEAGUE_ALREADY_STARTED"
 
+class LeagueFinishedError(ConflictError):
+    """Rama 409 LEAGUE_FINISHED: la liga ya terminó."""
+    error_code = "LEAGUE_FINISHED"
+
 class InvalidQueryParamsError(BadRequestError):
     error_code = "INVALID_QUERY_PARAMS"
 
@@ -172,6 +176,22 @@ class OddTeamsCountError(BadRequestError):
 class NotLeagueHostError(ForbiddenError):
     """Rama 403 NOT_LEAGUE_HOST: el usuario no es el anfitrión de la liga."""
     error_code = "NOT_LEAGUE_HOST"
+    
+class ResourceNotFoundError(NotFoundError):
+    """Rama 404 RESOURCE_NOT_FOUND: el partido (en ejecución), el equipo o el jugador solicitado no existe."""
+    error_code = "RESOURCE_NOT_FOUND"
+
+class InvalidPlayerSelectionError(BadRequestError):
+    """Rama 400 INVALID_PLAYER_SELECTION: el saliente no está en cancha o el entrante no está en el banco."""
+    error_code = "INVALID_PLAYER_SELECTION"
+
+class SubstitutionLimitExceededError(ConflictError):
+    """Rama 409 SUBSTITUTION_LIMIT_EXCEEDED: el equipo ya hizo su cambio en esta pausa."""
+    error_code = "SUBSTITUTION_LIMIT_EXCEEDED"
+    
+class LeagueNotInProgressError(ConflictError):
+    """Rama 409 LEAGUE_NOT_IN_PROGRESS: la liga no está en curso."""
+    error_code = "LEAGUE_NOT_IN_PROGRESS"
 
 def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Función suelta, sin `app`: se registra en cualquier FastAPI() con

@@ -7,7 +7,9 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from src.core.exceptions import UnauthorizedError, InvalidQueryParamsError, BehaviorNotFoundError, InvalidData, ForbiddenError
-from src.models.behavior import Behavior
+from src.engine._03_to_builder.coach_api import CoachAPI
+from src.engine._03_to_builder.player_api import PlayerAPI
+from src.models.behavior import Behavior, BehaviorType
 from src.repositories.behavior_repository import list_behaviors_for_user, get_behavior_by_id
 from src.repositories.user_repository import get_user_by_id
 from src.schemas.behavior import CreateUpdateBehaviorRequest
@@ -15,9 +17,21 @@ import ast
 
 INVALID_DATA = "Los datos ingresados para el comportamiento no son validos"
 
+
+def _primitives_of(api_class: type) -> set[str]:
+    """Nombres de las primitivas de una API: sus métodos públicos (los que no empiezan con _)."""
+    return {name for name, member in vars(api_class).items() if callable(member) and not name.startswith("_")}
+
+
+# Se sacan de las clases (y no se escriben a mano) para que si se agrega una primitiva a
+# PlayerAPI o CoachAPI, la validación la tome sola.
+PLAYER_PRIMITIVES = _primitives_of(PlayerAPI)
+COACH_PRIMITIVES = _primitives_of(CoachAPI)
+
+
 def create_behavior(session: Session, user_id: int, payload: CreateUpdateBehaviorRequest) -> Behavior:
     validate_fields(payload.name, payload.description, payload.code)
-    validate_behavior_code(payload.code)
+    validate_behavior_code(payload.code, payload.behavior_type)
     try:  
         behavior = Behavior(
             name = payload.name,
@@ -25,6 +39,7 @@ def create_behavior(session: Session, user_id: int, payload: CreateUpdateBehavio
             code = payload.code,
             user_id = user_id,
             is_default = False,
+            behavior_type = payload.behavior_type
         )
         session.add(behavior)
         session.commit()
@@ -44,8 +59,10 @@ def update_behavior(payload: CreateUpdateBehaviorRequest, user_id: int, behavior
         raise ForbiddenError("No se puede modificar un comportamiento predeterminado")
     
     validate_fields(payload.name, payload.description, payload.code)
-    validate_behavior_code(payload.code)
     
+    # al editar el tipo no cambia: se valida con el que el comportamiento ya tiene, no con el del pedido
+    validate_behavior_code(payload.code, behavior.behavior_type)
+
     try:
         behavior.name = payload.name
         behavior.description = payload.description
@@ -59,8 +76,8 @@ def update_behavior(payload: CreateUpdateBehaviorRequest, user_id: int, behavior
     return behavior
 
 
-def validate_behavior_code(code: str) -> None: 
-    """ 
+def validate_behavior_code(code: str, behavior_type: BehaviorType) -> None:
+    """
     Valida el código de un comportamiento sin ejecutarlo.
 
     Usa el módulo ast, que convierte el texto del código en un árbol de
@@ -70,17 +87,28 @@ def validate_behavior_code(code: str) -> None:
         tree = ast.parse("x = 1")
         [type(n).__name__ for n in ast.walk(tree)]
         # ['Module', 'Assign', 'Name', 'Constant', 'Store']
+
+    Además revisa que el código solo use primitivas de su tipo: un COACH no puede
+    usar las de PlayerAPI y un PLAYER no puede usar las de CoachAPI. Es la primera capa;
+    la segunda es que en ejecución cada API solo tiene sus propias primitivas.
     """
-    try: 
-        tree = ast.parse(code) # ast parse devuelve un arbol con la estructura de un programa 
-    except SyntaxError: 
+    try:
+        tree = ast.parse(code) # ast parse devuelve un arbol con la estructura de un programa
+    except SyntaxError:
         raise InvalidData(INVALID_DATA)
 
-    if "__" in code: 
+    if "__" in code:
         raise InvalidData(INVALID_DATA) # no permitimos __import__, __builtin__, etc
 
+    # las primitivas prohibidas para este tipo son las de la otra API
+    forbidden_primitives = PLAYER_PRIMITIVES if behavior_type == BehaviorType.COACH else COACH_PRIMITIVES
+
     for node in ast.walk(tree): # ast.walk me da los nodos del arbol, los recorro
-        if isinstance(node, (ast.For, ast.While, ast.Import, ast.ImportFrom, ast.comprehension)): # lo rechazo si el nodo es alguna de esas cosas 
+        if isinstance(node, (ast.For, ast.While, ast.Import, ast.ImportFrom, ast.comprehension)): # lo rechazo si el nodo es alguna de esas cosas
+            raise InvalidData(INVALID_DATA)
+        # una primitiva se usa como api.<nombre>: es un nodo Attribute. Esto atrapa tanto
+        # api.run_to(...) como guardarla en una variable (f = api.run_to)
+        if isinstance(node, ast.Attribute) and node.attr in forbidden_primitives:
             raise InvalidData(INVALID_DATA)
 
     for node in tree.body: # tree.body es el nivel mas arriba del code

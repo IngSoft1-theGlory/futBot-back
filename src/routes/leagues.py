@@ -8,6 +8,7 @@ from src.schemas.league import VerifyPasswordRequest, VerifyPasswordResponse, Cr
 from src.core.security import get_current_user, create_join_token, get_current_user
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
+from src.schemas.lineup_config import LineupConfig
 from src.models import League, LeagueStatus
 from src.core.security import get_current_user, create_join_token
 from src.services.league_service import (
@@ -18,9 +19,10 @@ from src.services.league_service import (
     join_league,
     start_league,
     get_league_detail,
-    cancel_league
+    cancel_league,
+    update_league_lineup,
 )
-
+from src.services.coach_service import choose_coach_behavior
 from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
     VerifyPasswordRequest, 
@@ -32,7 +34,10 @@ from src.schemas.league import (
     JoinLeagueResponse,
     LeagueDetailOut,
     StartLeagueRequest,
-    StartLeagueResponse
+    StartLeagueResponse,
+    LeagueLineupOut,
+    ChooseCoachRequest,
+    ChooseCoachResponse,
 )
 
 from fastapi.concurrency import run_in_threadpool
@@ -179,6 +184,17 @@ async def join_league_endpoint(
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
 
+@router.put("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
+async def update_league_lineup_endpoint(
+    league_id: int,
+    team_id: int,
+    payload: LineupConfig,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueLineupOut:
+    """Reemplaza la alineación vigente del equipo en la liga."""
+    return await run_in_threadpool(update_league_lineup, session, user_id, league_id, team_id, payload)
+
 def _publish_league_initiated(league: League) -> None:
     """ Publica el evento LEAGUE_INITIATED cuando una liga es iniciada. """
     event_bus.publish("LEAGUE_INITIATED", {
@@ -242,3 +258,18 @@ async def cancel_league_endpoint(
     
     return Response(status_code=status.HTTP_204_NO_CONTENT)
     
+
+@router.put("/{league_id}/teams/{team_id}/coach", 
+    response_model=ChooseCoachResponse)
+def choose_coach_endpoint(
+    league_id: int, 
+    team_id: int,
+    payload: ChooseCoachRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ChooseCoachResponse:
+
+    # armo la respuesta y la devuelvo
+    coach = choose_coach_behavior(session, league_id, user_id, team_id=team_id, payload=payload)
+
+    return coach

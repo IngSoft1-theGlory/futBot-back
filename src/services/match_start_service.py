@@ -2,7 +2,13 @@
 Puesta en marcha de un partido: leer su configuración de la base, armar el
 estado inicial y lanzar el motor.
 
- prepare_match y prepare_engine van antes del commit y launch_match despues, con el event loop corriendo.
+  - prepare_match: lee las alineaciones y arma el estado inicial.
+  - prepare_engine: le asigna a cada jugador su comportamiento y, en los partidos
+    de liga, carga el DT de cada equipo (load_coach_behaviors).
+  - launch_match: lanza el motor como tarea de fondo.
+
+prepare_match y prepare_engine van antes del commit y launch_match después,
+con el event loop corriendo.
 """
 
 from __future__ import annotations
@@ -15,6 +21,8 @@ from functools import partial
 from sqlalchemy.orm import Session
 
 from src.repositories.league_repository import get_league_by_id
+from src.repositories.team_repository import get_team_by_id
+from src.repositories.behavior_repository import list_behaviors_for_user
 from src.database.base import SessionLocal
 from src.engine._01_to_world import pitch
 from src.engine._01_to_world.pitch import FORMATION_POSITIONS, TeamSide
@@ -27,6 +35,7 @@ from src.engine._02_to_match.state import (
     attributes_of,
     build_initial_state,
     match_registry,
+    coach_registry,
 )
 from src.engine.match_runner import (
     ApplyIntentions,
@@ -38,20 +47,23 @@ from src.engine.match_runner import (
     run_match,
     NotifyPause,
     NotifyPenalties,
+    ExecuteCoach,
 )
 from src.engine import penalties
 from src.engine._01_to_world.metrics import (
     PAUSE_DURATION_SECONDS, TICK_DURATION_SECONDS, VALID_MATCH_DURATIONS_MINUTES, PauseType, total_ticks_for
 )
-from src.models import LineupEntry, MatchStatus, Player, Match
+from src.models import LineupEntry, MatchStatus, Player, BehaviorType
 from src.repositories.match_repository import get_lineup_entries, get_match_by_id, get_players_by_team, get_behaviors_by_ids
 from src.realtime.match_broadcast import notify as broadcast_tick, notify_pause as broadcast_pause, notify_penalties as broadcast_penalties
 from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 
 from src.realtime.event_bus import event_bus # Necesario para lanzar el evento MATCH_FINISHED
 from src.models.match import MatchStatus
-from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior, load_on_tick
+from src.engine._03_to_builder import coach_api
 from src.core.exceptions import InvalidConfigurationError
+from src.services.global_stats_service import add_match_to_global_stats
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +186,36 @@ def prepare_match(session: Session, match_id: int) -> MatchState:
 
     return build_initial_state(match_id, total_ticks_for(match.match_duration), home, away, penalties_e)
 
+def load_coach_behaviors(session: Session, state: MatchState, league_id: int) -> None: 
+    """Carga, para cada equipo en un partido de liga, la lista de comportamientos que su DT puede usar y el DT que eligio""" 
+
+    # recorro cada equipo en el partido de liga
+    for team_id in (state.host_team_id, state.away_team_id):
+        try:
+            # busco al usuario dueño del equipo
+            team = get_team_by_id(session, team_id)
+            user = team.user
+
+            # traigo una lista de los comportamientos del usuario, default + propios
+            behaviors_list = list_behaviors_for_user(session, user.user_id)
+
+            # me quedo solo con los que son PLAYER. El DT no puede asignarle a un jugador un comportamiento COACH
+            codes = {}
+            for b in behaviors_list:
+                if b.behavior_type == BehaviorType.PLAYER:
+                    codes[b.behavior_id] = b.code
+            state.behavior_codes_for_coach[team_id] = codes
+
+            # si el equipo tiene DT elegido, lo cargo en el estado del partido. sino, lo salteo
+            coach_behavior_id = coach_registry.get(league_id, team_id)
+
+            if coach_behavior_id is not None: 
+                coach = get_behaviors_by_ids(session, [coach_behavior_id])
+                coach_code = coach[0].code # el codigo del comportamiento de DT
+                state.coach_on_ticks[team_id] = load_on_tick(coach_code)
+                
+        except Exception:
+            pass  # si el DT no se puede cargar, el equipo juega sin DT y el partido sigue
 
 def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, ExecuteBehavior]:
     """
@@ -182,6 +224,8 @@ def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, Execute
         dos equipos y los atributos PACSS de cada jugador (tabla players) y ubica
         a los titulares en la cancha
       - los comportamientos: a cada jugador se le asigna su propia función on_tick
+        - los DT: en partidos de liga, la lista de comportamientos que puede usar el DT de
+        cada equipo y el DT que eligió (los amistosos quedan sin DT)
 
     Cualquier falla se traduce a un error de negocio (400), nunca a un 500
     """
@@ -203,6 +247,11 @@ def prepare_engine(session: Session, match_id: int) -> tuple[MatchState, Execute
 
         for player in state.players.values(): # values me permite acceder al valor del dict en vez de la key
             assign_behavior(player, player.behavior_id, codes[player.behavior_id]) # codes es un diccionario, le paso el behavior_id del jugador como clave para que retorne el codigo (str)
+
+        # solo los partidos de liga tienen DT: los amistosos quedan sin DT
+        match = get_match_by_id(session, match_id)
+        if match.league_id is not None:
+            load_coach_behaviors(session, state, match.league_id)
 
     except Exception as exc:
         """
@@ -232,16 +281,29 @@ def save_match_result(
 
     Los goles de penales son opcionales: vacíos (None) significa que el partido terminó en
     tiempo reglamentario; con valor, que se definió por penales."""
-    match = get_match_by_id(session, match_id)
+    # bloqueo la fila del partido hasta el commit, si otro cierre del mismo partido llega a la vez, espera a que este termine y despues lo encuentra FINISHED
+    match = get_match_by_id(session, match_id, for_update=True)
     if match is None:
         raise LookupError(f"No se puede guardar el resultado: el partido {match_id} no existe.")
 
-    match.home_goals = home_goals
-    match.away_goals = away_goals
-    match.home_penalty_goals = home_penalty_goals
-    match.away_penalty_goals = away_penalty_goals
-    match.status = MatchStatus.FINISHED
-    session.commit()
+    # si ya estaba terminado, este cierre es repetido y el partido ya se sumó al ranking
+    was_already_finished = match.status is MatchStatus.FINISHED
+
+    try:
+        match.home_goals = home_goals
+        match.away_goals = away_goals
+        match.home_penalty_goals = home_penalty_goals
+        match.away_penalty_goals = away_penalty_goals
+        match.status = MatchStatus.FINISHED
+
+        ranking_changed = False
+        if not was_already_finished:
+            ranking_changed = add_match_to_global_stats(session, match)
+
+        session.commit()  # resultado y estadísticas se guardan juntos, o no se guarda nada
+    except Exception:
+        session.rollback()  # si algo falló, deshago todo: no queda nada a medias
+        raise
 
     # los eventos se publican DESPUES del commit: quien los recibe ya ve el resultado guardado
     match_finished_event = {
@@ -260,6 +322,9 @@ def save_match_result(
             "score": {"home": match.home_goals, "away": match.away_goals},
             "status": match.status.value,
         })
+
+    if ranking_changed:
+        event_bus.publish("RANKING_UPDATED", {})  # sin datos: el front vuelve a pedir el ranking
 
     return match
 
@@ -344,6 +409,7 @@ def launch_match(
     notify_pause: NotifyPause | None = broadcast_pause,
     play_shootout: PlayShootout | None = penalties.play_shootout,
     notify_penalties: NotifyPenalties | None = broadcast_penalties,
+    execute_coach: ExecuteCoach | None = coach_api.execute_coach,
 ) -> asyncio.Task:
     """
     Lanza run_match como tarea de fondo y devuelve la tarea. Requiere el
@@ -374,6 +440,7 @@ def launch_match(
             notify_pause=notify_pause,
             play_shootout=play_shootout,
             notify_penalties=notify_penalties,
+            execute_coach=execute_coach,
         ),
         name=f"match-{state.match_id}",
     )

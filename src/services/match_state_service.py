@@ -23,6 +23,7 @@ from src.schemas.match_state import (
     PlayerAttributesOut,
     ScoreOut,
     PauseOut,
+    PlannedSubstitutionOut,
     PointOut,
 )
 
@@ -159,6 +160,13 @@ def build_match_state_response(
             remaining_seconds=max(0.0, pause.ends_at - time.monotonic()),
         )
 
+    # cambio planificado del equipo de quien consulta: el plan del rival no se muestra
+    plan = state.planned_substitutions.get(context.user_team_id)
+    planned_out = None
+    if plan is not None:
+        player_out_id, player_in_id = plan  # así se guarda: (saliente, entrante)
+        planned_out = PlannedSubstitutionOut(player_in_id=player_in_id, player_out_id=player_out_id)
+
     return MatchStateResponse(
         match_id=context.match_id,
         current_tick=state.current_tick,
@@ -168,6 +176,7 @@ def build_match_state_response(
         substitutes=substitutes,
         phase=state.phase.value,
         pause=pause_out,
+        planned_substitution=planned_out,
         ball=PointOut(x=state.ball.position.x, y=state.ball.position.y),    
 
     )
