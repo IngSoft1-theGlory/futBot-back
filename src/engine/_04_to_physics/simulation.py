@@ -13,9 +13,10 @@ Para cada jugador reutiliza `resolve` (función pura, por jugador):
         IDLE      -> nada
 
 Orden dentro de un tick: run_tick hace comportamientos -> apply_intentions
--> detect_goal. Por eso el reinicio tras un gol (la pelota al centro y TODOS
-los jugadores en cancha a su posición inicial) se hace al PRINCIPIO de
-apply_intentions: si se hiciera al final, detect_goal nunca vería el gol.
+-> detect_goal. Por eso el reinicio tras un gol (la pelota al centro, corrida
+hacia el arco del equipo que recibió el gol, y TODOS los jugadores en cancha
+a su posición inicial) se hace al PRINCIPIO de apply_intentions: si se hiciera
+al final, detect_goal nunca vería el gol.
 Un gol se detecta en el tick en que la pelota entra al arco y el reinicio
 ocurre al comienzo del tick siguiente.
 Al final de apply_intentions la pelota avanza según su velocidad (_move_ball).
@@ -33,7 +34,7 @@ from typing import Optional
 from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
 from src.engine._01_to_world.metrics import GOALKEEPER_SAVE_RADIUS, TICK_DURATION_SECONDS
 from src.engine._01_to_world.pitch import (
-    BALL_INITIAL_POSITION, PITCH_LENGTH, PITCH_WIDTH, detect_goal, goal_line_crossing,
+    PITCH_LENGTH, PITCH_WIDTH, detect_goal, goal_line_crossing, TeamSide, kickoff_ball_position
 )
 from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
@@ -77,13 +78,18 @@ def apply_intentions(state: MatchState, intentions: dict[int, Intention]) -> Non
 def _reset_after_goal(state: MatchState) -> None:
     """
     Si la pelota quedó dentro de un arco (gol del tick anterior): la pelota vuelve
-    al centro, quieta, y cada jugador en cancha vuelve a su posición inicial.
-    Los suplentes (position=None) siguen en el banco.
+    al centro, quieta, corrida hacia el arco del equipo que recibió el gol (así ese
+    equipo saca y no se repite siempre el mismo saque), y cada jugador en cancha
+    vuelve a su posición inicial.
     """
-    if detect_goal(state.ball.position) is None:
+    scoring_side = detect_goal(state.ball.position)  # el lado que metió el gol, o None
+    if scoring_side is None:
         return
 
-    state.ball.position = BALL_INITIAL_POSITION
+    # el que recibió el gol es el otro lado
+    conceding_side = TeamSide.AWAY if scoring_side is TeamSide.HOME else TeamSide.HOME
+
+    state.ball.position = kickoff_ball_position(conceding_side)
     state.ball.velocity = Vector2D(0.0, 0.0)
 
     for player in state.players.values():

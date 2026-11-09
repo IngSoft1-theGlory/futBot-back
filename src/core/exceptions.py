@@ -173,6 +173,10 @@ class OddTeamsCountError(BadRequestError):
     """Rama 400 ODD_TEAMS_COUNT: hay un numero impar de equipos en la liga."""
     error_code = "ODD_TEAMS_COUNT"
 
+class NotLeagueHostError(ForbiddenError):
+    """Rama 403 NOT_LEAGUE_HOST: el usuario no es el anfitrión de la liga."""
+    error_code = "NOT_LEAGUE_HOST"
+    
 class ResourceNotFoundError(NotFoundError):
     """Rama 404 RESOURCE_NOT_FOUND: el partido (en ejecución), el equipo o el jugador solicitado no existe."""
     error_code = "RESOURCE_NOT_FOUND"

@@ -143,6 +143,14 @@ class MatchState:
     # La tanda de penales, o None si todavía no se preparó.
     penalty_shootout: Optional[PenaltyShootout] = None
 
+    # el comportamiento DT de cada equipo en este partido. team_id -> on_tick del DT.
+    # los equipos sin DT no aparecen en el dict
+    coach_on_ticks: dict[int, Callable] = field(default_factory=dict) 
+
+    # los comportamientos de jugador (PLAYER) que el DT de cada equipo puede asignar con change_behavior 
+    # team_id -> {behavior_id: código}.
+    behavior_codes_for_coach: dict[int, dict[int, str]] = field(default_factory=dict) # c/partido tiene su propio dict
+
     def players_of(self, team_id: int) -> list[MatchPlayerState]:
         """Jugadores del equipo, titulares y suplentes."""
         return [p for p in self.players.values() if p.team_id == team_id]

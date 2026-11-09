@@ -75,3 +75,20 @@ class CoachAPI:
         InvalidSubstitutionError, SubstitutionLimitError) salen tal cual.
         """
         substitute_player(self._state, self._team_id, player_out_id, player_in_id)
+
+
+def execute_coach(state: MatchState, team_id: int) -> None:
+    """
+    Corre el comportamiento del DT de UN equipo en este momento del partido.
+    El motor la llama después de cada tick y al comenzar cada pausa. No devuelve
+    nada: el DT actúa directo sobre el estado con las primitivas de CoachAPI.
+    """
+    # comportamientos de jugador que este DT puede asignar con change_behavior
+    codes = state.behavior_codes_for_coach[team_id] 
+    
+    # las primitivas del DT se guardan en api
+    api = CoachAPI(state, team_id, codes)  
+
+    # ahora llamo al on_tick que escribio el usuario para el DT de este equipo
+    on_tick = state.coach_on_ticks[team_id]
+    on_tick(api)

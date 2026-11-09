@@ -2,7 +2,7 @@
 Tests de la ejecución de la tanda de penales (play_shootout) y de su enganche en run_match.
 """
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
@@ -23,16 +23,20 @@ GOL = TeamSide.AWAY
 SIN_GOL = None
 
 
-async def _jugar_tanda(state, detect_goal, pausa=0):
-    """Juega la tanda con el detect_goal que se le pasa y el resto de las piezas en Mock."""
+async def _jugar_tanda(state, detect_goal, notify=None, pausa=0, preparacion=0):
+    """
+    Juega la tanda con el detect_goal que se le pasa y el resto de las piezas en Mock.
+    Por defecto no espera nada (pausa entre penales y espera de preparación en 0) para que los tests sean rápidos.
+    """
     await play_shootout(
         state,
         execute_behavior=Mock(),
         apply_intentions=Mock(),
         detect_goal=detect_goal,
-        notify=AsyncMock(),
+        notify=notify if notify is not None else AsyncMock(),
         tick_interval_seconds=0,
         penalty_pause_seconds=pausa,
+        penalty_setup_seconds=preparacion,
     )
 
 
@@ -118,6 +122,50 @@ async def test_deberia_sumar_el_gol_al_equipo_pateador_aunque_el_arco_sea_el_mis
     assert (state.score.phome, state.score.paway) == (0, 1)
 
     # (De forma análoga, se podría comprobar con el host convirtiendo.)
+
+@pytest.mark.asyncio
+async def test_deberia_avisar_como_quedaron_ubicados_los_jugadores_antes_de_jugar_el_primer_tick(monkeypatch):
+    state = _build_state()
+    monkeypatch.setattr(penalties, "PENALTY_MAX_TICKS", 1)  # cada penal dura un solo tick
+    notify = AsyncMock()
+    detect_goal = Mock(side_effect=[GOL, SIN_GOL])
+    # Un Mock "padre" que anota en qué orden se llamó a notify y a detect_goal (que se llama una vez por tick)
+    orden = Mock()
+    orden.attach_mock(notify, "aviso")
+    orden.attach_mock(detect_goal, "tick")
+
+    await _jugar_tanda(state, detect_goal, notify=notify)
+
+    # En cada penal primero va el aviso de preparación (jugadores en su lugar, pelota quieta),
+    # y después el tick con su aviso. Dos penales, entonces: aviso, tick, aviso, aviso, tick, aviso
+    assert [nombre for nombre, _args, _kwargs in orden.mock_calls] == ["aviso", "tick", "aviso", "aviso", "tick", "aviso"]
+
+
+@pytest.mark.asyncio
+async def test_deberia_esperar_antes_de_cada_patada_con_los_jugadores_ya_ubicados(monkeypatch):
+    state = _build_state()
+    monkeypatch.setattr(penalties, "PENALTY_MAX_TICKS", 1)  # cada penal dura un solo tick
+    sleep = AsyncMock()
+    monkeypatch.setattr(penalties.asyncio, "sleep", sleep)  # no espera de verdad: solo anota cuánto le pidieron
+    detect_goal = Mock(side_effect=[GOL, SIN_GOL])  # ronda 1: dos penales
+
+    await _jugar_tanda(state, detect_goal, pausa=3.0, preparacion=1.5)
+
+    # Una espera de preparación por penal (2). La pausa de 3 s es entre penales, no es esta espera
+    assert sleep.await_args_list.count(call(1.5)) == 2
+
+
+@pytest.mark.asyncio
+async def test_deberia_seguir_la_tanda_aunque_falle_el_aviso(monkeypatch):
+    state = _build_state()
+    monkeypatch.setattr(penalties, "PENALTY_MAX_TICKS", 1)  # cada penal dura un solo tick
+    notify = AsyncMock(side_effect=RuntimeError("falla simulada"))  # cada aviso lanza un error
+    detect_goal = Mock(side_effect=[GOL, SIN_GOL])
+
+    await _jugar_tanda(state, detect_goal, notify=notify)
+
+    assert (state.score.phome, state.score.paway) == (1, 0)  # la tanda se jugó igual y ganó el host
+
 
 """
 Los guardados (save_match_result y make_on_finished) se prueban en test_match_start_service.py

@@ -15,8 +15,9 @@ from __future__ import annotations
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from src.models.behavior import BehaviorType
 from src.models.lineup_entry import LineupEntry
-from src.schemas.lineup_config import LineupConfig
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
 from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team, get_lineup_entries
 from src.repositories.user_repository import get_user_by_id
@@ -71,6 +72,28 @@ def replace_league_lineup(session: Session, league_id: int, team_id: int, config
     # el delete se ejecuta en el momento, así las filas nuevas no chocan con las viejas (mismo jugador o rol)
     session.execute(delete(LineupEntry).where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id))
     save_lineup(session, None, team_id, config, league_id)
+
+def build_lineup_config(entries: list[LineupEntry]) -> LineupConfig:
+    """Arma la configuración táctica a partir de las filas guardadas.
+    La formación no se guarda: sale de los roles de los titulares."""
+
+    starters = [entry for entry in entries if entry.is_starter]
+    substitutes = [entry for entry in entries if not entry.is_starter]
+
+    roles = {entry.role for entry in starters}
+    formation_type = next(formation for formation, formation_roles in FORMATION_ROLES.items() if formation_roles == roles)
+
+    return LineupConfig(
+        formation_type=formation_type,
+        starting_players=[
+            StartingPlayer(player_id=entry.player_id, role=entry.role, behavior_id=entry.behavior_id)
+            for entry in starters
+        ],
+        substitute_players=[
+            SubstitutePlayer(player_id=entry.player_id, behavior_id=entry.behavior_id)
+            for entry in substitutes
+        ],
+    )
 
 def copy_league_lineup_to_match(session: Session, match: Match) -> None:
     """Copia al partido la alineación vigente que cada equipo tiene en la liga.
@@ -161,7 +184,8 @@ def _check_players(config: LineupConfig, team_players: list) -> None:
 
 
 def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> None:
-    """Falla si algún behavior_id no existe o el usuario no puede usarlo."""
+    """Falla si algún behavior_id no existe, el usuario no puede usarlo o es de DT (COACH):
+    en una alineación solo van comportamientos de jugador (PLAYER)."""
     # guardo todos los behavior_id de titulares y suplentes en una lista (pueden venir repetidos)
     behavior_ids = []
     for starter in config.starting_players:
@@ -171,10 +195,11 @@ def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> No
 
     # la función solo devuelve los comportamientos que existen, los ids que no existan no vienen
     behaviors = get_behaviors_by_ids(session, behavior_ids)
-    # me quedo solo con los ids que el usuario puede usar
+    # me quedo solo con los ids que el usuario puede usar y que son de jugador
+    # (un COACH queda afuera, así se rechaza con el mismo error que un comportamiento no válido)
     usable_ids = []
     for behavior in behaviors:
-        if behavior.is_default or behavior.user_id == user_id:
+        if behavior.behavior_type == BehaviorType.PLAYER and (behavior.is_default or behavior.user_id == user_id):
             usable_ids.append(behavior.behavior_id)
 
     # si alguno de los pedidos no está entre los usables, lo rechazo

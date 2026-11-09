@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from src.services.match_access_service import get_match_in_progress, user_participates
 from src.services.behavior_service import get_behavior
 from src.core.exceptions import ForbiddenError, PlayerNotFoundError, InvalidData, MatchNotFoundError
+from src.models.behavior import BehaviorType
 from src.repositories.user_repository import get_user_by_id
 from src.engine._02_to_match.state import match_registry
 from src.engine._03_to_builder.behavior_executor import assign_behavior
@@ -25,7 +26,12 @@ def validate_behavior_change(session: Session, user_id: int, match_id: int, beha
     # get behavior tira 404 si el id es invalido (no existe, o no pertenece al usuario y no es default)
     new_behavior = get_behavior(session, user_id=user_id, behavior_id=behavior_id)
 
-    return user.team_id, new_behavior.code 
+    # a un jugador solo se le puede poner un comportamiento de jugador. Si es de DT (COACH) se rechaza acá,
+    # antes de apply_behavior_change, así que el jugador conserva el que tenía
+    if new_behavior.behavior_type != BehaviorType.PLAYER:
+        raise InvalidData("No se pudo cambiar el comportamiento")
+
+    return user.team_id, new_behavior.code
 
 
 def apply_behavior_change(match_id: int, team_id: int, code : str, player_id: int, behavior_id: int): 
