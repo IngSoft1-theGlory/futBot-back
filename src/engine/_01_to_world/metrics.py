@@ -40,6 +40,7 @@ GOALKEEPER_SAVE_RADIUS = 1.0
 PENALTY_MAX_TICKS = 20          # ticks que dura como máximo un penal si nadie hace gol (10 s)
 PENALTY_MAX_ROUNDS = 3          # rondas máximas de la tanda (una ronda = un penal de cada equipo)
 PENALTY_PAUSE_SECONDS = 3.0     # espera entre un penal y el siguiente, con el estado congelado
+PENALTY_SETUP_SECONDS = 1.5     # espera antes de cada patada, con los jugadores ya ubicados y la pelota quieta
 
 # ======================================== Tiempos =============================================
 
