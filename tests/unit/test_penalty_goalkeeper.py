@@ -141,8 +141,10 @@ def test_deberia_la_pelota_que_pasa_fuera_del_radio_seguir_su_camino():
 
     apply_intentions(state, {})
 
-    assert state.ball.velocity == SHOT_VELOCITY  # no la frenó
+    # No la frenó el arquero: siguió su camino hasta x = -4 (detrás de la línea de fondo, por afuera
+    # de los palos) y ahí rebotó, así que vuelve con la misma rapidez y el sentido de x invertido
+    assert state.ball.velocity == Vector2D(-SHOT_VELOCITY.x, SHOT_VELOCITY.y)
     assert _same_point(
         state.ball.position,
-        Point2D(start.x + SHOT_VELOCITY.x * TICK_DURATION_SECONDS, start.y),  # avanzó lo normal
+        Point2D(-(start.x + SHOT_VELOCITY.x * TICK_DURATION_SECONDS), start.y),
     )

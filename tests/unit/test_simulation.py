@@ -353,6 +353,84 @@ def test_deberia_pelota_que_cruza_el_arco_en_un_tick_quedar_quieta_en_la_linea_y
     assert detect_goal(state.ball.position) == lado_que_convierte
 
 
+# --- Rebote de la pelota en los límites de la cancha ---
+
+def _tick_con_la_pelota_en(posicion: Point2D, velocidad: Vector2D):
+    """Estado con la pelota en `posicion` y `velocidad`, después de un tick sin intenciones."""
+    state = _state()
+    state.ball.position = posicion
+    state.ball.velocity = velocidad
+    apply_intentions(state, {})
+    return state
+
+
+@pytest.mark.parametrize(
+    "inicio, velocidad, posicion_final, velocidad_final",
+    [
+        # lateral superior e inferior: rebota solo en y
+        (Point2D(50.0, 58.0), Vector2D(0.0, 6.0), Point2D(50.0, 59.0), Vector2D(0.0, -6.0)),
+        (Point2D(50.0, 2.0), Vector2D(0.0, -6.0), Point2D(50.0, 1.0), Vector2D(0.0, 6.0)),
+        # línea de fondo fuera del arco, de HOME y de AWAY: rebota solo en x
+        (Point2D(3.0, 10.0), Vector2D(-8.0, 0.0), Point2D(1.0, 10.0), Vector2D(8.0, 0.0)),
+        (Point2D(102.0, 10.0), Vector2D(8.0, 0.0), Point2D(104.0, 10.0), Vector2D(-8.0, 0.0)),
+        # esquina: rebota en los dos ejes
+        (Point2D(103.0, 58.0), Vector2D(10.0, 10.0), Point2D(102.0, 57.0), Vector2D(-10.0, -10.0)),
+    ],
+)
+def test_deberia_pelota_que_sale_de_la_cancha_rebotar_en_la_direccion_opuesta(
+    inicio, velocidad, posicion_final, velocidad_final
+):
+    state = _tick_con_la_pelota_en(inicio, velocidad)
+
+    assert state.ball.position.x == pytest.approx(posicion_final.x)
+    assert state.ball.position.y == pytest.approx(posicion_final.y)
+    assert state.ball.velocity.x == pytest.approx(velocidad_final.x)
+    assert state.ball.velocity.y == pytest.approx(velocidad_final.y)
+
+
+def test_deberia_pelota_que_rebota_conservar_la_rapidez():
+    """Rebote en la esquina con una velocidad 'rara': cambia el sentido, no el módulo."""
+    velocidad = Vector2D(-7.3, -11.9)
+
+    state = _tick_con_la_pelota_en(Point2D(2.0, 1.0), velocidad)
+
+    assert state.ball.velocity.magnitude() == pytest.approx(velocidad.magnitude())
+    assert state.ball.velocity.x == pytest.approx(7.3)   # rebotó en x (cruzó el fondo)
+    assert state.ball.velocity.y == pytest.approx(11.9)  # rebotó en y (cruzó el lateral)
+
+
+@pytest.mark.parametrize(
+    "inicio, velocidad, lado_que_convierte, linea_x",
+    [
+        (Point2D(3.0, 30.0), Vector2D(-8.0, 0.0), TeamSide.AWAY, 0.0),     # entra al arco de HOME
+        (Point2D(102.0, 30.0), Vector2D(8.0, 0.0), TeamSide.HOME, 105.0),  # entra al arco de AWAY
+    ],
+)
+def test_deberia_pelota_que_entra_al_arco_no_rebotar(inicio, velocidad, lado_que_convierte, linea_x):
+    state = _tick_con_la_pelota_en(inicio, velocidad)
+
+    # no rebota: queda quieta en la línea de gol, como antes de este cambio
+    assert state.ball.position.x == pytest.approx(linea_x)
+    assert state.ball.velocity == Vector2D(0.0, 0.0)
+    assert detect_goal(state.ball.position) == lado_que_convierte
+
+
+def _behavior_quieto(_state, _player_id):
+    return Intention(ActionType.IDLE)
+
+
+@pytest.mark.parametrize("y_del_tiro", [20.0, 25.0])  # 25 = justo afuera del palo (los postes están en 26.34 y 33.66)
+def test_deberia_tiro_desviado_rebotar_y_no_contar_gol(y_del_tiro):
+    state = _state()
+    state.ball.position = Point2D(3.0, y_del_tiro)
+    state.ball.velocity = Vector2D(-8.0, 0.0)
+
+    run_tick(state, execute_behavior=_behavior_quieto, apply_intentions=apply_intentions, detect_goal=detect_goal)
+
+    assert (state.score.home, state.score.away) == (0, 0)
+    assert state.ball.position.x == pytest.approx(1.0)
+    assert state.ball.velocity.x == pytest.approx(8.0)
+
 # --- Reinicio de la pelota tras un gol ---
 
 @pytest.mark.parametrize(
