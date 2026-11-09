@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.models.behavior import BehaviorType
 from src.models.lineup_entry import LineupEntry
-from src.schemas.lineup_config import LineupConfig
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
 from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team, get_lineup_entries
 from src.repositories.user_repository import get_user_by_id
@@ -72,6 +72,28 @@ def replace_league_lineup(session: Session, league_id: int, team_id: int, config
     # el delete se ejecuta en el momento, así las filas nuevas no chocan con las viejas (mismo jugador o rol)
     session.execute(delete(LineupEntry).where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id))
     save_lineup(session, None, team_id, config, league_id)
+
+def build_lineup_config(entries: list[LineupEntry]) -> LineupConfig:
+    """Arma la configuración táctica a partir de las filas guardadas.
+    La formación no se guarda: sale de los roles de los titulares."""
+
+    starters = [entry for entry in entries if entry.is_starter]
+    substitutes = [entry for entry in entries if not entry.is_starter]
+
+    roles = {entry.role for entry in starters}
+    formation_type = next(formation for formation, formation_roles in FORMATION_ROLES.items() if formation_roles == roles)
+
+    return LineupConfig(
+        formation_type=formation_type,
+        starting_players=[
+            StartingPlayer(player_id=entry.player_id, role=entry.role, behavior_id=entry.behavior_id)
+            for entry in starters
+        ],
+        substitute_players=[
+            SubstitutePlayer(player_id=entry.player_id, behavior_id=entry.behavior_id)
+            for entry in substitutes
+        ],
+    )
 
 def copy_league_lineup_to_match(session: Session, match: Match) -> None:
     """Copia al partido la alineación vigente que cada equipo tiene en la liga.

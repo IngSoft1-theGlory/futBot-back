@@ -29,6 +29,7 @@ from src.services.league_service import (
     join_league,
     start_league,
     update_league_lineup,
+    get_league_lineup,
 )
 from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
@@ -185,6 +186,16 @@ async def join_league_endpoint(
         await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
+
+@router.get("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
+def get_league_lineup_endpoint(
+    league_id: int,
+    team_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueLineupOut:
+    """Devuelve la alineación vigente del equipo en la liga."""
+    return get_league_lineup(session, user_id, league_id, team_id)
 
 @router.put("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
 async def update_league_lineup_endpoint(
