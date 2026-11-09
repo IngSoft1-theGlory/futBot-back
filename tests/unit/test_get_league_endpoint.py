@@ -126,6 +126,8 @@ def test_deberia_devolver_el_detalle_completo_de_una_liga_publica(
         "teams": [{"team_id": usuario_con_equipo.team_id, "team_name": "Sacachispas FC"}],
         "ranking": [],
         "fixture": [],
+        "penalties_enabled": False,
+        "coach_behavior_id": None,
     }
 
 
@@ -255,7 +257,7 @@ def test_deberia_devolver_el_fixture_ordenado_por_fecha_con_los_datos_de_los_equ
     for partido in fixture:
         # Todos los partidos recién creados comienzan pendientes y sin goles
         assert partido["status"] == "PENDING"
-        assert partido["score"] == {"home": 0, "away": 0}
+        assert partido["score"] == {"home": 0, "away": 0, 'paway': None, 'phome': None}
         # La respuesta debe incluir el nombre correcto de cada equipo
         assert partido["team_host"]["team_name"] == nombres[partido["team_host"]["team_id"]]
         assert partido["team_away"]["team_name"] == nombres[partido["team_away"]["team_id"]]

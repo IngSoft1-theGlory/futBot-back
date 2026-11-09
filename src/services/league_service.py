@@ -15,6 +15,7 @@ from src.core.exceptions import (
     InvalidQueryParamsError,
     JoinTokenRequiredError,
     LeagueAlreadyStartedError,
+    LeagueFinishedError,
     LeagueFullError,
     LeagueNotFoundError,
     ForbiddenError,
@@ -35,16 +36,18 @@ from src.schemas.league import (
     JoinLeagueRequest, 
     FixtureMatchOut, 
     FixtureTeamOut, 
-    FixtureScoreOut
+    FixtureScoreOut,
+    LeagueLineupOut,
 )
 
 from src.models.league import League, LeagueStatus
 from src.repositories.league_repository import get_leagues, get_league_by_id, get_league_teams, is_team_in_league
 from src.repositories.user_repository import get_user_by_id
-from src.repositories.match_repository import get_league_fixture, get_finished_league_matches
+from src.repositories.match_repository import get_league_fixture, get_finished_league_matches, get_players_by_team
 from src.core.security import hash_password, verify_join_token, verify_password
 from src.models.lineup_entry import LineupEntry
 from src.services.standings_service import build_standings
+from src.schemas.lineup_config import LineupConfig
 from src.services.fixture_service import generate_fixture
 from src.services.lineup_service import (
     save_lineup,
@@ -52,7 +55,9 @@ from src.services.lineup_service import (
     validate_match_duration,
     validate_min_players, 
     validate_lineup,
+    replace_league_lineup,
 )
+from src.engine._02_to_match.state import coach_registry
 
 MIN_TEAMS_TO_START = 4  # cantidad mínima de equipos para iniciar una liga
 
@@ -79,6 +84,7 @@ def create_league(session: Session, user_id: int, payload: CreateLeagueRequest) 
             host_team_id=payload.team_id,
             match_duration=payload.match_duration,
             status=LeagueStatus.PENDING,
+            penalties_enabled=payload.penalties_enabled
         )
 
         session.add(league)
@@ -193,10 +199,17 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
 
     teams = get_league_teams(session, league_id)
     is_private = league.password_hash is not None
+    
+    user = get_user_by_id(session, user_id)
+
+    # DT que eligió el equipo del usuario en esta liga 
+    # None si no eligio ninguno
+    coach_behavior_id = None
+    if user is not None:
+        coach_behavior_id = coach_registry.get(league_id, user.team_id)
 
     # una liga privada solo la pueden ver los equipos inscriptos
     if is_private:
-        user = get_user_by_id(session, user_id)
         if user is None or all(team.team_id != user.team_id for team in teams):
             raise ForbiddenError("No se permite ver el estado de esta liga")
 
@@ -212,7 +225,7 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
             team_host=FixtureTeamOut(team_id=partido.host_team.team_id, team_name=partido.host_team.team_name),
             team_away=FixtureTeamOut(team_id=partido.away_team.team_id, team_name=partido.away_team.team_name),
             # Se agregan los goles de cada equipo, si el partido no se jugó, los goles son 0
-            score=FixtureScoreOut(home=partido.home_goals, away=partido.away_goals),
+            score=FixtureScoreOut(home=partido.home_goals, away=partido.away_goals, phome=partido.home_penalty_goals, paway=partido.away_penalty_goals),
         )
         for partido in partidos     
     ]
@@ -233,7 +246,9 @@ def get_league_detail(session: Session, user_id: int, league_id: int) -> LeagueD
         match_duration=league.match_duration,
         teams=[LeagueTeamOut(team_id=team.team_id, team_name=team.team_name) for team in teams],
         fixture=fixture,    
-        ranking=ranking
+        ranking=ranking,
+        penalties_enabled=league.penalties_enabled,
+        coach_behavior_id=coach_behavior_id
     )
 
 
@@ -394,3 +409,30 @@ def start_league(session: Session, user_id: int, league_id: int) -> League:
         raise
 
     return league
+
+def update_league_lineup(session: Session, user_id: int, league_id: int, team_id: int, payload: LineupConfig) -> LeagueLineupOut:
+    """Cambia la alineación vigente del equipo en la liga. Se usa desde el próximo partido que juegue."""
+
+    league = get_league_by_id(session, league_id, for_update=True)
+    if league is None:
+        raise LeagueNotFoundError("No existe una liga con el ID especificado.")
+
+    validate_team_belongs_to_user(session, user_id, team_id)
+
+    if not is_team_in_league(session, league_id, team_id):
+        raise TeamNotInLeagueError("El equipo no está inscripto en la liga.")
+
+    if league.status == LeagueStatus.FINISHED:
+        raise LeagueFinishedError("No se puede cambiar la alineación de una liga que ya terminó.")
+
+    team_players = get_players_by_team(session, team_id)
+    validate_lineup(session, payload, team_players, user_id)
+
+    try:
+        replace_league_lineup(session, league_id, team_id, payload)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+    return LeagueLineupOut(league_id=league_id, team_id=team_id, **payload.model_dump())

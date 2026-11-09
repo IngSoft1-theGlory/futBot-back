@@ -10,7 +10,9 @@ from src.services.league_service import check_league_password
 from fastapi import APIRouter, Depends, status, Response
 from src.schemas.league import CreateLeagueRequest, CreateLeagueResponse, LeagueListOut, LeagueDetailOut
 from src.services.league_service import create_league, list_leagues, get_league_detail
+from src.services.coach_service import choose_coach_behavior
 from src.models import League, LeagueStatus
+from src.schemas.lineup_config import LineupConfig
 
 from fastapi.concurrency import run_in_threadpool
 
@@ -25,8 +27,10 @@ from src.services.league_service import (
     check_league_password, 
     exit_league,
     join_league,
-    start_league
+    start_league,
+    update_league_lineup,
 )
+from src.services.league_run_service import FIRST_ROUND_NUMBER, start_league_round
 from src.schemas.league import (
     VerifyPasswordRequest, 
     VerifyPasswordResponse, 
@@ -37,7 +41,10 @@ from src.schemas.league import (
     JoinLeagueResponse,
     LeagueDetailOut,
     StartLeagueRequest,
-    StartLeagueResponse
+    StartLeagueResponse,
+    LeagueLineupOut,
+    ChooseCoachRequest,
+    ChooseCoachResponse,
 )
 
 
@@ -87,7 +94,8 @@ async def create_league_endpoint(
        match_duration = league.match_duration,
        max_teams = league.max_teams, 
        current_teams_count = 1,
-       host_team_id = league.host_team_id
+       host_team_id = league.host_team_id,
+       penalties_enabled= league.penalties_enabled
     )
 
 @router.delete(
@@ -172,8 +180,21 @@ async def join_league_endpoint(
     # si al unirse se completo el cupo, join_league ya dejo la liga en IN_PROGRESS
     if league.status == LeagueStatus.IN_PROGRESS:
         _publish_league_initiated(league)
+        # con la liga confirmada y el evento publicado, arranca la primera fecha
+        await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
 
     return JoinLeagueResponse(league_id=league_id, team_id=payload.team_id)
+
+@router.put("/{league_id}/teams/{team_id}/lineup", response_model=LeagueLineupOut)
+async def update_league_lineup_endpoint(
+    league_id: int,
+    team_id: int,
+    payload: LineupConfig,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> LeagueLineupOut:
+    """Reemplaza la alineación vigente del equipo en la liga."""
+    return await run_in_threadpool(update_league_lineup, session, user_id, league_id, team_id, payload)
 
 def _publish_league_initiated(league: League) -> None:
     """ Publica el evento LEAGUE_INITIATED cuando una liga es iniciada. """
@@ -201,12 +222,32 @@ async def start_league_endpoint(
     # despues de hacer commit, aviso a los suscriptores del evento LEAGUE_INITIATED
     _publish_league_initiated(league)
 
-    # aca se deberia engancha "Arrancar una fecha (jornada)" 
-    # ...
-
-    # devuelve el estado de la liga recien iniciada
-    return StartLeagueResponse(
+    # armo la respuesta antes de arrancar la fecha: asi, si falla algun partido,
+    # el PUT igual responde los datos de la liga recien iniciada
+    response = StartLeagueResponse(
         league_id=league.league_id,
         league_name=league.league_name,
         status=league.status.value,
     )
+
+    # con la liga confirmada y el evento publicado, arranca la primera fecha
+    await start_league_round(session, league_id, FIRST_ROUND_NUMBER)
+
+    # devuelve el estado de la liga recien iniciada
+    return response
+
+
+@router.put("/{league_id}/teams/{team_id}/coach", 
+    response_model=ChooseCoachResponse)
+def choose_coach_endpoint(
+    league_id: int, 
+    team_id: int,
+    payload: ChooseCoachRequest,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ChooseCoachResponse:
+
+    # armo la respuesta y la devuelvo
+    coach = choose_coach_behavior(session, league_id, user_id, team_id=team_id, payload=payload)
+
+    return coach

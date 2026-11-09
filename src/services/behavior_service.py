@@ -25,6 +25,7 @@ def create_behavior(session: Session, user_id: int, payload: CreateUpdateBehavio
             code = payload.code,
             user_id = user_id,
             is_default = False,
+            behavior_type = payload.behavior_type
         )
         session.add(behavior)
         session.commit()

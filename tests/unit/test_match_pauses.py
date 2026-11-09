@@ -13,11 +13,13 @@ from unittest.mock import Mock
 import pytest
 
 from src.engine import match_runner
-from src.engine._01_to_world.data_types import ActionType, Intention
-from src.engine._01_to_world.metrics import PauseType, pause_schedule_for
-from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState
-from src.engine.match_runner import run_match
-from tests.unit.test_match_runner import _build_state
+from src.engine._01_to_world.data_types import ActionType, Intention, Point2D, Vector2D
+from src.engine._01_to_world.metrics import PauseSlot, PauseType, pause_schedule_for
+from src.engine._01_to_world.pitch import BALL_INITIAL_POSITION, detect_goal
+from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState, swap_sides
+from src.engine._03_to_builder.snapshot import build_player_snapshot
+from src.engine.match_runner import _run_pause, run_match, run_tick
+from tests.unit.test_match_runner import _build_state, _idle_behavior, _noop_apply
 
 JUGADORES_EN_CANCHA = 6  # 3 titulares por equipo (ver _build_state)
 
@@ -199,3 +201,90 @@ async def test_deberia_continuar_el_partido_si_falla_notify_pause(monkeypatch):
     assert partido.ticks_notificados == list(range(1, 241)) # todos los ticks
     assert partido.state.phase is MatchPhase.FINISHED # y terminó el partido
     assert partido.resultados_guardados == [partido.state] # y guardó el resultado final
+
+
+# --- Cambio de lados en el Half-Time ---
+# Estos tests llaman a _run_pause con 0 segundos de espera y comparan el estado 
+# del partido antes y después de la pausa.
+
+COOLING_BREAK = PauseSlot(number=1, tick=60, type=PauseType.COOLING_BREAK)
+HALF_TIME = PauseSlot(number=2, tick=120, type=PauseType.HALF_TIME)
+
+
+@pytest.mark.asyncio
+async def test_deberia_invertir_el_side_de_todos_los_jugadores_tras_el_half_time():
+    state = _build_state()
+    sides_antes = {pid: p.side for pid, p in state.players.items()}
+
+    await _run_pause(state, HALF_TIME, 0)
+
+    # Solo hay dos lados, así que "distinto al de antes" es "el lado contrario".
+    for pid, jugador in state.players.items():  # titulares y suplentes
+        assert jugador.side is not sides_antes[pid]
+
+
+@pytest.mark.asyncio
+async def test_deberia_dejar_a_los_titulares_en_su_posicion_inicial_espejada_y_la_pelota_en_el_centro():
+    state = _build_state()
+    # Posición inicial de cada titular (los suplentes no tienen).
+    iniciales = {pid: p.initial_position for pid, p in state.players.items() if p.initial_position is not None}
+    # Durante el primer tiempo un jugador se movió y la pelota viajó.
+    state.players[100].position = Point2D(50.0, 20.0)
+    state.ball.position = Point2D(10.0, 5.0)
+    state.ball.velocity = Vector2D(3.0, 1.0)
+
+    await _run_pause(state, HALF_TIME, 0)
+
+    for pid, inicial in iniciales.items():
+        # Espejar es girar 180 grados respecto del centro de la cancha.
+        assert state.players[pid].position == Point2D(105 - inicial.x, 60 - inicial.y)
+    assert state.ball.position == BALL_INITIAL_POSITION
+    assert state.ball.velocity == Vector2D(0.0, 0.0)
+
+
+# En los dos tests de gol, swap_sides deja el estado como al empezar el segundo tiempo:
+# el anfitrión defiende x = 105 y ataca x = 0; el visitante, al revés.
+
+def test_deberia_sumar_al_anfitrion_el_gol_en_x_0_del_segundo_tiempo():
+    state = _build_state()
+    swap_sides(state)
+    state.ball.position = Point2D(0.0, 30.0)  # la pelota entra al arco al que ataca el anfitrión
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=detect_goal)
+
+    assert state.score.home == 1
+    assert state.score.away == 0
+
+
+def test_deberia_sumar_al_visitante_el_gol_en_x_105_del_segundo_tiempo():
+    state = _build_state()
+    swap_sides(state)
+    state.ball.position = Point2D(105.0, 30.0)  # la pelota entra al arco al que ataca el visitante
+
+    run_tick(state, execute_behavior=_idle_behavior, apply_intentions=_noop_apply, detect_goal=detect_goal)
+
+    assert state.score.home == 0
+    assert state.score.away == 1
+
+
+def test_deberia_el_snapshot_reflejar_el_lado_nuevo_tras_el_cambio_de_lados():
+    state = _build_state()
+    anfitrion = 100  # titular del anfitrión (en el primer tiempo defendía x = 0)
+
+    swap_sides(state)
+    game_state, _ = build_player_snapshot(state, anfitrion)
+
+    # Ahora defiende x = 105 y ataca x = 0.
+    assert game_state.team_goal == Point2D(105.0, 30.0)
+    assert game_state.opponent_goal == Point2D(0.0, 30.0)
+
+
+@pytest.mark.asyncio
+async def test_deberia_el_cooling_break_no_cambiar_lados_ni_posiciones():
+    state = _build_state()
+    antes = {pid: (p.side, p.position) for pid, p in state.players.items()}
+
+    await _run_pause(state, COOLING_BREAK, 0)
+
+    despues = {pid: (p.side, p.position) for pid, p in state.players.items()}
+    assert despues == antes

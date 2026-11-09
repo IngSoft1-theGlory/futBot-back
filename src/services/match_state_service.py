@@ -23,6 +23,8 @@ from src.schemas.match_state import (
     PlayerAttributesOut,
     ScoreOut,
     PauseOut,
+    PlannedSubstitutionOut,
+    PointOut,
 )
 
 import time # para calcular remaining_seconds de la pausa
@@ -92,6 +94,7 @@ def build_player_out(context: MatchStateContext, player_id: int, player_state) -
         )
 
     es_propio = player_state.team_id == context.user_team_id
+    position = player_state.position
     return MatchPlayerOut(
         player_id=player.player_id,
         team_id=player_state.team_id,
@@ -105,6 +108,9 @@ def build_player_out(context: MatchStateContext, player_id: int, player_state) -
             strength=player.strength,
         ),
         behavior_id=player_state.behavior_id if es_propio else None,
+        position=PointOut(x=position.x, y=position.y) if position is not None else None,
+        current_action=player_state.current_action.value if position is not None else None,
+ 
     )
 
 
@@ -154,14 +160,23 @@ def build_match_state_response(
             remaining_seconds=max(0.0, pause.ends_at - time.monotonic()),
         )
 
+    # cambio planificado del equipo de quien consulta: el plan del rival no se muestra
+    plan = state.planned_substitutions.get(context.user_team_id)
+    planned_out = None
+    if plan is not None:
+        player_out_id, player_in_id = plan  # así se guarda: (saliente, entrante)
+        planned_out = PlannedSubstitutionOut(player_in_id=player_in_id, player_out_id=player_out_id)
+
     return MatchStateResponse(
         match_id=context.match_id,
         current_tick=state.current_tick,
         total_ticks=state.total_ticks,
-        score=ScoreOut(home=state.score.home, away=state.score.away),
+        score=ScoreOut(home=state.score.home, away=state.score.away, phome=state.score.phome, paway=state.score.paway),
         players=players,
         substitutes=substitutes,
         phase=state.phase.value,
         pause=pause_out,
+        planned_substitution=planned_out,
+        ball=PointOut(x=state.ball.position.x, y=state.ball.position.y),    
 
     )

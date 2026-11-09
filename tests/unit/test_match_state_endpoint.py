@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from src.core.security import create_access_token
 from src.database.base import get_db
 from src.engine._01_to_world.pitch import TeamSide
-from src.engine._01_to_world.data_types import Point2D, Vector2D
+from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType
 from src.engine._02_to_match.state import (
     BallState,
     MatchPhase,
@@ -123,7 +123,10 @@ def test_deberia_devolver_200_con_el_estado_y_solo_los_6_jugadores_en_cancha(cli
     state = partido["state"]
     state.current_tick = 7
     state.score.home = 2
-    state.score.away = 1
+    state.score.away = 2
+    state.score.phome = 1
+    state.score.paway = 1
+
 
     response = client.get(url(partido["match"].match_id), headers=auth(partido["host"]))
 
@@ -132,7 +135,7 @@ def test_deberia_devolver_200_con_el_estado_y_solo_los_6_jugadores_en_cancha(cli
     assert body["match_id"] == partido["match"].match_id
     assert body["current_tick"] == 7
     assert body["total_ticks"] == 240
-    assert body["score"] == {"home": 2, "away": 1}
+    assert body["score"] == {"home": 2, "away": 2, "phome": 1, "paway": 1}
     # 3 titulares por equipo: los suplentes (position=None) no aparecen
     en_cancha = {j.player_id for j in partido["jugadores_host"][:3] + partido["jugadores_away"][:3]}
     assert {p["player_id"] for p in body["players"]} == en_cancha
@@ -142,9 +145,43 @@ def test_deberia_traer_name_number_y_atributos_de_la_base(client, partido):
     body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
 
     jugador = body["players"][0]
-    assert set(jugador) == {"player_id", "team_id", "name", "number", "attributes", "behavior_id"}
+    assert set(jugador) == {"player_id", "team_id", "name", "number", "attributes", "behavior_id", "position", "current_action"}
     assert jugador["name"].startswith("Jugador ")
     assert jugador["attributes"] == {"power": 40, "agility": 50, "control": 60, "speed": 70, "strength": 80}
+
+
+# --- ball, position y current_action ---
+
+def test_deberia_devolver_la_posicion_de_la_pelota(client, partido):
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+
+    assert body["ball"] == {"x": 52.5, "y": 30.0}
+
+
+def test_deberia_devolver_la_posicion_de_los_jugadores_y_current_action(client, partido):
+    state = partido["state"]
+    rival = partido["jugadores_away"][0]
+    state.players[rival.player_id].current_action = ActionType.RUN_TO
+
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+
+    for jugador in body["players"]:
+        jugador_state = state.players[jugador["player_id"]]
+
+        assert jugador["position"] == {
+            "x": jugador_state.position.x,
+            "y": jugador_state.position.y,
+        }
+        assert jugador["current_action"] == jugador_state.current_action.value
+
+
+def test_deberia_devolver_position_y_current_action_null_los_suplentes(client, partido):
+    body = client.get(url(partido["match"].match_id), headers=auth(partido["host"])).json()
+    assert body["substitutes"]
+    
+    for suplente in body["substitutes"]:
+        assert suplente["position"] is None
+        assert suplente["current_action"] is None
 
 
 # --- behavior_id - real el propio, null el rival ---

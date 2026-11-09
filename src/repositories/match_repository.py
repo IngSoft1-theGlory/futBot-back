@@ -5,7 +5,7 @@ Sólo lectura: la escritura vive en src/services/friendly_service.py.
 
 from __future__ import annotations
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import selectinload
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player
@@ -24,17 +24,41 @@ def get_behaviors_by_ids(session: Session, behavior_ids: list[int]) -> list[Beha
     
     return list(session.scalars(statement).all())
 
-def get_match_by_id(session: Session, match_id: int) -> Match | None:
-    """El partido con ese id, o None si no existe."""
+def get_match_by_id(session: Session, match_id: int, for_update: bool = False) -> Match | None:
+    """
+    El partido con ese id, o None si no existe
+    Si for_update es True, bloquea la fila hasta el commit (otra sesion que la pida, espera)
+    """
+    if for_update:
+        return session.get(Match, match_id, with_for_update=True)
     return session.get(Match, match_id)
 
-def get_lineup_entries(session: Session, match_id: int) -> list[LineupEntry]:
-    """Las entradas de alineación de AMBOS equipos del partido, en orden de creación."""
+def get_lineup_entries(session: Session, match_id: int | None = None, league_id: int | None = None, team_id: int | None = None) -> list[LineupEntry]:
+    """Las entradas de alineación de ambos equipos del partido amistoso, o de un solo equipo en el caso de ligas, en orden de creación.
+    
+    Para los partidos amistosos se devuelve la informacion de ambos equipos, asi que no se debe pasar team_id"""
+
+    if (match_id is None and league_id is None) or (match_id is not None and league_id is not None):
+        raise ValueError("Solo match_id o league_id es requerido") 
+    
     statement = (
-        select(LineupEntry)
-        .where(LineupEntry.match_id == match_id)
-        .order_by(LineupEntry.entry_id)
-    )
+            select(LineupEntry)
+        )
+    
+    if match_id is not None: 
+        statement = (
+            statement.where(LineupEntry.match_id == match_id)
+        ) 
+    if league_id is not None: 
+        statement = (
+            statement.where(LineupEntry.league_id == league_id)
+        )
+    if team_id is not None:
+        statement = (
+            statement.where(LineupEntry.team_id == team_id)
+        )
+
+    statement = statement.order_by(LineupEntry.entry_id)
 
     return list(session.scalars(statement).all())
   
@@ -90,6 +114,26 @@ def claim_pending_match(session: Session, match_id: int, away_team_id: int) -> b
     result = session.execute(statement)
     return result.rowcount == 1 ##las filas que modifico, si es 0 es porque no cumplio una condicion y es 1 si salio todo bien y se unio al partido
 
+def claim_pending_league_match(session: Session, match_id: int) -> bool:
+    """Pasa el partido de liga a IN_PROGRESS en un solo UPDATE condicional
+    solo lo logra quien lo encuentre todavia PENDING: si dos pedidos intentan arrancar
+    el mismo partido, la base deja pasar a uno solo. Devuelve False si no lo logró
+
+    No hace commit, y no actualiza el objeto Match que ya esta en memoria:
+    quien la llama debe hacer session.refresh(match)
+    """
+    statement = (
+        update(Match) 
+        .where( 
+            Match.match_id == match_id,
+            Match.status == MatchStatus.PENDING,
+        )
+        .values(status=MatchStatus.IN_PROGRESS)
+    )
+    result = session.execute(statement) # execute manda el update a la base. no hace commit, asi que se puede deshacer con rollback 
+
+    return result.rowcount == 1 # las filas que modifico, si es 0 es porque no cumplio una condicion y si es 1 es porque salio todo bien. result es la respuesta de la base
+
 def get_finished_league_matches(session, league_id) -> list[Match]:
     """ 
     Devuelve todos los partidos de la liga que ya terminaron.
@@ -111,3 +155,47 @@ def get_league_fixture(session: Session, league_id: int) -> list[Match]:
         .order_by(Match.round_number, Match.match_id)   # ordena los partidos por numero de fecha y match_id
     )
     return list(session.scalars(statement).all())
+
+def get_pending_round_matches(session: Session, league_id: int, round_number: int) -> list[Match]:
+    """
+    devuelve los partidos de una fecha de la liga que todavia no arrancaron
+    los que ya arrancaron o terminaron no vienen, por eso arrancar dos veces la misma fecha no los relanza
+    """
+    statement = (
+        select(Match)
+        .where(
+            Match.league_id == league_id,          # solo los de esta liga
+            Match.round_number == round_number,    # solo los de esta fecha
+            Match.status == MatchStatus.PENDING,   # solo los que no arrancaron
+        )
+        .order_by(Match.match_id)
+    )
+    return list(session.scalars(statement).all())
+
+def count_unfinished_round_matches(session: Session, league_id: int, round_number: int) -> int:
+    """
+  Devuelve la cantidad de partidos de una fecha cuyo estado NO es FINISHED,
+  retorna 0 si todos los partidos de la fecha están finalizados
+  o si la fecha no tiene partidos
+    """
+    statement = (
+        select(func.count()) 
+        .select_from(Match) 
+        .where(
+            Match.league_id == league_id,
+            Match.round_number == round_number,
+            Match.status != MatchStatus.FINISHED,
+        )
+    )
+
+    return session.scalar(statement)
+
+def get_last_round_number(session: Session, league_id: int) -> int | None:
+    """
+    Devuelve el numero de la última fecha registrada en la liga,
+    determinado por el round_number más alto de sus partidos,
+    retorna None si la liga no tiene partidos
+    """
+    statement = (select(func.max(Match.round_number)).where(Match.league_id == league_id))
+
+    return session.scalar(statement)

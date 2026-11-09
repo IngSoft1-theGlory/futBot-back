@@ -5,6 +5,8 @@ from pydantic import BaseModel
 class ScoreOut(BaseModel):
     home: int
     away: int
+    phome: int | None = None
+    paway: int | None = None
 
 class PlayerAttributesOut(BaseModel):
     power: int
@@ -13,6 +15,10 @@ class PlayerAttributesOut(BaseModel):
     speed: int
     strength: int
 
+class PointOut(BaseModel):
+    x: float
+    y: float
+
 class MatchPlayerOut(BaseModel):
     player_id: int
     team_id: int
@@ -20,10 +26,17 @@ class MatchPlayerOut(BaseModel):
     number: int
     attributes: PlayerAttributesOut
     behavior_id: int | None   # sin default a propósito: hay que pasarlo siempre
+    position: PointOut | None
+    current_action: str | None
 
 class PauseOut(BaseModel):
     type: str
     remaining_seconds: float
+
+# Cambio que el equipo de quien consulta dejó planificado para la próxima pausa
+class PlannedSubstitutionOut(BaseModel):
+    player_in_id: int
+    player_out_id: int
 
 # Respuesta del endpoint GET /matches/{match_id}/state.
 # Incluye el marcador y los jugadores con sus atributos.
@@ -36,6 +49,8 @@ class MatchStateResponse(BaseModel):
     substitutes: list[MatchPlayerOut]   # suplentes, solo del equipo de quien consulta
     phase: str
     pause: PauseOut | None
+    planned_substitution: PlannedSubstitutionOut | None   # solo del equipo de quien consulta
+    ball: PointOut
       
 # Peticion para cambiar comportamiento durante un partido
 class ChangeBehaviorRequest(BaseModel): 

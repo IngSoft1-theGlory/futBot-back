@@ -20,18 +20,18 @@ al final, detect_goal nunca vería el gol.
 Un gol se detecta en el tick en que la pelota entra al arco y el reinicio
 ocurre al comienzo del tick siguiente.
 Al final de apply_intentions la pelota avanza según su velocidad (_move_ball).
-
-Fuera de alcance:
-  - Qué pasa si la pelota sale por un lateral o por el fondo fuera del arco
-    (hoy sigue de largo: no hay rebote ni saque).
-  - Dos jugadores pateando en el mismo tick. POLÍTICA PROVISORIA: se
-    aplican en orden de player_id ascendente y gana la última patada
-    (es determinista, pero no es una decisión de diseño definitiva).
+Si en ese tramo pasa cerca de un arquero (is_goalkeeper), queda quieta en el
+punto de contacto (atajada). Si cruza la línea de gol por entre los palos, queda
+quieta en la línea (gol). Frena en lo primero que le toque. Como eso pasa antes de
+detect_goal, una atajada no cuenta como gol.
 """
 
+import math
+from typing import Optional
+
 from src.engine._01_to_world.data_types import Point2D, Vector2D, ActionType, Intention
-from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS
-from src.engine._01_to_world.pitch import TeamSide, detect_goal, kickoff_ball_position
+from src.engine._01_to_world.metrics import TICK_DURATION_SECONDS, GOALKEEPER_SAVE_RADIUS, TICK_DURATION_SECONDS
+from src.engine._01_to_world.pitch import TeamSide, detect_goal, kickoff_ball_position, goal_line_crossing
 from src.engine._02_to_match.state import MatchState
 from src.engine._03_to_builder.snapshot import build_player_snapshot
 from src.engine._04_to_physics.resolve import resolve
@@ -94,8 +94,83 @@ def _reset_after_goal(state: MatchState) -> None:
 
 
 def _move_ball(state: MatchState) -> None:
-    """Avanza la pelota un tick: posición += velocidad * duración del tick."""
-    state.ball.position = Point2D(
-        state.ball.position.x + state.ball.velocity.x * TICK_DURATION_SECONDS,
-        state.ball.position.y + state.ball.velocity.y * TICK_DURATION_SECONDS,
+    """
+    Avanza la pelota un tick: posicion = posicion + velocidad * duración del tick
+    La pelota queda quieta en el primer punto que toca: un arquero que la ataja o la línea
+    de gol.
+    """
+    start = state.ball.position
+    end = Point2D(
+        start.x + state.ball.velocity.x * TICK_DURATION_SECONDS,
+        start.y + state.ball.velocity.y * TICK_DURATION_SECONDS,
     )
+
+    # Lista de posiciones (Point2D) donde se frena la pelota: sea arquero o linea de gol.
+    contacts = []
+
+    for player in state.players.values():
+        if player.is_goalkeeper and player.position is not None:
+            contact = save_contact_point(start, end, player.position)
+            if contact is not None:
+                contacts.append(contact)
+
+    # Así detect_goal ve el gol aunque el tiro termine fuera de los palos.
+    # i.e: un tiro dirigido al arco que tenia end fuera de los palos, pero que cruzó la línea de gol antes.
+    crossing = goal_line_crossing(start, end)
+    if crossing is not None:
+        contacts.append(crossing)
+
+    # ¿Hubo un arquero o la línea de gol que frenó la pelota?: queda quieta en el primero que toca.
+    # Si no hubo (lista vacía), queda quieta en el final del tick.
+    if contacts:
+        # frena en el primero que toca: si hay un arquero antes de la línea, es atajada
+        state.ball.position = min(contacts, key=start.distance_to)
+        state.ball.velocity = Vector2D(0.0, 0.0)
+    else:
+        state.ball.position = end
+
+
+# ========================================== Atajada ================================================
+
+def save_contact_point(ball_start: Point2D, ball_end: Point2D, goalkeeper_position: Point2D) -> Optional[Point2D]:
+    """
+    Primer punto del tramo ball_start -> ball_end que queda a GOALKEEPER_SAVE_RADIUS
+    o menos del arquero, o None si la pelota nunca pasa tan cerca
+
+    Se revisa el tramo entero y no solo ball_end: la pelota puede recorrer hasta
+    15 m en un tick y pasar de largo por delante del arquero
+    """
+    # la pelota ya arranca pegada al arquero: la ataja ahí mismo
+    if ball_start.distance_to(goalkeeper_position) <= GOALKEEPER_SAVE_RADIUS:
+        return ball_start
+
+    path_length = ball_start.distance_to(ball_end)
+    if path_length == 0:
+        return None  # la pelota está quieta y lejos del arquero
+
+    direction = ball_start.direction_to(ball_end)  # vector de largo 1, hacia donde viaja la pelota
+
+    # Cuántos metros avanza la pelota hasta el punto de su recta más cercano al arquero, es el producto escalar entre el vector "pelota -> arquero" y la dirección
+    to_goalkeeper_x = goalkeeper_position.x - ball_start.x
+    to_goalkeeper_y = goalkeeper_position.y - ball_start.y
+    meters_to_closest = to_goalkeeper_x * direction.x + to_goalkeeper_y * direction.y
+
+    closest_point = _point_along_path(ball_start, direction, meters_to_closest)
+    closest_distance = closest_point.distance_to(goalkeeper_position)
+    if closest_distance > GOALKEEPER_SAVE_RADIUS:
+        return None  # la recta de la pelota pasa lejos del arquero
+
+    # Pitágoras desde el punto más cercano se retrocede sobre la recta hasta el borde del radio de atajada, que es donde la pelota lo toca por primera vez
+    meters_back = math.sqrt(GOALKEEPER_SAVE_RADIUS ** 2 - closest_distance ** 2)
+    meters_to_contact = meters_to_closest - meters_back
+
+    # < 0: el arquero quedó atrás (la pelota se aleja) > path_length no llega en este tick
+    if meters_to_contact < 0 or meters_to_contact > path_length:
+        return None
+
+    return _point_along_path(ball_start, direction, meters_to_contact)
+
+
+def _point_along_path(start: Point2D, direction: Vector2D, meters: float) -> Point2D:
+    """Punto al que se llega avanzando `meters` metros desde `start` en `direction` (de largo 1)"""
+    return Point2D(start.x + direction.x * meters, start.y + direction.y * meters)

@@ -332,6 +332,29 @@ def test_deberia_pelota_patada_hacia_el_arco_terminar_dentro_y_run_tick_contar_e
     assert state.score.home == 1
 
 
+@pytest.mark.parametrize(
+    "inicio, velocidad, lado_que_convierte, linea_x",
+    [
+        # Tiros a 30 m/s (15 m por tick) que cruzan el arco entre los palos pero, por la desviación en y,
+        # terminarían el tick por afuera de los palos (y=34.05 > 33.66)
+        (Point2D(10.7, 30.0), Vector2D(-28.9, 8.1), TeamSide.AWAY, 0.0),
+        (Point2D(94.3, 30.0), Vector2D(28.9, 8.1), TeamSide.HOME, 105.0),
+    ],
+)
+def test_deberia_pelota_que_cruza_el_arco_en_un_tick_quedar_quieta_en_la_linea_y_contar_gol(
+    inicio, velocidad, lado_que_convierte, linea_x
+):
+    state = _state()
+    state.ball.position = inicio
+    state.ball.velocity = velocidad
+
+    apply_intentions(state, {})
+
+    assert state.ball.position.x == pytest.approx(linea_x)
+    assert state.ball.velocity == Vector2D(0.0, 0.0)
+    assert detect_goal(state.ball.position) == lado_que_convierte
+
+
 # --- Reinicio de la pelota tras un gol ---
 
 # La pelota vuelve a la línea central, corrida KICKOFF_OFFSET hacia el arco del que RECIBIÓ el gol.
@@ -364,7 +387,7 @@ def test_deberia_pelota_en_un_arco_volver_a_la_linea_central_corrida_hacia_el_qu
     [
         Point2D(0.0, 5.0),    # línea de fondo pero afuera del arco (no es gol)
         Point2D(50.0, 30.0),
-        Point2D(104.0, 30.0),
+        Point2D(100.0, 30.0),  # cerca del arco, pero su recorrido de este tick no llega a la línea
     ],
 )
 def test_deberia_pelota_fuera_de_un_arco_no_reiniciarse(posicion):

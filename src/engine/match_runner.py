@@ -3,10 +3,14 @@ Ciclo del partido, tick a tick.
 
 - run_tick: juega UN tick (cada jugador decide, se aplican las
   decisiones, se cuenta el gol y avanza el reloj).
+- play_tick: la parte de run_tick que no depende del marcador del partido
+  (decisiones, aplicación y detección del gol). La reutiliza la tanda de penales.
 - run_match: repite run_tick hasta el final del partido. Después de
   cada tick avisa a los clientes (notify) y espera. Cuando llega a un
   tick de pausa (Cooling Break o Half-Time) el reloj se detiene y el
-  partido espera en PAUSED antes de seguir.
+  partido espera en PAUSED antes de seguir. Tras el Half-Time, los equipos 
+  cambian de lado. Si el partido de liga con penales terminó empatado, juega la
+  tanda antes de pasar a FINISHED, avisando su inicio y su fin (notify_penalties).
 
 Las piezas que vienen de otros módulos (comportamientos, física, regla
 de gol, aviso y guardado del resultado) se reciben por parámetro: así
@@ -31,7 +35,14 @@ from src.engine._01_to_world.metrics import (
     PauseType,
     pause_schedule_for,
 )
-from src.engine._02_to_match.state import MatchPhase, MatchRegistry, MatchState, PauseState
+from src.engine._02_to_match.state import (
+    MatchPhase,
+    MatchRegistry,
+    MatchState,
+    PauseState,
+    apply_planned_substitutions,
+    swap_sides,
+)
 from src.engine._01_to_world.pitch import TeamSide
 from src.engine._01_to_world.data_types import Point2D, ActionType, Intention 
 
@@ -45,18 +56,25 @@ DetectGoal = Callable[[Point2D], Optional[TeamSide]]
 NotifyTick = Callable[[MatchState], Awaitable[None]]
 OnFinished = Callable[[MatchState], None]
 NotifyPause = Callable[[MatchState, PauseType, float, bool], Awaitable[None]]
+NotifyPenalties = Callable[[MatchState, bool], Awaitable[None]]
+# La tanda de penales (la implementa penalties.play_shootout). Se recibe por parámetro,
+# y no se importa acá, porque penalties.py ya importa play_tick de este módulo.
+PlayShootout = Callable[..., Awaitable[None]]
 
 
-def run_tick(
+def play_tick(
     state: MatchState,
     *,
     execute_behavior: ExecuteBehavior,
     apply_intentions: ApplyIntentions,
     detect_goal: DetectGoal,
-) -> None:
+) -> Optional[TeamSide]:
     """
-    Juega UN tick completo: cada jugador decide, se aplican las decisiones
-    y se cuenta el gol. Modifica state directamente.
+    Juega UN tick: cada jugador decide, se aplican las decisiones y se detecta
+    el gol. Devuelve el lado que convirtió, o None si no hubo gol.
+
+    NO suma el gol al marcador ni avanza el reloj: eso lo decide quien la llama
+    (run_tick en el partido, penalties.play_shootout en los penales).
 
     No tiene ningún await a propósito.
     Ver más info. en Documentación - "ABOUT_DESIGN"
@@ -95,11 +113,36 @@ def run_tick(
         )
         scoring_side = None
     
-    # suma de gol al equipo que corresponda, si hubo gol
-    if scoring_side is TeamSide.HOME:
-        state.score.home += 1
-    elif scoring_side is TeamSide.AWAY:
-        state.score.away += 1
+    return scoring_side
+
+
+def run_tick(
+    state: MatchState,
+    *,
+    execute_behavior: ExecuteBehavior,
+    apply_intentions: ApplyIntentions,
+    detect_goal: DetectGoal,
+) -> None:
+    """
+    Juega UN tick completo del partido: play_tick, más la suma del gol al
+    marcador y el avance del reloj. Modifica state directamente.
+    """
+    scoring_side = play_tick(
+        state,
+        execute_behavior=execute_behavior,
+        apply_intentions=apply_intentions,
+        detect_goal=detect_goal,
+    )
+
+    # Suma de gol al equipo que corresponda, si hubo gol.
+    # scoring_side es el lado del equipo que metió el gol. Si es el lado que defiende hoy
+    # el anfitrión, el gol es suyo. No se compara con HOME porque tras el Half-Time el
+    # anfitrión pasa a defender AWAY.
+    if scoring_side is not None:
+        if scoring_side is state.host_side:
+            state.score.home += 1
+        else:
+            state.score.away += 1
 
     state.current_tick += 1
 
@@ -126,6 +169,25 @@ async def _notify_pause_safely(
         )
 
 
+async def _notify_penalties_safely(
+        notify_penalties: Optional[NotifyPenalties],
+        state: MatchState,
+        started: bool,
+) -> None:
+    """ Avisa el inicio (started=True) o el fin (started=False) de la tanda de penales.
+    Si el aviso falla, el partido sigue: lo importante es que llegue a FINISHED. """
+    if notify_penalties is None:
+        return
+    try:
+        await notify_penalties(state, started)
+    except Exception:
+        logger.exception(
+            "notify_penalties falló al %s la tanda del partido %s; el partido sigue.",
+            "iniciar" if started else "terminar",
+            state.match_id,
+        )
+
+
 async def _run_pause(
         state: MatchState, 
         slot: PauseSlot, 
@@ -143,11 +205,20 @@ async def _run_pause(
         ends_at=time.monotonic() + duration_seconds,
     )
 
+    # aplica los cambios que los equipos dejaron planificados. Va antes de avisar el inicio
+    # de la pausa: así, cuando el front consulte el estado, ya ve la alineación nueva.
+    apply_planned_substitutions(state)
+
     # avisa a los clientes que empezó la pausa (Cooling Break o Half-Time)
     await _notify_pause_safely(notify_pause, state, slot.type, duration_seconds, started=True)
 
     # espera el tiempo de la pausa (Cooling Break o Half-Time)
     await asyncio.sleep(duration_seconds)
+
+    # al terminar el Half-Time los equipos cambian de lado (se hace al final para
+    # que los suplentes que entraron durante la pausa también queden del lado nuevo)
+    if slot.type is PauseType.HALF_TIME:
+        swap_sides(state)
 
     # termina la pausa: vuelve a IN_PROGRESS y borra state.pause
     state.pause = None
@@ -169,6 +240,8 @@ async def run_match(
     on_finished: Optional[OnFinished] = None,
     pause_durations: dict[PauseType, float] = PAUSE_DURATION_SECONDS,
     notify_pause: Optional[NotifyPause] = None,
+    play_shootout: Optional[PlayShootout] = None,
+    notify_penalties: Optional[NotifyPenalties] = None,
 ) -> None:
     """ 
     Corre el partido completo, tick a tick, hasta que pasa a FINISHED.
@@ -203,6 +276,21 @@ async def run_match(
                     state.match_id,
                 )
             await asyncio.sleep(tick_interval_seconds) # espera el intervalo de tiempo entre ticks antes del proximo tick
+
+        # Si el partido de liga con penales habilitados terminó empatado, se juega la tanda
+        # ANTES de pasar a FINISHED: así el resultado se guarda una sola vez, con los penales.
+        if play_shootout is not None and state.penalties_enabled and state.score.home == state.score.away:
+            # PENALTIES_STARTED sale antes del primer TICK_UPDATE de la tanda
+            await _notify_penalties_safely(notify_penalties, state, started=True)
+            await play_shootout(
+                state,
+                execute_behavior=execute_behavior,
+                apply_intentions=apply_intentions,
+                detect_goal=detect_goal,
+                notify=notify,
+                tick_interval_seconds=tick_interval_seconds,
+            )
+            await _notify_penalties_safely(notify_penalties, state, started=False)
 
         state.phase = MatchPhase.FINISHED
 

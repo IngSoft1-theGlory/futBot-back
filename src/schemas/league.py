@@ -17,7 +17,8 @@ class CreateLeagueRequest(LineupConfig):
     match_duration: int 
     max_teams: int 
     password: str | None = None # si no viene, es None 
-    team_id: int 
+    team_id: int
+    penalties_enabled: bool = False # si no viene, la liga no tiene penales 
     # hereda formation_type, starting_players y substitute_players de LineupConfig 
 
 class CreateLeagueResponse(BaseModel): 
@@ -29,6 +30,7 @@ class CreateLeagueResponse(BaseModel):
     max_teams: int 
     current_teams_count: int 
     host_team_id: int
+    penalties_enabled: bool 
 
 class LeagueOut(BaseModel):
     league_id: int
@@ -59,6 +61,9 @@ class FixtureTeamOut(BaseModel):
 class FixtureScoreOut(BaseModel):
     home: int
     away: int
+    phome: int | None = None # goles de penales del anfitrión, solo si hubo penales
+    paway: int | None = None # goles de penales del visitante, solo si hubo penales
+
 
 class FixtureMatchOut(BaseModel):
     match_id: int
@@ -94,12 +99,18 @@ class LeagueDetailOut(BaseModel):
     teams: list[LeagueTeamOut]
     ranking: list[StandingRowOut] = Field(default_factory=list)
     fixture: list[FixtureMatchOut] = Field(default_factory=list)
+    penalties_enabled: bool
+    coach_behavior_id: int | None = None # comportamiento de DT elegido para el equipo del usuario en la liga, si es que hay
 
 class JoinLeagueRequest(LineupConfig):
     team_id: int
     join_token: str | None = None # solo requerido para ligas privadas
 
 class JoinLeagueResponse(BaseModel):
+    league_id: int
+    team_id: int
+
+class LeagueLineupOut(LineupConfig):
     league_id: int
     team_id: int
 
@@ -110,3 +121,11 @@ class StartLeagueResponse(BaseModel):
     league_id : int
     league_name : str
     status : LeagueStatus
+
+class ChooseCoachRequest(BaseModel):
+    behavior_id: int | None 
+
+class ChooseCoachResponse(BaseModel): 
+    league_id: int
+    team_id: int 
+    behavior_id: int | None
