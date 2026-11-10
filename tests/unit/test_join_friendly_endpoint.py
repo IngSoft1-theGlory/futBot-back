@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from src.models import LineupEntry, Match, MatchStatus, Player, Team, User
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.realtime.event_bus import event_bus
 from src.routes import friendly as friendly_routes
 
@@ -253,7 +253,7 @@ def test_deberia_hacer_rollback_y_devolver_error_de_negocio_si_el_comportamiento
     client, db, usuario, rival, comportamiento, partido, motor_lanzado, codigo
 ):
     body = body_rival(rival, db, comportamiento)
-    comportamiento.code = codigo  # sin on_tick o con sintaxis rota: make_execute_behavior falla
+    comportamiento.code = codigo  # sin on_tick o con sintaxis rota: falla
     db.commit()
 
     r = client.post(url(partido.match_id), json=body, headers=headers(rival))

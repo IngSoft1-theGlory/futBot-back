@@ -13,12 +13,12 @@ import asyncio
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from src.engine.behavior_executor import make_execute_behavior
-from src.engine.game_types import AttributeType
-from src.engine.intentions import ActionType, Intention
-from src.engine.pitch import TeamSide, starter_position
-from src.engine.simulation import apply_intentions
-from src.engine.state import MatchInitializationError, MatchRegistry
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
+from src.engine._01_to_world.metrics import PauseType
+from src.engine._01_to_world.pitch import TeamSide, starter_position
+from src.engine._01_to_world.data_types import AttributeType, ActionType, Intention
+from src.engine._04_to_physics.simulation import apply_intentions
+from src.engine._02_to_match.state import MatchInitializationError, MatchRegistry
 from src.models import Behavior, LineupEntry, Match, MatchStatus, Player, Team
 from src.services.match_start_service import (
     launch_match,
@@ -29,6 +29,9 @@ from src.services.match_start_service import (
 )
 
 from src.realtime.event_bus import event_bus
+
+# Los partidos de 240 y 600 ticks tienen pausas: estos tests no esperan su duración real.
+PAUSAS_SIN_ESPERA = dict.fromkeys(PauseType, 0)
 
 ROLES_2_1 = ["DEF_LEFT", "DEF_RIGHT", "FORWARD"]
 ROLES_1_2 = ["DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"]
@@ -260,6 +263,29 @@ def test_deberia_save_match_result_fallar_si_el_partido_no_existe(session):
     with pytest.raises(LookupError):
         save_match_result(session, 999, 0, 0)
 
+# --- penales en el resultado guardado ---------------------------------------
+
+
+def test_deberia_save_match_result_guardar_los_goles_de_penales_cuando_se_le_pasan(session, partido):
+    save_match_result(session, partido.match_id, 1, 1, home_penalty_goals=2, away_penalty_goals=1)
+
+    # expunge_all hace que get() lea de la base y no del objeto que ya estaba en memoria
+    session.expunge_all()
+    guardado = session.get(Match, partido.match_id)
+    assert (guardado.home_penalty_goals, guardado.away_penalty_goals) == (2, 1)
+
+def test_deberia_make_on_finished_pasarle_phome_y_paway_del_estado_al_guardado(session, partido):
+    state = prepare_match(session, partido.match_id)
+    state.score.home, state.score.away = 1, 1       # empataron en el tiempo reglamentario
+    state.score.phome, state.score.paway = 2, 1     # y se definió por penales
+
+    make_on_finished(_fabrica_de_sesiones(session))(state)
+
+    session.expunge_all()
+    guardado = session.get(Match, partido.match_id)
+    assert (guardado.home_penalty_goals, guardado.away_penalty_goals) == (2, 1)
+
+
 @pytest.fixture()
 def eventos_globales():
     """Un suscriptor al bus GLOBAL (el mismo bus que alimenta al WS global).
@@ -325,6 +351,7 @@ async def test_deberia_start_match_publicar_match_finished_una_sola_vez_al_termi
         registry=MatchRegistry(),
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -377,6 +404,7 @@ async def test_deberia_start_match_correr_el_partido_y_persistir_el_resultado(se
         registry=registry,
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -401,7 +429,9 @@ async def test_deberia_el_motor_real_mover_a_los_jugadores_con_los_atributos_de_
     """Acople completo: base -> prepare_match -> execute_behavior y apply_intentions reales."""
     state = prepare_match(session, partido.match_id)
     posiciones_iniciales = {pid: p.position for pid, p in state.players.items() if p.position is not None}
-    execute_behavior = make_execute_behavior({comportamiento.behavior_id: CODIGO_CORRER_A_LA_PELOTA})
+
+    for jugador in state.players.values():
+        assign_behavior(jugador, comportamiento.behavior_id, CODIGO_CORRER_A_LA_PELOTA)
 
     task = launch_match(
         state,
@@ -411,6 +441,7 @@ async def test_deberia_el_motor_real_mover_a_los_jugadores_con_los_atributos_de_
         registry=MatchRegistry(),
         on_finished=make_on_finished(_fabrica_de_sesiones(session)),
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     await task
 
@@ -521,6 +552,7 @@ async def test_deberia_no_reintentar_si_lo_que_falla_es_guardar_el_resultado(ses
         registry=registry,
         on_finished=on_finished_que_falla,
         tick_interval_seconds=0,
+        pause_durations=PAUSAS_SIN_ESPERA,
     )
     with pytest.raises(RuntimeError):
         await task

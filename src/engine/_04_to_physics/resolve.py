@@ -1,0 +1,107 @@
+"""
+resolve: función pura que aplica una Intention a un GameState (un solo jugador).
+
+Ver más info. en Documentación - "ABOUT_FORMULAS"
+"""
+
+from dataclasses import replace
+
+from src.engine._01_to_world.data_types import (
+    Point2D, Vector2D, ActionType, Intention, AttributeType, GameState
+)
+from src.engine._01_to_world.metrics import (
+    MAX_ATTRIBUTE_VALUE,
+    MAX_RUN_SPEED_METERS_PER_SECOND,
+    TICK_DURATION_SECONDS,
+    kick_speed,
+    reach_distance,
+)
+from src.engine._01_to_world.pitch import PITCH_LENGTH, PITCH_WIDTH
+
+
+# ======================================== Resolución ===============================================
+
+def resolve(state: GameState, intention: Intention, attributes: dict[AttributeType, int]) -> GameState:
+    """
+    Devuelve el GameState resultante de aplicar `intention`.
+    `attributes` son los atributos del jugador (RUN_TO usa su SPEED).
+
+    Implementadas: IDLE, RUN_TO y KICK_BALL (usa POWER y CONTROL del jugador).
+    Una acción desconocida falla fuerte en vez de ignorarse en silencio.
+    """
+    if intention.action == ActionType.IDLE:
+        return state
+
+    if intention.action == ActionType.RUN_TO:
+        max_distance = max_run_distance_per_tick(attributes[AttributeType.SPEED], intention.speed_percentage)
+        new_position = move_towards(state.my_position, intention.target, max_distance)
+        # replace() crea un GameState nuevo, igual al anterior salvo my_position
+        return replace(state, my_position=new_position)
+
+    if intention.action == ActionType.KICK_BALL:
+        return _resolve_kick_ball(state, intention, attributes)
+
+    raise NotImplementedError(f"Acción no implementada: {intention.action}")
+
+
+def _resolve_kick_ball(state: GameState, intention: Intention, attributes: dict[AttributeType, int]) -> GameState:
+    """
+    Patada: solo cambia ball_velocity, y solo si la pelota está al alcance
+    (distancia <= reach_distance(CONTROL), borde inclusive).
+    Fuera de alcance devuelve el MISMO estado (no se pisa la velocidad de la pelota).
+    El movimiento de la pelota por tick (posición += velocidad) no se resuelve acá.
+    """
+    reach = reach_distance(attributes[AttributeType.CONTROL])
+    if state.my_position.distance_to(state.ball_position) > reach:
+        return state
+
+    speed = kick_speed(attributes[AttributeType.POWER], intention.power_percentage)
+    direction = intention.direction.normalize()
+    new_velocity = Vector2D(direction.x * speed, direction.y * speed)
+    return replace(state, ball_velocity=new_velocity)
+
+
+# ========================================== Movimiento =============================================
+
+def max_run_distance_per_tick(speed_attribute: int, speed_percentage: float) -> float:
+    """
+    Distancia máxima (en metros) que puede correr un jugador en un tick.
+
+        velocidad máxima (m/s) = MAX_RUN_SPEED * SPEED / MAX_ATTRIBUTE_VALUE
+        distancia por tick     = velocidad máxima * speed_percentage * duración del tick
+
+    Ejemplo: SPEED 100 a fondo (1.0) -> 8 m/s * 0.5 s = 4 metros por tick
+    """
+    max_speed = MAX_RUN_SPEED_METERS_PER_SECOND * speed_attribute / MAX_ATTRIBUTE_VALUE
+    return max_speed * speed_percentage * TICK_DURATION_SECONDS
+
+
+def move_towards(start: Point2D, target: Point2D, max_distance: float) -> Point2D:
+    """
+    Avanza en línea recta desde `start` hacia `target`, como máximo
+    `max_distance` metros, y nunca termina fuera de la cancha.
+    """
+    distance = start.distance_to(target)
+
+    if distance <= max_distance:
+        # Llega en este tick: queda exactamente en target (sin pasarse).
+        # También cubre target == start (distancia 0): no se mueve y nunca
+        # se calcula una dirección con el vector cero.
+        new_position = target
+    else:
+        # No llega: avanza max_distance en la dirección de target.
+        direction = start.direction_to(target)  # vector de largo 1
+        new_position = Point2D(
+            start.x + direction.x * max_distance,
+            start.y + direction.y * max_distance,
+        )
+
+    # Si target estaba fuera de la cancha, el jugador queda en el borde.
+    return clamp_to_pitch(new_position)
+
+
+def clamp_to_pitch(position: Point2D) -> Point2D:
+    """Devuelve `position` recortada a los límites de la cancha."""
+    x = min(max(position.x, 0.0), PITCH_LENGTH)
+    y = min(max(position.y, 0.0), PITCH_WIDTH)
+    return Point2D(x, y)

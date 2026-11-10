@@ -11,19 +11,18 @@ Uno o dos tests por cada criterio de aceptacion:
 import pytest
 from sqlalchemy import select
 
-
 from src.default_behaviors import DEFAULT_BEHAVIORS
-from src.engine.behavior_executor import make_execute_behavior
-from src.engine.game_types import AttributeType
-from src.engine.geometry_types import Point2D, Vector2D
 from src.engine.match_runner import run_tick
-from src.engine.pitch import TeamSide
-from src.engine.simulation import apply_intentions
-from src.engine.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
+from src.engine._04_to_physics.simulation import apply_intentions
+from src.engine._02_to_match.state import BallState, MatchPhase, MatchPlayerState, MatchState, Score
 from src.main import app
 from src.models import Behavior
 from src.seed import seed_default_behaviors
-
+from src.engine._03_to_builder.behavior_executor import assign_behavior, execute_behavior
+from src.engine._01_to_world.pitch import TeamSide
+from src.engine._01_to_world.data_types import (
+    AttributeType, Point2D, Vector2D
+)
 
 # ---------------------------------------------------------------------------
 # Ayudas
@@ -34,7 +33,7 @@ NAMES = [data["name"] for data in DEFAULT_BEHAVIORS]
 # id de comportamiento para cada default: {"Neutro": 1, "Ofensivo": 2, ...}
 BEHAVIOR_IDS = {name: i for i, name in enumerate(NAMES, start=1)}
 
-# los textos indexados por ese id: lo que recibe make_execute_behavior
+# los textos indexados por ese id: de aca se busca el codigo de cada jugador para asignarselo
 CODES = {BEHAVIOR_IDS[data["name"]]: data["code"] for data in DEFAULT_BEHAVIORS}
 
 # atributos del jugador de prueba (alcance = 0.05625 * 60 - 0.625 = 2.75 m).
@@ -63,6 +62,9 @@ def _state(behavior_name, ball):
         position=Point2D(70.0, 30.0),
         attributes=dict(ATTRIBUTES),
     )
+    
+    assign_behavior(player, player.behavior_id, CODES[player.behavior_id])
+
     return MatchState(
         match_id=1,
         phase=MatchPhase.IN_PROGRESS,
@@ -76,7 +78,6 @@ def _state(behavior_name, ball):
 
 def _run_ticks(state, ticks):
     """Corre `ticks` ticks con el motor real: comportamientos + apply_intentions."""
-    execute_behavior = make_execute_behavior(CODES)
     for _ in range(ticks):
         run_tick(
             state,
@@ -106,8 +107,6 @@ def test_deberia_cargar_al_menos_3_comportamientos_default(session):
 # excepciones y devuelve IDLE, y ocultaria justo lo que se quiere detectar
 @pytest.mark.parametrize("name", NAMES)
 def test_deberia_ejecutar_sin_excepcion_en_un_tick(name):
-    execute_behavior = make_execute_behavior(CODES)
-
     # una vez con la pelota lejos (el jugador corre o se queda) y otra al alcance (patea)
     for ball in (Point2D(52.5, 30.0), Point2D(70.5, 30.0)):
         state = _state(name, ball)

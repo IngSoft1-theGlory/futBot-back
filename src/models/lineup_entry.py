@@ -1,7 +1,7 @@
 """
 Modelo persistente LineupEntry.
 
-Una fila por jugador de la configuracion tactica de un equipo en un partido
+Una fila por jugador de la configuracion tactica de un equipo en un partido o liga
 """
 
 from typing import Optional
@@ -21,6 +21,12 @@ class LineupEntry(Base):
         # Dos jugadores del mismo equipo no pueden tener el mismo rol en un partido
         UniqueConstraint("match_id", "team_id", "role", name="uq_lineup_entries_match_team_role"),
 
+         # Un jugador no puede aparecer dos veces en la plantilla de la misma liga.
+        UniqueConstraint("league_id", "player_id", name="uq_lineup_entries_league_player"), 
+
+        # Dos jugadores del mismo equipo no pueden tener el mismo rol en la plantilla de una liga. Los suplentes (role NULL) no se ven afectados.
+        UniqueConstraint("league_id", "team_id", "role", name="uq_lineup_entries_league_team_role"),
+
         # Los titulares deben tener rol asignado, los suplentes no 
         CheckConstraint(
             "(is_starter AND role IS NOT NULL) OR (NOT is_starter AND role IS NULL)",
@@ -29,17 +35,21 @@ class LineupEntry(Base):
         # Solo los seis roles permitidos pueden asignarse a un jugador
         CheckConstraint(
             "role IN ('DEF_LEFT', 'DEF_RIGHT', 'FORWARD', 'DEFENDER', 'FORWARD_LEFT', 'FORWARD_RIGHT')",
-            name="role_valid",
-        ),
-    )
+            name="role_valid"),
+
+        # Cada fila es de un partido o de la plantilla de una liga, nunca de los dos
+        CheckConstraint("(match_id is NULL and league_id IS NOT NULL) OR (league_id IS NULL and match_id is NOT NULL)", name = "either_match_id_or_league_id_for_lineup"),
+        )
 
     entry_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Partido al que pertenece. Si se borra el partido, se borran sus entries.
-    # NOT NULL por ahora. al implementar ligas debera ser nullable (y habra que poner league_id en la tabla)
-    match_id: Mapped[int] = mapped_column(
-        ForeignKey("matches.match_id", ondelete="CASCADE"), nullable=False
+    match_id: Mapped[Optional[int]]  = mapped_column(
+        ForeignKey("matches.match_id", ondelete="CASCADE"), nullable=True
     )
+
+    # ondelete = cascade si se borra la liga, se borran sus entries: no tienen sentido sin ella
+    league_id: Mapped[Optional[int]] = mapped_column(ForeignKey("leagues.league_id", ondelete = "CASCADE"), nullable=True)
 
     # Equipo al que pertenece esta configuracion. Si se borra el equipo, se borran sus entries
     team_id: Mapped[int] = mapped_column(

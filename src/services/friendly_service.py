@@ -8,21 +8,14 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from src.engine.behavior_executor import make_execute_behavior
 from src.engine.match_runner import ExecuteBehavior
-from src.engine.state import MatchInitializationError, MatchState
+from src.engine._02_to_match.state import MatchState
 from src.models import Match, MatchStatus
-from src.core.exceptions import ( InvalidConfigurationError, InvalidSettingsError, MatchNotFoundError,MatchUnavailableError,)
-from src.repositories.match_repository import (claim_pending_match, get_available_matches, get_behaviors_by_ids, get_lineup_entries, get_match_by_id,)
+from src.core.exceptions import InvalidSettingsError, MatchNotFoundError,MatchUnavailableError
+from src.repositories.match_repository import claim_pending_match, get_available_matches, get_match_by_id
 from src.schemas.friendly import CreateFriendlyRequest, JoinFriendlyRequest
-from src.services.match_start_service import prepare_match
-from src.services.lineup_service import (
-    save_lineup,
-    validate_team_belongs_to_user,
-    validate_match_duration,
-    validate_min_players, 
-    validate_lineup,
-)
+from src.services.lineup_service import save_lineup, validate_team_belongs_to_user, validate_match_duration, validate_min_players, validate_lineup
+from src.services.match_start_service import prepare_engine
 
 # Caso de uso 
 def create_friendly(session: Session, user_id: int, payload: CreateFriendlyRequest) -> Match:
@@ -33,7 +26,7 @@ def create_friendly(session: Session, user_id: int, payload: CreateFriendlyReque
     validate_team_belongs_to_user(session, user_id, payload.team_id)
     validate_match_duration(payload.match_duration)
     team_players = validate_min_players(session, payload.team_id)
-    validate_lineup(session, payload, team_players)
+    validate_lineup(session, payload, team_players, user_id)
 
     try:
         # el match y los 6 lineup entries se crean aca: si uno falla,
@@ -88,17 +81,15 @@ class JoinedMatch(NamedTuple):
 
     match: Match                         # partido ya commiteado, IN_PROGRESS, con el rival
     state: MatchState                    # estado inicial del motor (12 jugadores con PACSS)
-    execute_behavior: ExecuteBehavior    # corre el on_tick de cada jugador en cada tick
-
+    execute_behavior: ExecuteBehavior    # corre el on_tick que cada jugador tiene guardado, en cada tick
 
 def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFriendlyRequest) -> JoinedMatch:
     """
     Inscribe al equipo rival en un amistoso en espera y lo pasa a IN_PROGRESS.
     Guarda el rival y su alineación en una sola transacción.
 
-    Antes del commit prepara el partido (prepare_match) y arma el
-    execute_behavior con los comportamientos de AMBAS alineaciones: si algo
-    de eso falla se hace rollback y el error sale como error de negocio.
+    Antes del commit prepara el partido (prepare_match) y asigna a cada jugador el comportamiento de AMBAS alineaciones: 
+    si algo de eso falla se hace rollback y el error sale como error de negocio.
     Lanzar el motor (launch_match) es trabajo de la ruta, después del commit.
     """
 
@@ -114,7 +105,7 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
         raise InvalidSettingsError("El equipo no puede unirse a su propio partido.")
 
     team_players = validate_min_players(session, payload.team_id)
-    validate_lineup(session, payload, team_players)
+    validate_lineup(session, payload, team_players, user_id)
 
     try:
         # UPDATE condicional: si otro equipo se unio entre el chequeo de arriba
@@ -139,7 +130,7 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
          except de abajo hace rollback y el partido vuelve a quedar PENDING y sin
          rival (no queda un partido IN_PROGRESS que nadie va a correr)
         """
-        state, execute_behavior = _prepare_engine(session, match_id)
+        state, execute_behavior = prepare_engine(session, match_id)
 
         session.commit()
 
@@ -147,48 +138,4 @@ def join_friendly(session: Session, user_id: int, match_id: int, payload: JoinFr
         session.rollback()
         raise
 
-    session.refresh(match)  ## el commit expira el objeto: lo recargo con el estado nuevo
     return JoinedMatch(match, state, execute_behavior)
-
-
-def _prepare_engine(session: Session, match_id: int) -> tuple[MatchState, ExecuteBehavior]:
-    """
-    Arma lo que necesita el motor para arrancar, sin lanzarlo:
-      - el MatchState inicial: prepare_match lee de la base las alineaciones de los
-        dos equipos y los atributos PACSS de cada jugador (tabla players) y ubica
-        a los titulares en la cancha
-      - el execute_behavior: una funcion que, para un jugador y un tick, ejecuta el
-        on_tick del comportamiento que ese jugador tiene asignado
-
-    Cualquier falla se traduce a un error de negocio (400), nunca a un 500
-    """
-    try:
-        state = prepare_match(session, match_id)
-        ##los comportamientos de AMBAS alineaciones (host y rival), sin repetir ids: varios jugadores pueden usar el mismo comportamiento
-        behavior_ids = {entry.behavior_id for entry in get_lineup_entries(session, match_id)}
-
-        ## {behavior_id: codigo} es el formato que espera make_execute_behavior
-        codes = {b.behavior_id: b.code for b in get_behaviors_by_ids(session, list(behavior_ids))}
-        """
-        get_behaviors_by_ids devuelve solo los que existen: si falta alguno, lo
-        detecto acá y no recién en pleno partido con un KeyError dentro del tick
-        """
-        faltantes = behavior_ids - codes.keys()
-        if faltantes:
-            raise MatchInitializationError(f"No existen los comportamientos {sorted(faltantes)}.")
-        """
-         make_execute_behavior compila el codigo de cada comportamiento: un codigo
-         sin on_tick (ValueError) o con errores de sintaxis/ejecución falla aca
-        """
-        execute_behavior = make_execute_behavior(codes)
-    except Exception as exc:
-        """
-         aatrapo Exception (no solo MatchInitializationError) porque make_execute_behavior
-         ejecuta código escrito por usuarios (exec): puede tirar ValueError (sin on_tick),
-         SyntaxError, NameError, etc. Todos son "el partido no se puede preparar",
-         un error del usuario y no un bug del servidor: se devuelve como 400
-         "from exc" conserva el error original para los logs
-        """
-        raise InvalidConfigurationError(f"No se pudo preparar el partido: {exc}") from exc
-
-    return state, execute_behavior

@@ -13,7 +13,7 @@ from src.core.exceptions import (
     MatchPendingError,
     UnauthorizedError,
 )
-from src.engine.state import MatchRegistry, match_registry
+from src.engine._02_to_match.state import MatchRegistry, match_registry
 from src.models import MatchStatus, Player
 from src.repositories.match_repository import get_match_by_id, get_players_by_team
 from src.repositories.user_repository import get_user_by_id
@@ -22,7 +22,12 @@ from src.schemas.match_state import (
     MatchStateResponse,
     PlayerAttributesOut,
     ScoreOut,
+    PauseOut,
+    PlannedSubstitutionOut,
+    PointOut,
 )
+
+import time # para calcular remaining_seconds de la pausa
 
 @dataclass(frozen=True)
 class MatchStateContext:
@@ -76,6 +81,39 @@ def load_match_state_context(session: Session, user_id: int, match_id: int) -> M
     )
 
 
+def build_player_out(context: MatchStateContext, player_id: int, player_state) -> MatchPlayerOut:
+    """
+    Arma un jugador de la respuesta (en cancha o suplente) con los datos de la base.
+    El behavior_id real solo se muestra si el jugador es del equipo de quien consulta.
+    """
+    player = context.players.get(player_id)
+    if player is None:
+        raise RuntimeError(
+            f"El jugador {player_id} está en el estado del partido {context.match_id} "
+            "pero no existe en la base de datos."
+        )
+
+    es_propio = player_state.team_id == context.user_team_id
+    position = player_state.position
+    return MatchPlayerOut(
+        player_id=player.player_id,
+        team_id=player_state.team_id,
+        name=player.name,
+        number=player.number,
+        attributes=PlayerAttributesOut(
+            power=player.power,
+            agility=player.agility,
+            control=player.control,
+            speed=player.speed,
+            strength=player.strength,
+        ),
+        behavior_id=player_state.behavior_id if es_propio else None,
+        position=PointOut(x=position.x, y=position.y) if position is not None else None,
+        current_action=player_state.current_action.value if position is not None else None,
+ 
+    )
+
+
     """
     PASO 2 (sin DB y sin await): se arma de corrido, sin cederle el loop al motor.
     Solo LEE el estado en memoria; el filtro de behavior_id se aplica acá, en la
@@ -95,43 +133,50 @@ def build_match_state_response(
     if state is None:
         raise MatchNotFoundError("El partido solicitado no existe o no se encuentra en ejecución.")
 
-    # se construye la lista de jugadores con sus atributos y behavior_id, solo si es del equipo del usuario
-    players: list[MatchPlayerOut] = []
-    for player_id in state.on_pitch_player_ids():
-        player_state = state.players[player_id]  
-        player = context.players.get(player_id)  
-        if player is None:
-            raise RuntimeError(
-                f"El jugador {player_id} está en el estado del partido {context.match_id} "
-                "pero no existe en la base de datos."
-            )
+    # se construye la lista de jugadores en cancha con sus atributos y behavior_id
+    players = [
+        build_player_out(context, player_id, state.players[player_id])
+        for player_id in state.on_pitch_player_ids()
+    ]
 
-        # behavior_id real solo si el jugador es del equipo de quien consulta
-        es_propio = player_state.team_id == context.user_team_id
-        players.append(
-            MatchPlayerOut(
-                player_id=player.player_id,
-                team_id=player_state.team_id,
-                name=player.name,
-                number=player.number,
-                attributes=PlayerAttributesOut(
-                    power=player.power,
-                    agility=player.agility,
-                    control=player.control,
-                    speed=player.speed,
-                    strength=player.strength,
-                ),
-                behavior_id=player_state.behavior_id if es_propio else None,
-            )
-        )
+    # suplentes (sin posición en cancha), solo del equipo del usuario: el banco del rival no se muestra
+    substitutes = [
+        build_player_out(context, player_id, player_state)
+        for player_id, player_state in state.players.items()
+        if player_state.team_id == context.user_team_id and player_state.position is None
+    ]
+    substitutes.sort(key=lambda p: p.player_id)
 
     # se ordena la lista de jugadores por team_id y luego por player_id
     players.sort(key=lambda p: (p.team_id, p.player_id))
+
+    # Se lee state.pause una sola vez. time.monotonic() 
+    # es el mismo reloj con el que se guardó ends_at.
+    pause = state.pause
+    pause_out = None
+    if pause is not None:
+        pause_out = PauseOut(
+            type=pause.type.value,
+            remaining_seconds=max(0.0, pause.ends_at - time.monotonic()),
+        )
+
+    # cambio planificado del equipo de quien consulta: el plan del rival no se muestra
+    plan = state.planned_substitutions.get(context.user_team_id)
+    planned_out = None
+    if plan is not None:
+        player_out_id, player_in_id = plan  # así se guarda: (saliente, entrante)
+        planned_out = PlannedSubstitutionOut(player_in_id=player_in_id, player_out_id=player_out_id)
 
     return MatchStateResponse(
         match_id=context.match_id,
         current_tick=state.current_tick,
         total_ticks=state.total_ticks,
-        score=ScoreOut(home=state.score.home, away=state.score.away),
+        score=ScoreOut(home=state.score.home, away=state.score.away, phome=state.score.phome, paway=state.score.paway),
         players=players,
+        substitutes=substitutes,
+        phase=state.phase.value,
+        pause=pause_out,
+        planned_substitution=planned_out,
+        ball=PointOut(x=state.ball.position.x, y=state.ball.position.y),    
+
     )

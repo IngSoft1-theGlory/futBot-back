@@ -1,16 +1,18 @@
 """
 Modelo persistente Match.
 
-Representa un partido. Hoy solo se usa para amistosos; cuando existan las
-ligas se le suma `league_id` (FK nullable a leagues, NULL = amistoso).
-- Contrato de API: POST/GET/DELETE /api/v1/friendly, /api/v1/matches/{id}/...
+Una fila por partido. Si league_id es NULL, es un amistoso. Si tiene valor, es
+un partido de esa liga. 
+El partido guarda el estado, la duracion, los goles y
+los equipos anfitrion y visitante.
+Las alineaciones de cada equipo estan en lineup_entries.
 """
 
-from datetime import datetime
+
 import enum
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, func
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.base import Base
@@ -38,13 +40,20 @@ class Match(Base):
         # Para evitar que un partido tenga el mismo equipo como anfitrion y visitante
         CheckConstraint("team_host_id != team_away_id", name="host_differs_from_away"),
         CheckConstraint("home_goals >= 0 AND away_goals >= 0", name="goals_non_negative"),
+        CheckConstraint("home_penalty_goals >= 0 AND away_penalty_goals >= 0", name="penalty_goals_non_negative"),
     )
 
     # Identificador unico del partido (lo comparten /friendly y /matches)
     match_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    # league_id: aun no existe, cuando haya ligas va a ser una FK nullable a leagues
-
+    # NULL = amistoso, con valor = partido de esa liga
+    league_id: Mapped[Optional[int]] = mapped_column(
+    ForeignKey("leagues.league_id", ondelete="CASCADE"), nullable=True, index=True)
+    
+    # Numero de fecha en la que se juega el partido
+    # El numero de fecha es Null en amistoso
+    round_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
     # Duracion configurada por el creador del amistoso 
     match_duration: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -64,6 +73,14 @@ class Match(Base):
     )
     away_goals: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # goles de penales. null si el partido no se resuelve por penales
+    home_penalty_goals: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=None, server_default=None
+    )
+    away_penalty_goals: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=None, server_default=None
     )
 
     # Equipo anfitrion: obligatorio. CASCADE: si se borra el equipo,

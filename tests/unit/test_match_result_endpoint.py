@@ -9,7 +9,7 @@ Un error se identifica por el campo "error" del JSON, no solo por el número HTT
 import pytest
 
 from src.core.exceptions import MatchNotFinishedError, MatchNotFoundError
-from src.models import Match, MatchStatus, Team, User
+from src.models import League, LeagueStatus, Match, MatchStatus, Team, User
 from src.services.match_result_service import get_match_result
 
 # Reutiliza fixtures (db, client, usuario) y helpers de los tests de amistosos
@@ -36,14 +36,16 @@ def terminado(db, usuario, rival):
 # --- 200 OK ---------------------------------------------------------------------
 
 def test_deberia_devolver_el_resultado_final_segun_el_contrato(client, usuario, rival, terminado):
+    """`terminado` es un amistoso: league_id viene en null (el campo no se omite)."""
     r = client.get(url(terminado.match_id), headers=headers(usuario))
 
     assert r.status_code == 200
     assert r.json() == {
         "match_id": terminado.match_id,
         "status": "FINISHED",
-        "home_team": {"team_id": usuario.team_id, "team_name": "Local FC", "goals": 3},
-        "away_team": {"team_id": rival.team_id, "team_name": "Rival FC", "goals": 1},
+        "league_id": None,
+        "home_team": {"team_id": usuario.team_id, "team_name": "Local FC", "goals": 3, "penalty_goals": None},
+        "away_team": {"team_id": rival.team_id, "team_name": "Rival FC", "goals": 1, "penalty_goals": None},
     }
 
 
@@ -82,9 +84,30 @@ def test_deberia_devolver_goles_en_cero_en_un_0_a_0(client, db, usuario, rival):
 def test_deberia_devolver_solo_los_campos_del_contrato(client, usuario, terminado):
     data = client.get(url(terminado.match_id), headers=headers(usuario)).json()
 
-    assert set(data) == {"match_id", "status", "home_team", "away_team"}
-    assert set(data["home_team"]) == {"team_id", "team_name", "goals"}
-    assert set(data["away_team"]) == {"team_id", "team_name", "goals"}
+    assert set(data) == {"match_id", "status", "league_id", "home_team", "away_team"}
+    assert set(data["home_team"]) == {"team_id", "team_name", "goals", "penalty_goals"}
+    assert set(data["away_team"]) == {"team_id", "team_name", "goals", "penalty_goals"}
+
+
+def test_deberia_devolver_el_league_id_si_el_partido_es_de_liga(client, db, usuario, rival):
+    """En un partido de liga, league_id es el id de su liga (en un amistoso es null, ver el test del contrato)."""
+    liga = League(
+        league_name="Liga FAMAF", max_teams=4, match_duration=5,
+        host_team_id=usuario.team_id, status=LeagueStatus.IN_PROGRESS,
+    )
+    db.add(liga)
+    db.commit()
+    match = Match(
+        team_host_id=usuario.team_id, team_away_id=rival.team_id, league_id=liga.league_id,
+        match_duration=5, status=MatchStatus.FINISHED, home_goals=2, away_goals=0,
+    )
+    db.add(match)
+    db.commit()
+
+    r = client.get(url(match.match_id), headers=headers(usuario))
+
+    assert r.status_code == 200
+    assert r.json()["league_id"] == liga.league_id
 
 
 def test_cualquier_usuario_autenticado_puede_ver_el_resultado(client, db, terminado):

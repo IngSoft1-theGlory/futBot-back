@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session
 
 from src.core.security import get_current_user
 from src.database.base import get_db
-from src.schemas.behavior import BehaviorResponse
-from src.services.behavior_service import list_behaviors
+from src.schemas.behavior import BehaviorResponse, CreateUpdateBehaviorRequest
+from src.services.behavior_service import list_behaviors, get_behavior, create_behavior, update_behavior
+from fastapi.concurrency import run_in_threadpool
 
 router = APIRouter(prefix="/api/v1/behaviors", tags=["behaviors"])
 
@@ -31,3 +32,50 @@ def list_behaviors_endpoint(
 ) -> list[BehaviorResponse]:
     behaviors = list_behaviors(session, user_id=user_id, is_default=is_default)
     return [BehaviorResponse.model_validate(behavior) for behavior in behaviors]
+
+
+@router.get("/{behavior_id}", response_model=BehaviorResponse, status_code=status.HTTP_200_OK)
+def detail_behavior_endpoint(
+    behavior_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> BehaviorResponse:
+    behavior = get_behavior(session, user_id=user_id, behavior_id=behavior_id)
+    return BehaviorResponse.model_validate(behavior)
+
+
+@router.post("", response_model=BehaviorResponse, status_code=status.HTTP_201_CREATED) 
+def create_behavior_endpoint( 
+    payload: CreateUpdateBehaviorRequest,
+    user_id = Depends(get_current_user),
+    session: Session = Depends(get_db)
+) -> BehaviorResponse:
+    behavior = create_behavior(session, user_id, payload)
+    
+    return BehaviorResponse(
+    behavior_id=behavior.behavior_id,
+    name=behavior.name,
+    description=behavior.description,
+    code=behavior.code, 
+    is_default=False, 
+    behavior_type=behavior.behavior_type
+    )
+
+
+@router.put("/{behavior_id}", response_model=BehaviorResponse, status_code=status.HTTP_200_OK) 
+def update_behavior_endpoint(
+    behavior_id: int, # fastapi convierte en int el behavior_id del param y se lo pasa
+    payload: CreateUpdateBehaviorRequest,
+    user_id = Depends(get_current_user),
+    session: Session = Depends(get_db)
+    ) -> BehaviorResponse: 
+    behavior = update_behavior(payload, user_id, behavior_id, session)
+
+    return BehaviorResponse(
+        behavior_id=behavior_id,
+        name=behavior.name,
+        description=behavior.description,
+        code=behavior.code, 
+        is_default=False, 
+        behavior_type=behavior.behavior_type # devuelve el tipo actual, pq el tipo no se modifica 
+    )

@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 
 from src.core.security import get_current_user
 from src.database.base import get_db
-from src.schemas.match_state import MatchStateResponse
+from src.schemas.match_state import MatchStateResponse, ChangeBehaviorRequest, ChangeBehaviorResponse
 from src.services.match_state_service import (
     build_match_state_response, load_match_state_context,
 )
+from src.services.match_player_service import validate_behavior_change, apply_behavior_change
 
 router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
@@ -26,3 +27,23 @@ async def get_match_state_endpoint(
     context = await run_in_threadpool(load_match_state_context, session, user_id, match_id)
     # sin ningun await de aca en adelante
     return build_match_state_response(context)
+
+
+@router.put("/{match_id}/players/{player_id}/behavior", response_model=ChangeBehaviorResponse)
+async def change_behavior_on_match_endpoint(
+    payload: ChangeBehaviorRequest,
+    player_id: int,
+    match_id: int,
+    user_id: int = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ChangeBehaviorResponse:
+
+    # consulta la base, que es lento. es en un hilo aparte y con await para
+    # no frenar al event loop mientras espera
+    team_id, code = await run_in_threadpool(validate_behavior_change, session, user_id, match_id, payload.behavior_id)
+
+    # cambio en memoria, que es rapido. sin await, asi corre de corrido
+    # y el motor no puede correr un tick a la mitad del cambio
+    apply_behavior_change(match_id, team_id, code, player_id, payload.behavior_id)
+
+    return ChangeBehaviorResponse(player_id=player_id, behavior_id=payload.behavior_id)

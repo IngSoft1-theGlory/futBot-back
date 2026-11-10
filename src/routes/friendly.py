@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from src.core.security import get_current_user
 from src.database.base import get_db
 from src.services.friendly_service import create_friendly, list_friendly_matches, join_friendly, get_friendly
-from src.engine.simulation import apply_intentions
+from src.engine._04_to_physics.simulation import apply_intentions
 from src.models.match import MatchStatus
 from src.services.match_start_service import launch_match, make_on_finished
 from src.realtime.event_bus import event_bus
@@ -19,6 +19,7 @@ from src.schemas.friendly import (
     JoinFriendlyRequest,
     JoinFriendlyResponse,
     FriendlyListOut,
+    FriendlyMatchOut,
     FriendlyLobbyResponse,
 )
 
@@ -55,6 +56,7 @@ async def create_friendly_endpoint(
     event_bus.publish("FRIENDLY_CREATED", {
         "match_id": match.match_id,
         "team_host_id": match.team_host_id,
+        "team_host_name": match.host_team.team_name,
         "match_duration": match.match_duration,
         "status": match.status.value,
     })
@@ -81,7 +83,20 @@ def list_friendly(
     session: Session = Depends(get_db),
 ):
     matches = list_friendly_matches(session, status=status, page=page, limit=limit)
-    return {"matches": matches}
+    return FriendlyListOut(
+        matches=[
+            FriendlyMatchOut(
+                match_id=match.match_id,
+                team_host_id=match.team_host_id,
+                team_away_id=match.team_away_id,
+                status=match.status,
+                match_duration=match.match_duration,
+                team_host_name=match.host_team.team_name,
+                team_away_name=match.away_team.team_name if match.away_team else None,
+            )
+            for match in matches
+        ]
+    )
 
 # GET /api/v1/friendly/{match_id}
 @router.get(

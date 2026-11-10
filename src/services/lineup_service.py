@@ -12,13 +12,16 @@ Lo usan todos los endpoints que arman una configuración de partido
 
 from __future__ import annotations
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from src.models.behavior import BehaviorType
 from src.models.lineup_entry import LineupEntry
-from src.schemas.lineup_config import LineupConfig
+from src.schemas.lineup_config import LineupConfig, StartingPlayer, SubstitutePlayer
 from src.core.exceptions import ForbiddenError, InvalidConfigurationError, InvalidSettingsError, PreconditionFailedError
-from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team
+from src.repositories.match_repository import get_behaviors_by_ids, get_players_by_team, get_lineup_entries
 from src.repositories.user_repository import get_user_by_id
+from src.models.match import Match 
 
 STARTERS_COUNT = 3      # titulares por equipo
 SUBSTITUTES_COUNT = 3   # suplentes por equipo
@@ -31,37 +34,87 @@ FORMATION_ROLES = {
     "1-2": {"DEFENDER", "FORWARD_LEFT", "FORWARD_RIGHT"},
 }
 
-# Guardar alineación en la DB
-def save_lineup(session: Session, match_id: int, team_id: int, config: LineupConfig) -> None:
-    """Se usa cada vez que un equipo confirma su alineación para un partido:
-    el anfitrión al crear el amistoso, el rival al unirse, y más adelante en las ligas.
-    Antes hay que llamar a validate_lineup, y el partido ya tiene que tener su id (flush).
+# Guardar alineación en la DB (league_id: int | None porque puede ser null, como match_id)
+# Pero el = None es para q python lo tome como None por defecto si no se especifica al llamar a save_lineup (asi no rompo nada de lo que hicimos antes de implementar ligas))
+def save_lineup(session: Session, match_id:int | None, team_id: int, config: LineupConfig, league_id: int | None = None) -> None:
+    """Se usa cada vez que un equipo confirma su alineación para un partido o liga:
+    el anfitrión al crearlos, los rivales al unirse.
+    Antes hay que llamar a validate_lineup, y el partido/liga ya tiene que tener su id (flush).
     No hace commit: lo hace quien la llama, para que todo se guarde (o se deshaga) junto."""       
 
     # 3 titulares con rol
     for starter in config.starting_players:
         session.add(LineupEntry(
-        match_id = match_id,
-        team_id = team_id,
-        player_id = starter.player_id,
-        behavior_id = starter.behavior_id,
-        role = starter.role,
-        is_starter = True,
+            match_id = match_id,
+            league_id = league_id,
+            team_id = team_id,
+            player_id = starter.player_id,
+            behavior_id = starter.behavior_id,
+            role = starter.role,
+            is_starter = True,
         ))
 
     # 3 suplentes sin rol
     for substitute in config.substitute_players:
         session.add(LineupEntry(
-        match_id = match_id,
-        team_id = team_id,
-        player_id = substitute.player_id,
-        behavior_id = substitute.behavior_id,
-        role = None,
-        is_starter = False,
+            match_id = match_id,
+            league_id = league_id,
+            team_id = team_id,
+            player_id = substitute.player_id,
+            behavior_id = substitute.behavior_id,
+            role = None,
+            is_starter = False,
         ))
 
+def replace_league_lineup(session: Session, league_id: int, team_id: int, config: LineupConfig) -> None:
+    """Reemplaza la alineación del equipo en la liga. No hace commit: lo hace quien la llama"""
 
-# Validaciones para partidos amistosos y de liga
+    # el delete se ejecuta en el momento, así las filas nuevas no chocan con las viejas (mismo jugador o rol)
+    session.execute(delete(LineupEntry).where(LineupEntry.league_id == league_id, LineupEntry.team_id == team_id))
+    save_lineup(session, None, team_id, config, league_id)
+
+def build_lineup_config(entries: list[LineupEntry]) -> LineupConfig:
+    """Arma la configuración táctica a partir de las filas guardadas.
+    La formación no se guarda: sale de los roles de los titulares."""
+
+    starters = [entry for entry in entries if entry.is_starter]
+    substitutes = [entry for entry in entries if not entry.is_starter]
+
+    roles = {entry.role for entry in starters}
+    formation_type = next(formation for formation, formation_roles in FORMATION_ROLES.items() if formation_roles == roles)
+
+    return LineupConfig(
+        formation_type=formation_type,
+        starting_players=[
+            StartingPlayer(player_id=entry.player_id, role=entry.role, behavior_id=entry.behavior_id)
+            for entry in starters
+        ],
+        substitute_players=[
+            SubstitutePlayer(player_id=entry.player_id, behavior_id=entry.behavior_id)
+            for entry in substitutes
+        ],
+    )
+
+def copy_league_lineup_to_match(session: Session, match: Match) -> None:
+    """Copia al partido la alineación vigente que cada equipo tiene en la liga.
+    No hace commit ni flush: lo hace quien la llama"""
+
+    # busco la alineacion de cada equipo que va a jugar el match (hasta ahora, esta guardada asociada solo a su league_id)
+    filas_local = get_lineup_entries(session, league_id = match.league_id, team_id = match.team_host_id)
+    filas_visitante = get_lineup_entries(session, league_id=match.league_id, team_id=match.team_away_id)
+
+    # recorro cada una de las 12 filas de la alineacion
+    for entry in filas_local + filas_visitante:
+        session.add(LineupEntry( # y para cada fila guardo una copia (una nueva lineup entry) en la sesion
+            match_id=match.match_id,    # lo asocio a su match_id
+            team_id=entry.team_id,
+            player_id=entry.player_id,
+            behavior_id=entry.behavior_id,
+            role=entry.role,
+            is_starter=entry.is_starter,
+        ))
+
+# -------- Validaciones para partidos amistosos y de liga --------
 def validate_team_belongs_to_user(session: Session, user_id: int, team_id: int) -> None:
     """403 si team_id no es el equipo del usuario autenticado."""
     user = get_user_by_id(session, user_id)
@@ -130,9 +183,9 @@ def _check_players(config: LineupConfig, team_players: list) -> None:
             raise InvalidConfigurationError("Los jugadores seleccionados no pertenecen al equipo del usuario autenticado")
 
 
-def _check_behaviors(session: Session, config: LineupConfig) -> None:
-    """Falla si algún behavior_id no existe o el usuario no puede usarlo.
-    (en un futuro, cuando se puedan crear comportamientos, chequear si es de otro usuario o no es default)"""
+def _check_behaviors(session: Session, config: LineupConfig, user_id: int) -> None:
+    """Falla si algún behavior_id no existe, el usuario no puede usarlo o es de DT (COACH):
+    en una alineación solo van comportamientos de jugador (PLAYER)."""
     # guardo todos los behavior_id de titulares y suplentes en una lista (pueden venir repetidos)
     behavior_ids = []
     for starter in config.starting_players:
@@ -142,19 +195,21 @@ def _check_behaviors(session: Session, config: LineupConfig) -> None:
 
     # la función solo devuelve los comportamientos que existen, los ids que no existan no vienen
     behaviors = get_behaviors_by_ids(session, behavior_ids)
-    # me quedo solo con los ids que el usuario puede usar
+    # me quedo solo con los ids que el usuario puede usar y que son de jugador
+    # (un COACH queda afuera, así se rechaza con el mismo error que un comportamiento no válido)
     usable_ids = []
     for behavior in behaviors:
-        if behavior.is_default:
+        if behavior.behavior_type == BehaviorType.PLAYER and (behavior.is_default or behavior.user_id == user_id):
             usable_ids.append(behavior.behavior_id)
-    # si alguno de los pedidos no está entre los usables (porque no existe o no es default), lo rechazo
+
+    # si alguno de los pedidos no está entre los usables, lo rechazo
     for behavior_id in behavior_ids:
         if behavior_id not in usable_ids:
             raise InvalidConfigurationError("Los comportamientos seleccionados no son válidos para el usuario autenticado")
 
 
-def validate_lineup(session: Session, config: LineupConfig, team_players: list) -> None:
+def validate_lineup(session: Session, config: LineupConfig, team_players: list, user_id: int) -> None:
     """400 INVALID_CONFIGURATION si algo de la alineación está mal."""
     _check_formation_and_roles(config)
     _check_players(config, team_players)
-    _check_behaviors(session, config)
+    _check_behaviors(session, config, user_id)

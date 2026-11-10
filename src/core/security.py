@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from src.config.settings import settings
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from src.core.exceptions import UnauthorizedError
+from src.core.exceptions import InvalidJoinTokenError, JoinTokenExpiredError, UnauthorizedError
 
 import jwt
 import bcrypt
@@ -23,10 +23,12 @@ import bcrypt
 _MAX_PASSWORD_BYTES = 72  # límite para algoritmo bcrypt
 ALGORITHM = "HS256"  # fijo a propósito: no es un secreto ni varía por entorno
 
-# claims personalizados para diferenciar tokens de HTTP de los de WS
+# claims personalizados para diferenciar tokens 
 HTTP = "http" 
 WS_GLOBAL = "ws_global"
+JOIN_LEAGUE = "join_league"
 
+# --- hasheo y verificacion de contraseñas --- 
 def hash_password(plain_password: str) -> str:
     """ 
     Devuelve el hash de una contraseña en texto plano.
@@ -69,6 +71,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
     return matches
 
+
+# --- token de acceso a la hora de iniciar sesion --- 
 def create_access_token(user_id: int, expires_delta: timedelta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),) -> str:
     """
     Genera un JWT firmado que identifica a un usuario ya autenticado.
@@ -83,7 +87,7 @@ def create_access_token(user_id: int, expires_delta: timedelta = timedelta(minut
     # pertenece el token.
     encode = {"sub": str(user_id)}
 
-    token_type = HTTP # claim personalizado para diferenciar tokens de HTTP de los de WS
+    token_type = HTTP 
     encode.update({"type": token_type})
 
     # 'exp' (expiration) es otro claim estándar: pyjwt lo va a comparar
@@ -130,6 +134,7 @@ def get_current_user(
     return user_id
 
 
+# --- generacion y decodificacion de token de ws global ---
 def create_ws_global_token(user_id: int, expires_delta: timedelta = timedelta(seconds=settings.WS_GLOBAL_TOKEN_EXPIRE_SECONDS),) -> str:
     """
     Genera un JWT firmado que identifica a un usuario ya autenticado para WebSocket.
@@ -143,7 +148,7 @@ def create_ws_global_token(user_id: int, expires_delta: timedelta = timedelta(se
 
     encode = {"sub": str(user_id)}
 
-    token_type = WS_GLOBAL # claim personalizado para diferenciar tokens de WS de los de HTTP
+    token_type = WS_GLOBAL
     encode.update({"type": token_type})
 
     iat = datetime.now(timezone.utc) # claim estándar: cuando se emitio / issued at
@@ -174,3 +179,34 @@ def decode_ws_global_token(token: str) -> int:
     user_id = int(user_id_str)
 
     return user_id
+
+# --- token para unirse a una liga privada --- 
+def create_join_token(user_id: int,  league_id: int, expires_delta: timedelta = timedelta(seconds=300)) -> str: 
+    encode = {"sub": str(user_id)}
+    encode.update({"type": JOIN_LEAGUE})
+    encode.update({"league_id": league_id}) 
+    
+    expires = datetime.now(timezone.utc) + expires_delta
+    encode.update({"exp": expires}) 
+    
+    return jwt.encode(encode, key=settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_join_token(token: str, user_id: int, league_id: int) -> None:
+    """
+    Valida un join_token: firma, vencimiento, tipo y que haya sido emitido
+    para este usuario y esta liga. Lanza JoinTokenExpiredError o InvalidJoinTokenError.
+    """
+    try:
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise JoinTokenExpiredError("El token de unión a la liga venció")
+    except jwt.InvalidTokenError:
+        raise InvalidJoinTokenError("El token de unión a la liga no es válido")
+
+    if (
+        payload.get("type") != JOIN_LEAGUE
+        or payload.get("sub") != str(user_id)
+        or payload.get("league_id") != league_id
+    ):
+        raise InvalidJoinTokenError("El token de unión a la liga no es válido")
